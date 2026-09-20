@@ -35,6 +35,22 @@ placeholder text for the reason and the approver, and `verify` fails while it is
 still there. A baseline nobody edited is a list of findings somebody silenced in a
 hurry, and it should look like one.
 
+## Flags
+
+`create` and `update` both run a scan, so both take the same plugin-trust flags
+`scan`/`probe` do. `verify` reads a file and runs nothing, so it takes neither.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `PATH` (positional) | — | Directory to scan; required unless `--target` is used |
+| `--target SCHEME://LOCATOR` | none | Build a trusted installed artifact target for `create` or `update` |
+| `--target-option KEY=VALUE` | none | Repeatable, non-secret configuration passed to that target |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+
+`PATH` and `--target` are mutually exclusive. `verify` only reads the baseline,
+so target selection applies to `create` and `update` only.
+
 ## Expiry actually expires
 
 An expired waiver simply stops waiving: the finding comes back and fails the gate

@@ -26,7 +26,8 @@ Everything an extension implements or touches is re-exported at the top of
 ```python
 from guardana.core import (
     Capability, Evaluator, Evidence, Finding, Registry, Rule, RuleContext,
-    RuleMeta, Runner, ScanResult, Severity, Target, TargetKind,
+    LocatorError, RuleMeta, Runner, ScanResult, Severity, SystemPromptPlanter,
+    Target, TargetKind,
 )
 ```
 
@@ -36,8 +37,9 @@ valid — the re-exports are the same objects. The full list is
 `guardana.core.__all__`: `Capability`, `Evaluator`, `Evidence`,
 `Exchange`, `Expectation`, `FailOn`, `Finding`, `Policy`, `Profile`,
 `ProfileError`, `Provenance`, `Registry`, `Rule`, `RuleContext`, `RuleError`,
-`RuleLoadError`, `RuleMeta`, `Runner`, `ScanResult`, `Severity`, `Surface`,
-`Target`, `TargetKind`, `TaxonomyRef`, `Verdict`, and `__version__`.
+`RuleLoadError`, `RuleMeta`, `Runner`, `ScanResult`, `Severity`, `Surface`, `LocatorError`,
+`SystemPromptPlanter`, `Target`, `TargetKind`, `TaxonomyRef`, `Verdict`, and
+`__version__`.
 
 ## Adding a Rule
 
@@ -119,32 +121,66 @@ Implement the protocol for every capability you declare, and the built-in rules
 work against your target without knowing it exists:
 
 ```python
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from pathlib import Path
+from typing import Self
 
+from guardana.core import LocatorError
 from guardana.core.source import PythonSource, UnreadSource, read_source
 from guardana.core.target import Capability, Target, TargetKind
 
 class MyTarget(Target):
     kind = TargetKind.ARTIFACT   # ARTIFACT, ENDPOINT or TRACE
+    scheme = "acme-files"        # optional: makes --target acme-files://... work
+
+    def __init__(self, root: Path | str) -> None:
+        self._root = Path(root)
+        self._sources: dict[Path, PythonSource | None] = {}
+        self._unread: list[UnreadSource] = []
+
+    @classmethod
+    def from_locator(cls, locator: str, *, options: Mapping[str, str]) -> Self:
+        # Parse configuration only. `guardana plan` calls this method and must
+        # not contact a remote system.
+        if options:
+            raise LocatorError(f"unsupported option(s): {', '.join(sorted(options))}")
+        root = Path(locator)
+        if not root.is_dir():
+            raise LocatorError(f"{root} is not a directory")
+        return cls(root)
 
     def capabilities(self) -> set[Capability]:
         return {Capability.READ_FILES}   # so implement `FileReader`, below
 
     @property
     def ref(self) -> str:
-        return "..."  # stable identifier used in findings/reports
+        return f"my-target:{self._root}"  # stable identifier used in findings/reports
 
     # --- the FileReader surface `READ_FILES` promises ---
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
-        ...
+        for path in sorted(p for p in self._root.rglob("*") if p.is_file()):
+            if suffixes is None or path.suffix in suffixes:
+                yield path
 
     def python_source(self, path: Path) -> PythonSource | None:
-        ...   # cache this: every rule that inspects Python asks through here
+        # Cache this: every rule that inspects Python asks through here, so a
+        # target that re-reads per call turns a linear scan into a quadratic one.
+        if path.suffix != ".py":
+            return None
+        if path not in self._sources:
+            result = read_source(path)
+            if isinstance(result, UnreadSource):
+                self._unread.append(result)
+                self._sources[path] = None
+            else:
+                self._sources[path] = result
+        return self._sources[path]
 
     def unread_sources(self) -> tuple[UnreadSource, ...]:
-        ...   # what you were prevented from reading — the runner reports it
+        # A file you were *prevented* from reading (too large, unopenable) —
+        # the runner turns these into `errors`: a check that did not run.
+        return tuple(self._unread)
 ```
 
 | Protocol | Capability | Methods |
@@ -191,16 +227,34 @@ as rules and evaluators (see
 [`architecture.md`](architecture.md#current-entry-point-groups)): register a
 `Target` subclass (the class itself, not an instance — targets are
 parameterized by a path/URL at construction time) via the `guardana.targets`
-entry point, and `registry.targets()` returns it. This is aimed at
-library/embedding use; the CLI's own target selection remains path/URL-based
-(`scan` always builds an `ArtifactTarget`, `probe`/`monitor` always build an
-`EndpointTarget` via `build_endpoint()`) — a discovered custom `Target` isn't
-yet CLI-selectable, only usable by code that drives a `Runner` directly.
+entry point, and `registry.targets()` returns it. Declaring a unique lowercase
+`scheme` and implementing `from_locator` also makes it selectable from every
+matching CLI workflow:
 
-## The entry-point contract (rules, evaluators & targets)
+```bash
+guardana scan --target acme-files://./prompts
+guardana plan scan --target acme-files://./prompts
+```
+
+The command still chooses the kind: an artifact target is refused by `probe`,
+and an endpoint target is refused by `scan`. Schemes match
+`[a-z][a-z0-9-]*`; `file`, `http`, `https`, `mcp`, and `trace` are reserved,
+and two installed packs cannot claim the same one. Repeat non-secret settings as
+`--target-option key=value`; name secrets by environment variable inside your
+target rather than putting them in shell history. `guardana doctor` lists every
+loaded custom scheme.
+
+Endpoint targets that want Guardana to run canary rules also implement
+`SystemPromptPlanter.planting(system_prompt)`. Each planted view must preserve
+one shared usage meter and budget across the whole probe. Without that protocol,
+canary rules are recorded as skipped for a missing construction capability;
+they are never graded against a marker that was not planted.
+
+## The entry-point contract (rules, evaluators, targets & taxonomies)
 
 | Group | Provides | Loaded by |
 |---|---|---|
+| `guardana.taxonomies` | one `TaxonomyRef`, or an iterable | `Registry.discover()`, **first** — a rule pack's own `taxonomy:` references resolve while its own entry point is still loading |
 | `guardana.rules` | one `Rule`, or an iterable of `Rule`s | `Registry.discover()` |
 | `guardana.evaluators` | one `Evaluator`, or an iterable | `Registry.discover()` |
 | `guardana.targets` | one `Target` subclass, or an iterable | `Registry.discover()` |
@@ -208,6 +262,9 @@ yet CLI-selectable, only usable by code that drives a `Runner` directly.
 A package registers by adding to its `pyproject.toml`:
 
 ```toml
+[project.entry-points."guardana.taxonomies"]
+my_taxonomies = "acme_rules:provide_taxonomies"
+
 [project.entry-points."guardana.rules"]
 my_rules = "acme_rules:provide_rules"
 
@@ -218,13 +275,15 @@ my_evaluators = "acme_rules:provide_evaluators"
 my_targets = "acme_rules:provide_targets"
 ```
 
-`provide_rules()` / `provide_evaluators()` are zero-argument callables
-returning an instance or a list of instances. Any pip-installed package —
+`provide_rules()` / `provide_evaluators()` / `provide_targets()` /
+`provide_taxonomies()` are zero-argument callables returning an instance or a
+list of instances. Any pip-installed package —
 ours or a third party's private one — is discovered identically; there is
 no built-in/custom distinction at the registry level, only namespacing by
-`id`. `guardana scan --no-plugins` (and the equivalent bare `Registry()`)
-disables entry-point discovery entirely — see
-[`SECURITY.md`](../SECURITY.md) for why this exists and when to use it.
+`id`. `guardana scan --no-plugins` is a deprecated alias for `--plugins
+disabled`: discovery still runs, every plugin is refused, and each refusal is
+recorded — see [`SECURITY.md`](../SECURITY.md) for the trust modes and why
+this exists.
 
 ## Testing your extension
 
@@ -238,12 +297,64 @@ needs a test that `capabilities()` and its read/interaction surface behave.
 pattern end-to-end for a rule package, including a discovery-proving test
 you can copy.
 
-For dynamic (endpoint) rules, `guardana.core.testing` ships transport test
-doubles — `ScriptedTransport` (canned replies, records requests),
-`RefusingTransport` (a well-behaved model that refuses everything),
-`EchoingTransport` (discloses its planted system prompt — the canary-leak
-fixture), `ToolCallingScriptedTransport` (calls the tools it was told to — the
-excessive-agency fixture), and `FailingTransport` (raises like an unreachable
-endpoint) — that plug into `EndpointTarget`'s `ChatTransport` seam, so both
-fixtures run against a scripted model with no network. Worked example:
+`guardana.core.testing` ships every double behind that, so a fixture is a
+few lines of Python instead of a network call or a hand-crafted binary, in
+five families:
+
+**Transports** plug into `EndpointTarget`'s `ChatTransport` seam, so a
+dynamic rule is graded end-to-end against a scripted model with no network:
+
+- `ScriptedTransport` — canned replies in order, the last one repeating
+  once exhausted; records every request it received.
+- `RefusingTransport` — a well-behaved model: refuses everything, leaks
+  nothing (the negative fixture for most dynamic rules).
+- `EchoingTransport` — discloses whatever system prompt was planted on it
+  (the canary-leak positive fixture).
+- `ToolCallingScriptedTransport` — calls the tools it was told to when any
+  are offered (the excessive-agency fixture).
+- `GullibleAgentTransport` — treats a tool's result as an instruction and
+  acts on it (the positive fixture for prompt injection through tool
+  output); pair with `RefusingTransport` for the negative.
+- `FailingTransport` — an unreachable endpoint: every call raises the
+  given error.
+- `ScriptedAgentTransport` — plays a written agent run: one reply per round
+  trip, one script per session, nothing repeated. What a declarative fixture's
+  `turns:` builds, and what a Python fixture uses to script a run by hand.
+- `ScriptExhaustedError` — raised when a run asks a scripted double for a turn
+  or a session nobody wrote. It is an error rather than a repeated turn because
+  a repeat loops until the step budget is gone, and the run is then graded as
+  cut short — a sample passing for a reason its author never wrote.
+
+Worked example:
 [`writing-rules.md`](writing-rules.md#testing-a-dynamic-rule-without-a-model).
+
+**Artifact builders** stand in for a model file, so a static rule is driven
+against a crafted artifact with no binary checked into the repo:
+
+- `build_gguf` — a well-formed GGUF file carrying the given metadata
+  entries, e.g. a malicious chat template.
+- `build_safetensors` — a well-formed safetensors file; the negative
+  fixture for any artifact rule (no code-execution surface) and the
+  positive one for anything reading `__metadata__`.
+- `build_onnx` — a walkable ONNX `ModelProto`, for operator-domain,
+  metadata, and external-data checks.
+
+**Fake credentials** are assembled at run time rather than written down, so
+a redaction test does not put a secret-shaped literal in the repository:
+
+- `fake_aws_key` — input for a secret-detection rule to hunt: shaped exactly
+  like a real AWS access key id, without being one.
+- `fake_llm_key` — the same, shaped like an OpenAI API key.
+- `fake_jwt` — a JWT-shaped token (three base64url segments).
+- `fake_secrets` — all three above, for a test asserting that none leaked.
+
+**A scripted MCP server**, `ScriptedMcpServer`, stands in for a live one,
+reached exactly the way the real one is (through a `Sender`) and
+configurable for authorization, session handling, caching headers, and both
+eras of the protocol — so an authorization rule gets a positive and a
+negative server with no network.
+
+**A run manifest**: `manifest_for` builds a `RunManifest` describing a
+`ScanResult` with test-stable circumstances, and `FIXED_RUN_TIME` is the
+fixed instant it stamps everywhere — so two renderings of the same result
+are byte-identical and a renderer test is not also a test about clocks.

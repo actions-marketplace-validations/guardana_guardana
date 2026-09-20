@@ -62,8 +62,8 @@ For a pipeline that runs containers rather than Python, both halves are publishe
 to the GitHub Container Registry on every release:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.22 scan /work
-docker run --rm ghcr.io/guardana/guardana-collector:0.22 --help
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.25 scan /work
+docker run --rm ghcr.io/guardana/guardana-collector:0.25 --help
 ```
 
 Three tags: the exact version, the moving minor (what the commands above pin),
@@ -103,5 +103,5 @@ uv add acme-guardana-rules   # example; see examples/custom_rule/
 Guardana discovers their rules automatically the next time it runs, via the
 `guardana.rules` entry point (see [`extending.md`](extending.md)). Because
 this executes the installed package's code, only install rule packages you
-trust — or run with `--no-plugins` to disable all code-plugin discovery; see
-[`SECURITY.md`](../SECURITY.md).
+trust — or run with `--plugins builtins` to keep Guardana's own reviewed rules
+while refusing every third-party one; see [`SECURITY.md`](../SECURITY.md).

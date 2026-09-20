@@ -82,6 +82,7 @@ expect:
 | `requires` | no (default `[]`) | list of capability names | Capabilities the target must support, e.g. `[chat]` or `[chat, plant_system_prompt]`. Maps to `guardana.core.target.Capability` (case-insensitive). The `Runner` skips the rule (not a crash) if the target lacks any of these. |
 | `prompts` | yes (at least one) | list of strings | The corpus sent to the target, one `chat()` call per prompt. A scalar string is rejected — it would explode into single-character prompts. |
 | `expect` | no (default `{}`) | mapping | Passed straight to the evaluator as an `Expectation`: `canary` (string, the marker the `canary` evaluator looks for) and `goal` (string, free-text used by `llm_judge`'s prompt template). Unknown keys are rejected. |
+| `fixtures` | no | list of mappings | The rule's own samples — a finding, a clean and an inconclusive one — each a scripted `reply` and the `outcome` the rule must reach. [`guardana rule test`](usage-rule-test.md) runs them; a rule without all three is reported as not fully sampled. |
 
 A YAML file may contain a single rule mapping or a **list** of rule
 mappings — `load_yaml_rules` accepts both.
@@ -136,6 +137,7 @@ Scenario-specific fields (`id`/`title`/`severity`/`target_kind`/`taxonomy`/
 | `steps` | yes (non-empty list) | The conversation, in order. Each step is a mapping with `send` (the message) and an optional `expect` block grading that step's reply. |
 | `stateful` | no (default `false`) | How conversation context reaches the endpoint. The default (`false`) replays the whole accumulated conversation on every turn — the right choice for stateless chat APIs, and the model still sees full context. Set `true` for an endpoint that keeps session state server-side: each turn then sends only the new message. |
 | `expect` (top level) | no | Grades the **whole conversation** after the last step; `llm_judge` sees the full transcript. An `expect` block (step-level or conversation-level) holds `evaluator`, `goal`, and/or `canary`, exactly like a single-turn rule. |
+| `fixtures` | no | Samples scripted with `replies:`, one reply per step — see [`usage-rule-test.md`](usage-rule-test.md#a-scenario-one-reply-per-step). |
 
 At least one `expect` — a step's or the conversation's — is required: an
 ungraded scenario would drive turns and pass everything, so the loader
@@ -178,8 +180,10 @@ expect:
 | Key | Required | What it does |
 |---|---|---|
 | `task` | yes | The user turn that starts the run. |
-| `tools` | yes | Each entry needs `name`, `description` and `returns`. A duplicate name is a load error — whichever double lost would be dead configuration. |
-| `max_steps` | no (default `6`) | Model round trips. Capped at 12; a rule cannot raise its own cost without bound. |
+| `tools` | yes | Each entry needs `name`, `description` and `returns` — or `memory: write` / `memory: read` instead of `returns`, which binds the tool to one store that outlives the session. A duplicate name is a load error — whichever double lost would be dead configuration. |
+| `then` | no | A second task, run in a fresh session that shares nothing with the first but the memory store; one tool must declare `memory: read`. The question is asked of the second session, but the first still counts: a failure already made there is a finding, and a first session that was cut short or saved nothing turns a clean second one into `inconclusive`. |
+| `max_steps` | no (default `6`) | Model round trips per session. Capped at 12; a rule cannot raise its own cost without bound. |
+| `fixtures` | no | Samples scripted with `turns:` — what the model says and which tool it calls on each round trip — and `then_turns:` for a rule with `then:`. See [`usage-rule-test.md`](usage-rule-test.md#an-agent-run-one-turn-per-round-trip). |
 
 The `tool_call` evaluator reads four `expect` fields: `forbidden_tools`,
 `canary_in_arguments`, `forbidden_argument_values`, and `delivered_by`. Configure
@@ -241,21 +245,28 @@ Three ways, all real:
 Use this for custom parsers, stateful probes, or any check against an
 **artifact** target. Of the 51 built-in rules, 19 are build-time (artifact-kind)
 Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
-Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk,
-remote-code (`trust_remote_code`/`torch.hub.load`) and its config form
-(`auto_map`), code execution (`eval`/`exec`/`os.system`/`shell=True`), notebook
-payloads, insecure transport (`verify=False`/plaintext HTTP), known-malicious
-dependencies, MCP tool-poisoning, hidden-instruction rules-file backdoors,
-training-data integrity, hallucinated packages, provenance, hardcoded secrets —
-since they need real parsing logic, not a prompt corpus. (A Python plugin is
-also how a runtime rule that isn't a simple prompt corpus is written — e.g. the
-tool-calling excessive-agency rule.) (The hallucinated-package rule scans `import`/`from` statements in
-`.py` files only; it does not read `requirements.txt` or lockfiles.) The
-other 8 are dynamic endpoint rules (4 single-turn YAML: injection, jailbreak,
-system-prompt-leak, unbounded-consumption; 2 YAML scenarios: gradual jailbreak
-and indirect/RAG injection; plus `output.secrets` and the tool-calling
-`agent.excessive_tool_use`, both Python plugins like this one but endpoint-kind
-— see the note below).
+chat-template code-execution gadgets, risky ONNX graph constructs, Keras
+Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk, remote-code
+(`trust_remote_code`/`torch.hub.load`) and its config form (`auto_map`), code
+execution (`eval`/`exec`/`os.system`/`shell=True`), notebook payloads, insecure
+transport (`verify=False`/plaintext HTTP), known-malicious dependencies, MCP
+tool-poisoning, hidden-instruction rules-file backdoors, training-data
+integrity, hallucinated packages, provenance, hardcoded secrets — since they
+need real parsing logic, not a prompt corpus. (The hallucinated-package rule
+scans `import`/`from` statements in `.py` files only; it does not read
+`requirements.txt` or lockfiles.) The other 32 are dynamic endpoint rules: 12
+are YAML (10 single-turn — injection, jailbreak, system-prompt-leak,
+unbounded-consumption, cost-asymmetry, and five agent-scoped checks for
+credential exfiltration, memory poisoning, tool-argument scope, tool-result
+injection, and hidden context in a tool schema — plus 2 scenarios: gradual
+jailbreak and indirect/RAG injection). The remaining 20 need real logic and are
+Python plugins like this one but endpoint-kind: `output.secrets`, the
+tool-calling `agent.excessive_tool_use` (see the note below),
+`agent.mcp_server_manifest`, all 8 `mcp.*` checks (the MCP authorization
+surface — session binding, token audience, scope breadth, and others), and all
+9 `trace.*` checks (graded from a recorded `Trace` rather than a live chat —
+credential passthrough, identity disagreement, cross-tenant retrieval, and
+others).
 
 Subclass `Rule`, set `meta` to a `RuleMeta`, implement `run`:
 
@@ -434,7 +445,12 @@ never happened.
 Every rule needs at least a positive fixture (proves it fires) and a
 negative fixture (proves it stays silent on clean input) — this is the
 project's main defense against the false-positive/false-negative failure
-mode dynamic security checks are prone to. See
+mode dynamic security checks are prone to.
+
+A YAML rule of any shape declares them in its own file, together with the
+third one — a sample the rule has to decline — and
+[`guardana rule test`](usage-rule-test.md) runs all three with no network. A
+Python plugin returns them from `fixtures()`. See
 `packages/guardana-rules/tests/supply_chain/test_pickle_opcode.py` for the
 pattern on a plugin rule, or
 [`examples/custom_rule/tests/test_discovery.py`](../examples/custom_rule/tests/test_discovery.py)
@@ -453,7 +469,17 @@ graded end-to-end against a scripted model — no network, no model process:
 | `RefusingTransport()` | A well-behaved model: refuses everything, leaks nothing — the negative fixture |
 | `EchoingTransport()` | A model that discloses its planted system prompt — the canary-leak positive fixture |
 | `ToolCallingScriptedTransport("tool_name", ...)` | A model that calls the named tools when offered any — the excessive-agency fixture |
+| `GullibleAgentTransport()` | A model that treats a tool's result as an instruction and acts on it — the positive fixture for prompt injection through tool output; pair it with `RefusingTransport` for the negative |
 | `FailingTransport(error)` | An unreachable endpoint: every call raises `error` |
+| `ScriptedAgentTransport([reply, ...], ...)` | A model playing a written agent run, one reply per round trip and one script per session — what a YAML fixture's `turns:` builds; a turn nobody wrote raises `ScriptExhaustedError` |
+
+These seven are what a rule author testing without a model needs. The kit ships ten
+more doubles for other concerns — artifact builders (see
+[below](#testing-a-rule-that-reads-a-model-file)), fake credentials for a
+redaction test, a scripted MCP server for an authorization rule, and a
+test-stable run manifest for a renderer test — none of which a dynamic endpoint
+rule's fixtures touch. The complete, enforced list is
+[`extending.md`](extending.md#testing-your-extension).
 
 Both fixtures for a dynamic rule, in full:
 

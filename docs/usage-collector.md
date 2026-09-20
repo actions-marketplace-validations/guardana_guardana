@@ -47,11 +47,11 @@ Or as a container, where the same three commands are three `docker run`s:
 
 ```bash
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.22 migrate
+  ghcr.io/guardana/guardana-collector:0.25 migrate
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.22 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:0.25 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.22
+  ghcr.io/guardana/guardana-collector:0.25
 ```
 
 The image's default command is `serve --host 0.0.0.0 --port 8000`, and it does
@@ -608,7 +608,6 @@ protocol and fails on any method that does not take a tenant scope first.
 
 ## See also
 
-- [`design/collector-domain-model.md`](design/collector-domain-model.md) — the model the next items build
 - [`design/collector-persistence.md`](design/collector-persistence.md) — why persistence is shaped the way it is
 - [`design/collector-tenancy.md`](design/collector-tenancy.md) — the organization/project boundary that is being built next
 - [`architecture.md`](architecture.md#the-coreserver-boundary) — why the engine never imports this

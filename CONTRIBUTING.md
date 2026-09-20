@@ -81,6 +81,13 @@ both were measured and both returned the stale wheel. You want to see a line say
 `Building acme-guardana-rules` in the output. If it is not there, you are testing
 what you built last time.
 
+Two more isolated gates exist for the *producer* side of the contract —
+`examples/hermes_integrator` and `examples/shell_hook_integrator` — run the same
+way (`--isolated --no-cache`, one `--with` per example) whenever you touch the
+trace writer or the trace format itself, rather than rule authoring.
+`scripts/ci_local.sh` runs each with the exact command, and `--quiet` gives one
+verdict line per gate.
+
 It installs the five distributions into an empty environment and runs the
 commands the documentation tells people to type. Everything above it passes in an
 environment where an undeclared module happens to be installed for some other
@@ -151,7 +158,8 @@ disliking the rule.
 Before the code standards, the seven rules that decide whether a change belongs
 in the engine *at all*. A PR that breaks one gets sent back however good the code
 is — these are what [`ROADMAP.md`](ROADMAP.md) is planned against. The full
-wording lives in [`CLAUDE.md`](CLAUDE.md); in short:
+wording and the incidents behind each live in
+[`docs/maintainers/lessons.md`](docs/maintainers/lessons.md); in short:
 
 1. **No regulation or vendor name is logic in `guardana-core`** — it is data in a
    rule, a taxonomy entry, or a separate extension package.
@@ -199,9 +207,11 @@ Guardana's code standard is: write it like a senior developer would.
 
 ## Adding a rule, evaluator, or target
 
-See `CLAUDE.md` → "Extending Guardana" for the full contract (YAML rule shape,
-Python plugin shape, entry-point registration, the `guardana.rules` /
-`guardana.evaluators` / `guardana.targets` groups). In short:
+See [`docs/extending.md`](docs/extending.md) and
+[`docs/writing-rules.md`](docs/writing-rules.md) for the full contract (YAML rule
+shape, Python plugin shape, entry-point registration, the `guardana.rules` /
+`guardana.evaluators` / `guardana.targets` / `guardana.taxonomies` groups). In
+short:
 
 - A **new check** is almost always a YAML file dropped into a rule directory —
   no code. `uv run guardana new-rule acme.prompt.my_check` scaffolds one, and

@@ -9,7 +9,9 @@ import typer
 from guardana.cli._plugins import resolve_trust
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
+from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode
+from guardana.core.plugins import PluginTrust
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import (
@@ -20,7 +22,7 @@ from guardana.core.report import (
 )
 from guardana.core.report.baseline import Baseline, Waiver, read_baseline
 from guardana.core.runner import Runner
-from guardana.core.target import ArtifactTarget
+from guardana.core.target import ArtifactTarget, TargetKind
 
 baseline_app = typer.Typer(
     help="Create, check and refresh the findings a project has accepted.",
@@ -30,14 +32,36 @@ baseline_app = typer.Typer(
 _DEFAULT = Path("guardana-baseline.yaml")
 
 
-def _scan(path: Path, profile: Path | None, preset: str | None) -> ScanResult:
+def _scan(  # noqa: PLR0913, PLR0917 — small shared seam for create and update
+    path: Path | None,
+    profile: Path | None,
+    preset: str | None,
+    trust: PluginTrust,
+    locator: str | None,
+    options: Sequence[str],
+) -> ScanResult:
     prof = resolve_profile(profile, preset)
-    registry = Registry.discover(resolve_trust("all", [], no_plugins=False))
+    registry = Registry.discover(trust)
     load_custom_rules(registry, prof, [])
-    target = ArtifactTarget(path, excludes=prof.path_excludes)
+    target = resolve_target(
+        registry,
+        locator=locator,
+        options=options,
+        kind=TargetKind.ARTIFACT,
+        fallback=lambda: _path_target(path, prof.path_excludes),
+    )
     result = Runner(registry=registry, profile=prof).run(target)
     result = relativize_findings(result, Path.cwd())
     return EvidenceRedactor(prof.privacy).redact_result(result)
+
+
+def _path_target(path: Path | None, excludes: tuple[str, ...]) -> ArtifactTarget:
+    """Build a baseline's legacy path target without accepting a missing tree."""
+    if path is None:
+        raise typer.BadParameter("pass a path to scan, or --target scheme://locator")
+    if not path.exists():
+        raise typer.BadParameter(f"{path} does not exist, so there is nothing to scan")
+    return ArtifactTarget(path, excludes=excludes)
 
 
 def _report_health(baseline: Baseline) -> int:
@@ -63,11 +87,27 @@ def _report_health(baseline: Baseline) -> int:
     return problems
 
 
-def create(
-    path: Annotated[Path, typer.Argument(help="Directory to scan")],
+def create(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
+    path: Annotated[Path | None, typer.Argument(help="Directory to scan")] = None,
     output: Annotated[Path, typer.Option("--output", help="Where to write it")] = _DEFAULT,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help="Named policy preset")] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    target: Annotated[
+        str | None,
+        typer.Option("--target", help="Installed artifact target as scheme://locator."),
+    ] = None,
+    target_option: Annotated[
+        list[str],
+        typer.Option("--target-option", help="Non-secret key=value for --target; repeatable."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Write a baseline waiving every finding a scan produces right now.
 
@@ -75,7 +115,10 @@ def create(
     placeholder text for the reason and the approver. A baseline nobody edited is
     a list of findings somebody silenced, and it should look like one.
     """
-    result = _scan(path, profile, preset)
+    if target is not None and path is not None:
+        raise typer.BadParameter("pass either a path or --target, not both")
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
+    result = _scan(path, profile, preset, trust, target, target_option)
     output.write_text(serialize_baseline(result), encoding="utf-8")
     count = len(result.findings)
     typer.echo(
@@ -113,11 +156,27 @@ def verify(
         raise typer.Exit(code=ExitCode.POLICY_FAILED)
 
 
-def update(
-    path: Annotated[Path, typer.Argument(help="Directory to scan")],
+def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
+    path: Annotated[Path | None, typer.Argument(help="Directory to scan")] = None,
     file: Annotated[Path, typer.Option("--file", help="Baseline to refresh")] = _DEFAULT,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[str | None, typer.Option(help="Named policy preset")] = None,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    target: Annotated[
+        str | None,
+        typer.Option("--target", help="Installed artifact target as scheme://locator."),
+    ] = None,
+    target_option: Annotated[
+        list[str],
+        typer.Option("--target-option", help="Non-secret key=value for --target; repeatable."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Drop waivers for findings that no longer occur, keeping the rest untouched.
 
@@ -125,12 +184,15 @@ def update(
     never adds new ones. Adding is what `create` does, and it should be a decision
     somebody makes rather than something an update does on their behalf.
     """
+    if target is not None and path is not None:
+        raise typer.BadParameter("pass either a path or --target, not both")
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
     try:
         baseline = read_baseline(file)
     except BaselineError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
-    result = _scan(path, profile, preset)
+    result = _scan(path, profile, preset, trust, target, target_option)
     if result.errors or result.stopped_by is not None:
         # Nothing is written. This command decides a finding is fixed by not
         # seeing it, and a rule that could not run produces exactly that absence —

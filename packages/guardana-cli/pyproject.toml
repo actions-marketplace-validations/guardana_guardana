@@ -1,16 +1,16 @@
 [project]
 name = "guardana-cli"
-version = "0.22.0"
+version = "0.25.0"
 description = "Guardana command-line interface: scan, probe, monitor, init, rules, new-rule."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [
-    { name = "Guardana contributors", email = "maintainers@guardana.io" },
+    { name = "Guardana contributors", email = "contact@guardana.dev" },
 ]
 maintainers = [
-    { name = "Guardana contributors", email = "maintainers@guardana.io" },
+    { name = "Guardana contributors", email = "contact@guardana.dev" },
 ]
 keywords = ["ai-security", "llm", "prompt-injection", "security-scanner", "mlsecops"]
 classifiers = [
@@ -28,10 +28,10 @@ classifiers = [
 # only there transitively is one a dependant can remove without anybody noticing
 # until a clean install fails.
 dependencies = [
-    "guardana-core>=0.22.0,<0.23",
-    "guardana-rules>=0.22.0,<0.23",
-    "guardana-report>=0.22.0,<0.23",
-    "typer>=0.12",
+    "guardana-core>=0.25.0,<0.26",
+    "guardana-rules>=0.25.0,<0.26",
+    "guardana-report>=0.25.0,<0.26",
+    "typer>=0.27.2",
     "pyyaml>=6.0",
 ]
 

@@ -15,14 +15,17 @@ import typer
 from guardana.cli._endpoint import build_endpoint
 from guardana.cli._formats import OutputFormat
 from guardana.cli._mcp_run import plan_target, require_chat_endpoint
+from guardana.cli._plugins import resolve_trust, warn_about_load_errors
 from guardana.cli._profile import resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._safety_flags import parse_impact
+from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.plan import RunPlan, build_plan
+from guardana.core.plugins import PluginTrust
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.target import ArtifactTarget, Target
+from guardana.core.target import ArtifactTarget, Target, TargetKind
 
 PLAN_SCHEMA_VERSION = 1
 
@@ -32,12 +35,22 @@ plan_app = typer.Typer(
 )
 
 
-def _render_human(run_plan: RunPlan) -> str:
-    lines = [
-        f"{len(run_plan.rules)} rule(s) would run, {len(run_plan.skipped)} skipped.",
-        f"requests: at least {run_plan.min_requests}, at most {run_plan.max_requests}"
-        + ("" if run_plan.is_complete else f" — plus {len(run_plan.unknown_cost)} of unknown cost"),
-    ]
+def _render_human(run_plan: RunPlan, kind: TargetKind) -> str:
+    lines = [f"{len(run_plan.rules)} rule(s) would run, {len(run_plan.skipped)} skipped."]
+    if run_plan.is_complete and run_plan.max_requests == 0:
+        if kind is TargetKind.ARTIFACT:
+            lines.append("requests: 0 — every selected rule declares it sends nothing")
+        else:
+            lines.append("requests: 0 — no selected rule sends a request")
+    else:
+        lines.append(
+            f"requests: at least {run_plan.min_requests}, at most {run_plan.max_requests}"
+            + (
+                ""
+                if run_plan.is_complete
+                else f" — plus {len(run_plan.unknown_cost)} of unknown cost"
+            )
+        )
     if run_plan.unknown_cost:
         lines.append(
             "  these rules do not declare a request count, so the ceiling above is a "
@@ -80,39 +93,69 @@ def _render_json(run_plan: RunPlan) -> str:
     )
 
 
-def _emit(run_plan: RunPlan, output_format: OutputFormat) -> None:
+def _emit(run_plan: RunPlan, output_format: OutputFormat, kind: TargetKind) -> None:
     if output_format is OutputFormat.json:
         typer.echo(_render_json(run_plan))
     else:
-        typer.echo(_render_human(run_plan))
+        typer.echo(_render_human(run_plan, kind))
     if run_plan.exceeds_budget:
         # Invalid configuration, not a failed run: nothing ran. Raising it here
         # means a pipeline finds out before it pays, which is the whole point.
         raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
 
-def _plan_for(profile: Profile, target: Target, rules: list[Path], *, plugins: bool) -> RunPlan:
-    registry = Registry.discover() if plugins else Registry()
+def _registry_for(profile: Profile, rules: list[Path], *, trust: PluginTrust) -> Registry:
+    """Load exactly the registry a planned run will use."""
+    registry = Registry.discover(trust)
+    warn_about_load_errors(registry, what="rule")
     load_custom_rules(registry, profile, rules)
-    return build_plan(registry, profile, target)
+    return registry
 
 
 def plan_scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
-    path: Annotated[Path, typer.Argument(help="Directory that would be scanned")],
+    path: Annotated[Path | None, typer.Argument(help="Directory that would be scanned")] = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
     preset: Annotated[
         str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
     ] = None,
     format: Annotated[OutputFormat, typer.Option(help="human|json")] = OutputFormat.human,
-    no_plugins: Annotated[bool, typer.Option("--no-plugins")] = False,
+    no_plugins: Annotated[
+        bool, typer.Option("--no-plugins", help="Deprecated alias for --plugins disabled.")
+    ] = False,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
     rules: Annotated[
         list[Path], typer.Option("--rules", help="Directory or file of custom YAML rules.")
     ] = [],  # noqa: B006 — typer builds the option from a literal default
+    target: Annotated[
+        str | None,
+        typer.Option("--target", help="Installed artifact target as scheme://locator."),
+    ] = None,
+    target_option: Annotated[
+        list[str],
+        typer.Option("--target-option", help="Non-secret key=value for --target; repeatable."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Report which rules a scan would run. A file scan sends no requests at all."""
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=no_plugins)
     prof = resolve_profile(profile, preset)
-    target = ArtifactTarget(path, excludes=prof.path_excludes)
-    _emit(_plan_for(prof, target, rules, plugins=not no_plugins), format)
+    if target is not None and path is not None:
+        raise typer.BadParameter("pass either a path or --target, not both")
+    registry = _registry_for(prof, rules, trust=trust)
+    selected = resolve_target(
+        registry,
+        locator=target,
+        options=target_option,
+        kind=TargetKind.ARTIFACT,
+        fallback=lambda: _plan_scan_path(path, prof.path_excludes),
+    )
+    _emit(build_plan(registry, prof, selected), format, selected.kind)
 
 
 def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
@@ -149,6 +192,22 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
             help="Permit rules that can destroy or alter something the target owns.",
         ),
     ] = False,
+    plugins: Annotated[
+        str,
+        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
+    ] = "all",
+    allow_plugin: Annotated[
+        list[str],
+        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    target: Annotated[
+        str | None,
+        typer.Option("--target", help="Installed endpoint target as scheme://locator."),
+    ] = None,
+    target_option: Annotated[
+        list[str],
+        typer.Option("--target-option", help="Non-secret key=value for --target; repeatable."),
+    ] = [],  # noqa: B006 — typer builds the option from a literal default
 ) -> None:
     """Report what probing this endpoint or MCP server would cost, without contacting it.
 
@@ -170,13 +229,44 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
     is only a preview of the run it is a preview of: without them, pricing a
     `--safety passive` probe listed every active rule it would have refused.
     """
+    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
     prof = resolve_profile(profile, preset)
     prof = replace(prof, max_impact=parse_impact(safety), allow_destructive=allow_destructive)
+    legacy_target_options = (url, model, mcp, system_prompt_file)
+    if target is not None and any(value is not None for value in legacy_target_options):
+        raise typer.BadParameter(
+            "--target cannot be combined with --url, --model, --mcp, or --system-prompt-file"
+        )
+    registry = _registry_for(prof, rules, trust=trust)
+    selected = resolve_target(
+        registry,
+        locator=target,
+        options=target_option,
+        kind=TargetKind.ENDPOINT,
+        fallback=lambda: _plan_probe_target(url, model, mcp, provider, system_prompt_file),
+    )
+    _emit(build_plan(registry, prof, selected), format, selected.kind)
+
+
+def _plan_scan_path(path: Path | None, excludes: tuple[str, ...]) -> ArtifactTarget:
+    """Build the legacy file target for a plan."""
+    if path is None:
+        raise typer.BadParameter("pass a path to scan, or --target scheme://locator")
+    return ArtifactTarget(path, excludes=excludes)
+
+
+def _plan_probe_target(
+    url: str | None,
+    model: str | None,
+    mcp: str | None,
+    provider: str,
+    system_prompt_file: Path | None,
+) -> Target:
+    """Build the legacy endpoint or MCP target without contacting it."""
     if mcp is not None:
-        _emit(_plan_for(prof, plan_target(mcp), rules, plugins=True), format)
-        return
+        return plan_target(mcp)
     endpoint_url, model_name = require_chat_endpoint(url, model)
-    target: Target = build_endpoint(
+    return build_endpoint(
         endpoint_url,
         model_name,
         api_key=None,
@@ -184,7 +274,6 @@ def plan_probe(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; thi
         provider=provider,
         transport=None,
     )
-    _emit(_plan_for(prof, target, rules, plugins=True), format)
 
 
 def _system_prompt_the_probe_will_send(named: Path | None) -> str:
