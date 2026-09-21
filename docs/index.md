@@ -51,6 +51,7 @@ Start with the root [README](../README.md). Before production use, read
 - [`writing-rules.md`](writing-rules.md) — create YAML or Python rules
 - [`usage-rule-test.md`](usage-rule-test.md) — test positive, negative, and inconclusive fixtures
 - [`extending.md`](extending.md) — provide rules, evaluators, targets, or taxonomies
+- [`usage-new-pack.md`](usage-new-pack.md) — scaffold an installable pack that already passes
 - [`usage-pack.md`](usage-pack.md) — validate and lock extension packs
 - [`usage-taxonomy.md`](usage-taxonomy.md) — resolve framework editions and crosswalks
 - [`model-formats.md`](model-formats.md) — use the bounded artifact readers
@@ -91,6 +92,7 @@ not task guides and may describe rejected or superseded alternatives.
 - [`../FEATURES.md`](../FEATURES.md) — concise shipped capability overview
 - [`../ROADMAP.md`](../ROADMAP.md) — ordered next work and exit criteria
 - [`design/audit-0.23-market.md`](design/audit-0.23-market.md) — repository audit, market evidence, and the rationale for the current order
+- [`design/audit-0.25-market.md`](design/audit-0.25-market.md) — whether that order still follows from evidence, and the validation plan that replaces the one it could not run
 - [`../CHANGELOG.md`](../CHANGELOG.md) — release history
 
 ## Maintainers

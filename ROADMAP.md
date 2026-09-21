@@ -23,38 +23,38 @@ Every roadmap item must preserve these properties:
 5. Application-specific risk remains expressible without forking the engine.
 6. Public schemas are versioned and migratable.
 
-## What ships today (0.25.0)
+## What ships today (0.26.0)
 
 The current release is beta. It provides artifact scanning, controlled endpoint
 and MCP probing, recorded-trace analysis, regression comparison, policy and
-baseline gates, extension APIs, and an optional authenticated PostgreSQL-backed
-collector. See [FEATURES.md](FEATURES.md) for the concise overview and
+baseline gates, extension APIs with scaffolding for a new pack, and an optional
+authenticated PostgreSQL-backed collector. See [FEATURES.md](FEATURES.md) for the concise overview and
 [Product status](docs/product-status.md) for limitations.
 
 ## Now: repeatable application assurance
 
-Target locators are complete since 0.24.0 and declarative fixtures since 0.25.0:
-every declarative rule shape can ship its own positive, negative, and inconclusive
-samples. The remaining milestone
-turns a one-off extension into something a team can scaffold, repeat, compare, and
-operate. The order below reflects the
+Target locators are complete since 0.24.0 and declarative fixtures since 0.25.0,
+and one command now writes an installable pack whose rules already grade their own
+finding, clean, and inconclusive samples. The remaining milestone turns a
+repeatable extension into measurement a team can compare and operate. The order below reflects the
 [0.23 repository and market audit](docs/design/audit-0.23-market.md): author
-workflow and honest measurement come before additional output destinations.
+workflow and honest measurement come before additional output destinations. The
+[0.25 audit](docs/design/audit-0.25-market.md) re-read the standards and the
+comparable projects a month later and moved no row.
 
 | Order | Deliverable | Done when |
 |---:|---|---|
-| 1 | `guardana new-pack` | one command creates an installable pack with manifest, entry points, fixtures, locator target, and tests |
-| 2 | Suites, versioned datasets, and assessors | a run records the sample, assessor, denominator, and uncertainty rather than only findings |
-| 3 | Paired statistical diff | comparison refuses unequal or undersized samples and gates only on a declared minimum effect |
-| 4 | Renderer and reporter plugins | outputs are discoverable entry points and every output remains behind the common redaction boundary |
-| 5 | Provider conformance matrix | documented endpoint support is backed by repeatable capability tests |
-| 6 | Assessments in the collector | trends are keyed by system, deployment, dataset, and assessor version; findings and quality measurements stay separate |
+| 1 | Suites, versioned datasets, and assessors | a run records the sample, assessor, denominator, and uncertainty rather than only findings |
+| 2 | Paired statistical diff | comparison refuses unequal or undersized samples and gates only on a declared minimum effect |
+| 3 | Renderer and reporter plugins | outputs are discoverable entry points and every output remains behind the common redaction boundary |
+| 4 | Provider conformance matrix | documented endpoint support is backed by repeatable capability tests |
+| 5 | Assessments in the collector | trends are keyed by system, deployment, dataset, and assessor version; findings and quality measurements stay separate |
 
-Design inputs already exist for the shipped locators and fixtures and for the first
-four remaining items:
+Design inputs exist for everything shipped so far and for rows 1, 2 and 3:
 
 - [target locators](docs/design/target-locators.md)
 - [declarative fixtures](docs/design/declarative-fixtures.md)
+- [pack scaffolding](docs/design/pack-scaffolding.md)
 - [output plugins](docs/design/output-plugins.md)
 - [extension author tooling](docs/design/extension-author-tooling.md)
 - [quality suites](docs/design/quality-suites.md)
@@ -62,14 +62,15 @@ four remaining items:
 
 The full OTLP intake remains in the next milestone because the OpenTelemetry
 GenAI agent conventions are still changing. A compatibility spike may proceed
-after items 2 and 3, in parallel with items 4 and 5, but it must normalize an
+after items 1 and 2, in parallel with items 4 and 5, but it must normalize an
 explicit supported subset behind an adapter rather than make a development
 convention a persisted Guardana schema.
 
 ### Milestone exit criteria
 
 - A third-party target, rule, evaluator, renderer, and reporter are usable without
-  modifying Guardana; target locators satisfy the target part from 0.24.0.
+  modifying Guardana; target locators satisfy the target part from 0.24.0, and
+  `guardana new-pack` scaffolds the rest.
 - A suite records passes as well as failures and names its dataset version.
 - `guardana diff` can say better, worse, unchanged, or incomparable with an
   auditable statistical reason.
@@ -119,6 +120,10 @@ New artifact formats, deterministic rules, framework adapters, and taxonomy
 updates may proceed in parallel when they do not delay the ordered milestone.
 Prefer extension packs when a feature adds a large dependency, a niche corpus, or
 an experimental evaluator.
+
+One taxonomy update is open now: the MITRE ATLAS catalogue records a data-format
+version rather than the content release its entries were transcribed from, and
+three content releases have landed since.
 
 ## Researched after the foundations
 
