@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-09-24 — a clean result states its trial count and upper bound
+
+### Added
+
+- **`--trials N` repeats eligible cases in `guardana probe`, `guardana monitor`
+  and `guardana plan probe`.** Until now each prompt was sent once, so a clean
+  result meant "not observed in one try" and a report without findings read as
+  safe. Set `trials:` in `guardana.yaml`; the flag wins. Presets `ci`,
+  `pre-training` and `monitor` keep `trials: 1`, so existing gates cost no more
+  without an edit. We recommend `5` for a release gate. Each trial sends the
+  same input as a fresh request, without shared history or agent memory. Target
+  sampling settings stay unchanged. Single-turn YAML rules, scenarios, agent
+  runs, `guardana.output.secrets` and `guardana.agent.excessive_tool_use` repeat.
+  MCP and other protocol checks, trace rules and `stateful: true` scenarios run
+  once per case; the report names them. Any failed attempt fails the case and
+  produces one finding, such as `2 of 5 trials failed: …`. If none fail but a
+  grader cannot decide, the case is unverified. Earlier failures survive budget
+  exhaustion. The human report counts trials and bounds results over cases
+  because attempts at one prompt are correlated. It says
+  `static prompt set · no adaptive attacker ran`. Saved runs use schema `7`:
+  assessments carry a `trial` number, `run.execution.trials` records the request,
+  repeating rules store `trial_summary`, and `run.rules[].trials` becomes
+  `declared_requests`. Version-6 runs migrate with one attempt per case and no
+  recomputation. `guardana plan probe --trials N` prices attempts before sending;
+  plan schema is `2`, and budget exit `6` remains. `guardana diff` exits `2`
+  when trials per case change, separating added sampling from a regression.
+
+### Changed
+
+- **`README.md` drops its per-release Roadmap table and the paragraph below it.** Rows
+  covered each minor release from 0.17 to the current one, plus `next` and `1.0`.
+  `ROADMAP.md` (plan) and `CHANGELOG.md` (release history) were duplicated; `README.md`
+  links both in its top link row and Documentation list. Manual release rewrites made it
+  stale. `scripts/bump_version.py` ceases to require or rewrite `README.md`'s
+  `*(current)*` marker; `test_docs_consistency.py` cuts two table tests; `RELEASING.md`
+  and release checklist omit it.
+- **`ROADMAP.md` puts repeated trials and judge-error correction first.** "Now" row 1
+  widens suites, versioned datasets and assessors to include them; paired diff row 2
+  rejects unequal trials, prints minimum detectable effect and adjusts for several gated
+  suites. Row 3 retains opted-in redacted exchanges for `guardana run regrade` with a
+  new assessor without target traffic; old rows 3-5 become 4-6. Clean results give trial
+  counts; judge-graded rates correct for measured error or decline to gate.
+  `guardana probe` ran once per prompt; `guardana calibrate` measures error but does
+  not correct rates. Published evidence shows one sample understates attack success.
+  "Next" item 3 replaces a fixed level per look with a confidence sequence. Reusable
+  attack techniques and adaptive attackers are under "Researched after the foundations",
+  behind repeated trials and judge-error correction. No code or behavior changed. See
+  [`docs/design/audit-0.26-measurement.md`](docs/design/audit-0.26-measurement.md).
+
 ## [0.26.1] - 2026-09-21 — a field report, and the audit of its own fix
 
 ### Added

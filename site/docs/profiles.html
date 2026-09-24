@@ -84,6 +84,7 @@
 <h2>Project direction</h2><ul>
 <li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
 <li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
+<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
 </ul>
 <h2>Maintainers</h2><ul>
 <li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
@@ -110,9 +111,13 @@
 <li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
 <li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
 <li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">accepted</span></a></li>
+<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
 <li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
+<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
 <li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
+<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
+<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
+<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
 <li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
 <li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
 <li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
@@ -172,6 +177,9 @@ trace:                          # only ever governs `analyze-trace` / `trace ins
 
 contracts:                      # optional; security contracts to load, files or
   - ./contracts/checkout.yaml   # directories — see usage-contracts.md
+
+trials: 1                       # optional; attempts per case for rules that grade a
+                                # sampled reply — see usage-probe.md#repeated-trials
 
 evaluators:                     # config-wired evaluators — see the section below
   llm_judge:
@@ -253,6 +261,12 @@ evaluators:                     # config-wired evaluators — see the section be
 <td>list of paths</td>
 <td><code>[]</code></td>
 <td>Security contracts to load — files, or directories of <code>.yaml</code>/<code>.yml</code>. Added to anything passed via the repeatable <code>--contract PATH</code> flag. Unlike a malformed <em>rule</em> file, a contract that will not load is a hard error: it is your own threat model, and a silently absent one is a gate you think you have. See <a href="usage-contracts.html"><code>usage-contracts.md</code></a>.</td>
+</tr>
+<tr>
+<td><code>trials</code></td>
+<td>integer ≥ 1</td>
+<td><code>1</code></td>
+<td>How many independent attempts <code>probe</code>, <code>monitor</code> and <code>plan probe</code> make at each case of a rule that grades a sampled model reply. <code>--trials N</code> wins over it. A rule that does not repeat (a protocol check, a <code>stateful</code> scenario) makes one attempt whatever this says, and the run records that. Anything other than a whole number of at least 1 is refused at load. See <a href="usage-probe.html#repeated-trials"><code>usage-probe.md</code></a>.</td>
 </tr>
 <tr>
 <td><code>evaluators</code></td>
@@ -389,6 +403,9 @@ layer runs is already decided by the command (<code>scan</code> runs the build-t
 guardana scan ./data     --preset pre-training  # strict pre-run gate on the training box
 guardana monitor --url … --model … --preset monitor
 </code></pre>
+<p>Every preset makes <strong>one attempt per case</strong> (<code>trials: 1</code>), so choosing a preset never
+multiplies what a gate costs. Raise it with <code>--trials</code> or <code>trials:</code> where you mean to pay
+for it.</p>
 <p><code>--preset</code> and <code>--profile</code> are mutually exclusive — pass one or the other. When
 you need finer control (per-rule config, custom rule directories, a wired judge),
 write an explicit <code>guardana.yaml</code> as shown above; you can still ship as many
@@ -428,7 +445,7 @@ paying for the answer.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.26.1 · Apache-2.0</span>
+<span>Guardana 0.27.0 · Apache-2.0</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/profiles.md">Edit this page on GitHub</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
