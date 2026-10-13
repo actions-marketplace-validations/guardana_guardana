@@ -280,15 +280,19 @@ so this page is maintained as carefully as the code.</p>
 output contracts, CLI flags and exit codes, profile schema and collector
 envelope become a compatibility promise.
 <a href="compatibility.html">Compatibility</a> defines the full surface.</p>
-<p>1.0.0rc1 and 1.0.0rc2 shipped the 0.41.0 supported surface unchanged. That surface is frozen
-until stable 1.0. Candidates carry fixes only, with no new CLI flag, persisted
-field, rule family or public API. A change to the existing supported surface
-is allowed only to correct a defect in it and must be announced.</p>
-<p>Three candidates are required: rc1, rc2 and rc3. The rc3 round lets fixes found
-after the first external reports land before the stable promise. <code>1.0.0rc2</code>
-shipped after its own full green release gate and green CI on the exact commit;
-<code>1.0.0rc3</code> ships only after the same. A further candidate is required only if a
-release blocker needs one.</p>
+<p>1.0.0rc1 and 1.0.0rc2 shipped the 0.41.0 supported surface unchanged. 1.0.0rc3
+corrects three defects, each announced under &quot;Changed — breaking&quot; in the changelog:
+the collector's <code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> routes return 404;
+a <code>rules.include</code> pattern matching no registered rule refuses the command with
+exit 3; a scanned target's own <code>.guardanaignore</code> can no longer exclude a file
+a model loader reads. The surface remains frozen until stable 1.0 except for
+announced defect corrections. Candidates add no CLI flag, persisted field,
+rule family or public API.</p>
+<p>Three candidates were required: rc1, rc2 and rc3. The rc3 round, the second
+stabilization round, let fixes found after the first external reports land
+before the stable promise. <code>1.0.0rc2</code> and <code>1.0.0rc3</code> each shipped after its own
+full green release gate and green CI on the exact commit. A further candidate is
+required only if a release blocker needs one.</p>
 <p>Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow rc3 automatically.</p>
 <ul>
 <li><code>1.0.0rc2</code> and <code>1.0.0rc3</code> have shipped, each after its own full green release gate and green CI on the exact commit. A candidate has had a period without new defect reports against the supported surface. A further candidate is required only if a release blocker needs one.</li>
@@ -306,7 +310,7 @@ release blocker needs one.</p>
 </ul>
 <p>The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.</p>
 <p>No maintainer-run proof is published. The reference pack is attached to the GitHub Release but is not on PyPI. Recovery runbooks are exercised by tests; the security drill is not recorded.</p>
-<p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope for <code>1.0.0rc3</code> and <code>1.0.0</code>.</p>
+<p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope. With <code>1.0.0rc3</code> released, <code>1.0.0</code> is the only open release milestone.</p>
 <p>The owner decides changes to release criteria and records each one here and in the changelog.</p>
 <h3 id="adoption-measures">Adoption measures</h3>
 <p>These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study, F2; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study, F6); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.</p>
@@ -512,7 +516,7 @@ clean. It has told you it could not look.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span class="who">Guardana 1.0.0rc2 · Apache-2.0 ·
+<span class="who">Guardana 1.0.0rc3 · Apache-2.0 ·
 maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/product-status.md">Edit this page on GitHub</a>
 <a href="https://github.com/guardana/guardana">github.com/guardana</a>

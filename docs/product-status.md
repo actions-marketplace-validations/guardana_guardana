@@ -49,16 +49,20 @@ output contracts, CLI flags and exit codes, profile schema and collector
 envelope become a compatibility promise.
 [Compatibility](compatibility.md) defines the full surface.
 
-1.0.0rc1 and 1.0.0rc2 shipped the 0.41.0 supported surface unchanged. That surface is frozen
-until stable 1.0. Candidates carry fixes only, with no new CLI flag, persisted
-field, rule family or public API. A change to the existing supported surface
-is allowed only to correct a defect in it and must be announced.
+1.0.0rc1 and 1.0.0rc2 shipped the 0.41.0 supported surface unchanged. 1.0.0rc3
+corrects three defects, each announced under "Changed — breaking" in the changelog:
+the collector's `/docs`, `/redoc` and `/docs/oauth2-redirect` routes return 404;
+a `rules.include` pattern matching no registered rule refuses the command with
+exit 3; a scanned target's own `.guardanaignore` can no longer exclude a file
+a model loader reads. The surface remains frozen until stable 1.0 except for
+announced defect corrections. Candidates add no CLI flag, persisted field,
+rule family or public API.
 
-Three candidates are required: rc1, rc2 and rc3. The rc3 round lets fixes found
-after the first external reports land before the stable promise. `1.0.0rc2`
-shipped after its own full green release gate and green CI on the exact commit;
-`1.0.0rc3` ships only after the same. A further candidate is required only if a
-release blocker needs one.
+Three candidates were required: rc1, rc2 and rc3. The rc3 round, the second
+stabilization round, let fixes found after the first external reports land
+before the stable promise. `1.0.0rc2` and `1.0.0rc3` each shipped after its own
+full green release gate and green CI on the exact commit. A further candidate is
+required only if a release blocker needs one.
 
 Stable 1.0 is the compatibility promise for the supported surface. It ships only when all criteria below hold; it does not follow rc3 automatically.
 
@@ -76,7 +80,7 @@ The compatibility promise lets a team adopt Guardana, so it cannot wait for adop
 
 No maintainer-run proof is published. The reference pack is attached to the GitHub Release but is not on PyPI. Recovery runbooks are exercised by tests; the security drill is not recorded.
 
-[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope for `1.0.0rc3` and `1.0.0`.
+[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. With `1.0.0rc3` released, `1.0.0` is the only open release milestone.
 
 The owner decides changes to release criteria and records each one here and in the changelog.
 

@@ -6,14 +6,14 @@ tools without forking the engine. It is an offline-first verification framework
 with a usable CLI and optional collection, outside the production request path.
 
 [GitHub Issues](https://github.com/guardana/guardana/issues) are the live work queue.
-[Milestones](https://github.com/guardana/guardana/milestones) group release scope:
-`1.0.0rc3` and `1.0.0`. A milestone is a scope, not a date.
+[Milestones](https://github.com/guardana/guardana/milestones) group release scope;
+`1.0.0` is the only open release milestone. A milestone is a scope, not a date.
 Ideas without a reproducible problem or acceptance test start in
 [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
 
-## What ships today (1.0.0rc2)
+## What ships today (1.0.0rc3)
 
-1.0.0rc2 is the second candidate, with only fixes found after the first; latest stable 0.41.0's supported surface is unchanged.
+1.0.0rc3 is the third and last required candidate, from the second stabilization round; it changes the supported surface only to correct three defects.
 It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.
 Historical documents from 0.2.0 through 0.41.0 are read by current tests.
 See [FEATURES.md](FEATURES.md) for shipped behaviour, [Product status](docs/product-status.md) for limits, and the [generated rule summary](docs/generated/rule-summary.md) and [rule catalog](docs/generated/rule-catalog.md) for coverage.
@@ -31,7 +31,6 @@ allowed only to correct a defect in it and must be announced.
 
 | Release | Carries | Ships when |
 |---|---|---|
-| `1.0.0rc3` | A second stabilization round | Its fixes are complete, its own full release gate is green, and CI is green on the exact commit. |
 | `1.0.0` | The stable compatibility promise | All stable-release criteria hold, a candidate has had a period without new defect reports, and the full gate and CI are green on the exact commit. |
 
 Three candidates are required: rc1, rc2 and rc3. The rc3 round lets fixes found
