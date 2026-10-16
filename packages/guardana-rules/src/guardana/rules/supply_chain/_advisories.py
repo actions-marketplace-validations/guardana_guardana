@@ -20,12 +20,13 @@ loads as empty is a rubber stamp, which is worse than no blocklist at all.
 
 import json
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib.resources import as_file, files
 from pathlib import Path
 
 from guardana.core.rule import RuleLoadError
 from guardana.core.severity import Severity
+from guardana.rules.supply_chain._versions import Version, parse_version
 
 SCHEMA_VERSION = 1
 ADVISORY_KINDS = frozenset({"malicious_release", "vulnerable_loader"})
@@ -49,9 +50,9 @@ class Advisory:
     summary: str
     reference: str
 
-    def matches(self, version: str) -> bool:
-        """Whether this advisory covers the given exact version."""
-        return any(version_matches(spec, version) for spec in self.versions)
+    def matches(self, version: str, *, arbitrary: bool = False) -> bool:
+        """Whether this advisory covers the given pinned version (`===` when `arbitrary`)."""
+        return any(version_matches(spec, version, arbitrary=arbitrary) for spec in self.versions)
 
 
 def load_advisories(path: Path | None = None) -> tuple[Advisory, ...]:
@@ -70,52 +71,76 @@ def load_advisories(path: Path | None = None) -> tuple[Advisory, ...]:
     return tuple(_parse(document, path))
 
 
-def version_matches(spec: str, version: str) -> bool:
-    """Whether `version` satisfies one advisory spec.
+def version_matches(spec: str, version: str, *, arbitrary: bool = False) -> bool:
+    """Whether a pinned `version` satisfies one advisory spec.
 
     Supports `*`, an exact version, a comparator (`<`, `<=`, `>`, `>=`), and a
-    comma-joined conjunction of comparators. A version this cannot parse never
-    matches: guessing at `2.6.0rc1` would invent a finding.
+    comma-joined conjunction of comparators. An exact spec matches under PEP 440
+    version equality, so `8.3.041` and `8.3.41.0` are the release `8.3.41`; a
+    local label on the pin is still the same public release and matches. With
+    `arbitrary`, the pin came from `===` and an exact spec is compared as a
+    string, as pip does. A version this cannot parse never matches: guessing at
+    it would invent a finding.
     """
     if spec == _ANY_VERSION:
         return True
     if not any(spec.startswith(comparator) for comparator in _COMPARATORS):
-        return spec == version
-    parsed = _release(version)
+        if arbitrary:
+            return spec.strip().lower() == version.strip().lower()
+        return _equal(spec, version)
+    parsed = parse_version(version)
     if parsed is None:
         return False
-    return all(_clause_matches(clause.strip(), parsed) for clause in spec.split(","))
+    return all(_clause_matches(clause.strip(), parsed.public) for clause in spec.split(","))
 
 
-def _clause_matches(clause: str, version: tuple[int, ...]) -> bool:
+def _equal(spec: str, version: str) -> bool:
+    wanted = parse_version(spec)
+    pinned = parse_version(version)
+    if wanted is None or pinned is None:
+        # Two spellings PEP 440 cannot read are only the same version when they are
+        # the same text.
+        return spec.strip().lower() == version.strip().lower()
+    return pinned == wanted if wanted.local is not None else pinned.public == wanted
+
+
+def _clause_matches(clause: str, version: Version) -> bool:
     for comparator in _COMPARATORS:
         if clause.startswith(comparator):
-            bound = _release(clause[len(comparator) :])
-            if bound is None:
+            bound = parse_version(clause[len(comparator) :])
+            if bound is None or bound.local is not None:
                 return False
             return _compare(comparator, version, bound)
     return False
 
 
-def _compare(comparator: str, left: tuple[int, ...], right: tuple[int, ...]) -> bool:
-    width = max(len(left), len(right))
-    padded_left = left + (0,) * (width - len(left))
-    padded_right = right + (0,) * (width - len(right))
+def _compare(comparator: str, version: Version, bound: Version) -> bool:
+    # PEP 440 excludes `2.6.0rc1` from `<2.6.0` and `2.6.0.post1` from `>2.6.0`, unless
+    # the bound is itself a pre- or post-release.
+    left, right = version.sort_key(), bound.sort_key()
+    if comparator == "<" and not _is_pre(bound) and _is_pre(version):
+        earliest = replace(bound, pre=None, dev=0, local=None)
+        if left >= earliest.sort_key():
+            return False
+    if (
+        comparator == ">"
+        and bound.post is None
+        and version.post is not None
+        and replace(version, post=None, dev=None, local=None) == bound
+    ):
+        return False
     if comparator == "<":
-        return padded_left < padded_right
+        return left < right
     if comparator == "<=":
-        return padded_left <= padded_right
+        return left <= right
     if comparator == ">":
-        return padded_left > padded_right
-    return padded_left >= padded_right
+        return left > right
+    return left >= right
 
 
-def _release(version: str) -> tuple[int, ...] | None:
-    """Parse a plain numeric release tuple; None for anything else (rc, dev, local)."""
-    parts = version.split(".")
-    if not all(part.isdigit() for part in parts):
-        return None
-    return tuple(int(part) for part in parts)
+def _is_pre(version: Version) -> bool:
+    """Whether PEP 440 calls `version` a pre-release: it carries a pre- or dev-release marker."""
+    return version.pre is not None or version.dev is not None
 
 
 def _parse(document: object, path: Path) -> list[Advisory]:

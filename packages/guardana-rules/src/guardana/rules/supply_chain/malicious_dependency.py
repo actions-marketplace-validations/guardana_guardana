@@ -1,7 +1,9 @@
 import ast
+import json
 import re
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
+from typing import NamedTuple
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
@@ -19,11 +21,14 @@ from guardana.core.taxonomy import (
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._advisories import Advisory, load_advisories
-from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
 from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
+from guardana.rules.supply_chain._versions import canonical_name
 
 _MANIFEST_SUFFIXES = (".txt", ".toml", ".lock", ".cfg", ".in")
-_MANIFEST_NAMES = frozenset({"pipfile"})
+_MANIFEST_NAMES = frozenset(
+    {"pipfile", "environment.yml", "environment.yaml", "conda.yml", "conda.yaml"}
+)
 _ANY_VERSION = "*"
 
 # A network fetch inside setup.py runs at install time (`pip install`), the exact
@@ -33,16 +38,17 @@ _NETWORK_CALLS = frozenset({"urlopen", "urlretrieve", "get", "post", "Request"})
 
 # Only *exact* pins are matched. `torch>=2.0` does not say which version will be
 # installed, and inventing one would manufacture findings; a lockfile — which is
-# what CI actually installs from — always pins exactly.
+# what CI actually installs from — always pins exactly. `===` is arbitrary equality.
 _EXACT_PIN = re.compile(
-    r"""(?:^|[\s"'\[,])(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*==\s*["']?"""
-    r"""(?P<version>[0-9][\w.+!-]*)"""
+    r"""(?:^|[\s"'\[,])(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[[^\]]*\])?\s*"""
+    r"""(?P<operator>===?)\s*["']?(?P<version>[vV]?[0-9][\w.+!-]*)"""
 )
 # The `package = "1.2.3"` form of `[tool.poetry.dependencies]`. The quoted value
 # must be a bare version: `"^2.2.0"` and `"~1.4"` are ranges, and treating a range
 # as a pin would invent a version nobody chose.
 _TOML_PIN = re.compile(
-    r"""^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*=\s*["'](?P<version>[0-9][\w.+!-]*)["']\s*$"""
+    r"""^\s*(?P<name>[A-Za-z0-9][A-Za-z0-9._-]*)\s*=\s*["'](?:(?P<operator>===?)\s*)?"""
+    r"""(?P<version>[vV]?[0-9][\w.+!-]*)["']\s*$"""
 )
 # The `[[package]]` block form used by poetry.lock / uv.lock / pdm.lock, where the
 # name and the version sit on separate lines — the form that authoritatively pins
@@ -57,32 +63,76 @@ def _is_manifest(path: Path) -> bool:
     return path.suffix.lower() in _MANIFEST_SUFFIXES or path.name.lower() in _MANIFEST_NAMES
 
 
-def _exact_pins(text: str) -> set[tuple[str, str]]:
-    """Collect every `(package, version)` a manifest pins exactly."""
-    pins: set[tuple[str, str]] = set()
+class _Pin(NamedTuple):
+    """One exact pin: the PEP 503 name, the version as written, and whether it used `===`."""
+
+    name: str
+    version: str
+    arbitrary: bool
+
+
+def _pin(name: str, version: str, operator: str | None) -> _Pin:
+    return _Pin(canonical_name(name), version, operator == "===")
+
+
+def _exact_pins(text: str) -> set[_Pin]:
+    """Collect every pin a manifest makes exactly, by `==`, `===` or a lockfile version."""
+    pins: set[_Pin] = set()
     pending_name: str | None = None
     for line in text.splitlines():
         lock_name = _LOCK_NAME.match(line)
         if lock_name:
-            pending_name = lock_name.group(1).lower()
+            pending_name = lock_name.group(1)
             continue
         lock_version = _LOCK_VERSION.match(line)
         if lock_version:
             name, pending_name = pending_name, None
             if name is not None:
-                pins.add((name, lock_version.group(1)))
+                pins.add(_pin(name, lock_version.group(1), None))
             continue
         toml_pin = _TOML_PIN.match(line)
         if toml_pin:
-            pins.add((toml_pin.group("name").lower(), toml_pin.group("version")))
+            pins.add(_pin(toml_pin["name"], toml_pin["version"], toml_pin["operator"]))
         for pin in _EXACT_PIN.finditer(line):
-            pins.add((pin.group("name").lower(), pin.group("version")))
+            pins.add(_pin(pin["name"], pin["version"], pin["operator"]))
+    return pins | _json_lock_pins(text)
+
+
+def _json_lock_pins(text: str) -> set[_Pin]:
+    """Collect the pins a JSON lockfile (`Pipfile.lock`) records under its package sections.
+
+    Its versions sit in `"version": "==X"` beside a name on another line, which no line
+    pattern pairs; anything that is not such a document holds no pins here.
+    """
+    if not text.lstrip().startswith("{"):
+        return set()
+    try:
+        document = json.loads(text)
+    except ValueError:
+        return set()
+    if not isinstance(document, dict):
+        return set()
+    pins: set[_Pin] = set()
+    for section in ("default", "develop"):
+        packages = document.get(section)
+        if not isinstance(packages, dict):
+            continue
+        for name, entry in packages.items():
+            version = entry.get("version") if isinstance(entry, dict) else None
+            if isinstance(name, str) and isinstance(version, str):
+                operator = "===" if version.startswith("===") else "=="
+                if version.startswith(operator):
+                    pins.add(_pin(name, version[len(operator) :].strip(), operator))
     return pins
 
 
 def _mentions(text: str, package: str) -> bool:
-    """Whether a manifest declares the package at all, at any version."""
-    pattern = rf"""^\s*(?:name\s*=\s*)?["']?{re.escape(package)}\b"""
+    """Whether a manifest declares the package at all, at any version, in any PEP 503 spelling.
+
+    A line may open with a YAML list bullet, as the pip section of a conda environment does.
+    """
+    name = r"[-_.]+".join(re.escape(part) for part in canonical_name(package).split("-"))
+    pattern = rf"""^[ \t]*(?:-[ \t]+)?(?:name[ \t]*=[ \t]*)?["']?{name}(?![\w.-])"""
     return re.search(pattern, text, re.IGNORECASE | re.MULTILINE) is not None
 
 
@@ -162,41 +212,44 @@ class MaliciousDependencyRule(ArtifactRule):
             return
         for path in target.iter_files():
             if _is_manifest(path):
-                yield from self._scan_manifest(path)
+                yield from self._scan_manifest(path, ctx)
         for path in target.iter_files((".py",)):
             if path.name.lower() == "setup.py":
-                yield from self._scan_setup(path)
+                yield from self._scan_setup(path, ctx)
 
-    def _scan_manifest(self, path: Path) -> Iterator[Finding]:
+    def _scan_manifest(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         prefix = read_text_prefix(path, errors="ignore")
         if prefix is None:
-            yield self._unscanned(path, "Dependency manifest not scanned", "it could not be read")
+            yield self._unscanned(
+                path, "Dependency manifest not scanned", "it could not be read", ctx
+            )
             return
         text, truncated = prefix
         pins = _exact_pins(text)
         for advisory in self._advisories:
-            version = self._affected_version(advisory, text, pins)
-            if version is not None:
-                yield self._finding(path, advisory, version)
+            pinned = self._affected_pin(advisory, text, pins)
+            if pinned is not None:
+                yield self._finding(path, advisory, pinned)
         if truncated:
-            yield self._unscanned(path, "Dependency manifest not scanned", _PAST_THE_BOUND)
+            yield self._unscanned(path, "Dependency manifest not scanned", _PAST_THE_BOUND, ctx)
 
     @staticmethod
-    def _affected_version(advisory: Advisory, text: str, pins: set[tuple[str, str]]) -> str | None:
-        """Return the pinned version this advisory covers, or None.
+    def _affected_pin(advisory: Advisory, text: str, pins: set[_Pin]) -> str | None:
+        """Return the pin this advisory covers, spelled with the manifest's version, or None.
 
         A wildcard advisory is about the package *name* — a dependency-confusion
         squat is malicious at every version — so a mention is enough there.
         """
         if _ANY_VERSION in advisory.versions:
-            return _ANY_VERSION if _mentions(text, advisory.package) else None
-        for name, version in sorted(pins):
-            if name == advisory.package and advisory.matches(version):
-                return version
+            return advisory.package if _mentions(text, advisory.package) else None
+        package = canonical_name(advisory.package)
+        for pin in sorted(pins):
+            if pin.name == package and advisory.matches(pin.version, arbitrary=pin.arbitrary):
+                operator = "===" if pin.arbitrary else "=="
+                return f"{advisory.package}{operator}{pin.version}"
         return None
 
-    def _finding(self, path: Path, advisory: Advisory, version: str) -> Finding:
-        pinned = advisory.package if version == _ANY_VERSION else f"{advisory.package}=={version}"
+    def _finding(self, path: Path, advisory: Advisory, pinned: str) -> Finding:
         vulnerable_loader = advisory.kind == "vulnerable_loader"
         summary = (
             f"{pinned}: {advisory.summary}"
@@ -220,10 +273,10 @@ class MaliciousDependencyRule(ArtifactRule):
             verdict=lead_verdict(summary) if vulnerable_loader else None,
         )
 
-    def _scan_setup(self, path: Path) -> Iterator[Finding]:
+    def _scan_setup(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         prefix = read_text_prefix(path)
         if prefix is None:
-            yield self._unscanned(path, _SETUP_UNSCANNED, "it could not be read as UTF-8")
+            yield self._unscanned(path, _SETUP_UNSCANNED, "it could not be read as UTF-8", ctx)
             return
         source, truncated = prefix
         for lineno in _setup_network_calls(source):
@@ -240,9 +293,10 @@ class MaliciousDependencyRule(ArtifactRule):
                 verdict=lead_verdict("network fetch in setup.py; a lead, not a certainty"),
             )
         if truncated:
-            yield self._unscanned(path, _SETUP_UNSCANNED, _PAST_THE_BOUND)
+            yield self._unscanned(path, _SETUP_UNSCANNED, _PAST_THE_BOUND, ctx)
 
-    def _unscanned(self, path: Path, title: str, reason: str) -> Finding:
+    def _unscanned(self, path: Path, title: str, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(self.meta.id, path, reason))
         return Finding(
             rule_id=self.meta.id,
             severity=Severity.LOW,

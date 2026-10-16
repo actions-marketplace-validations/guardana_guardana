@@ -33,6 +33,7 @@ _SAMPLES: dict[str, tuple[str, ...]] = {
         "s" + "k-svcacct-" + "b" * 48,
         "s" + "k-ant-api03-" + "c" * 40,
     ),
+    "Guardana collector key": ("gd" + "n_" + "0a1b2c3d4e5f" + "_" + "F" * 24,),
 }
 
 _CASES = [

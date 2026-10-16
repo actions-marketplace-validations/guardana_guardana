@@ -1,6 +1,7 @@
 import ast
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
@@ -35,6 +36,7 @@ _FETCH_CALLS = frozenset(
     }
 )
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})  # noqa: S104 — matched, not bound
+_UNREADABLE_HOST = "an unreadable host"
 
 
 def _bare_call_name(node: ast.Call) -> str:
@@ -67,12 +69,19 @@ def _plaintext_host(url: str) -> str | None:
 
     The scheme is matched case-insensitively — `HTTP://` and `Http://` are exactly
     as plaintext as `http://`, and an attacker (or a sloppy config) will use them.
+    The host is the one a client connects to, after any `user:password@`; an
+    authority that cannot be read is reported, since nothing shows it stays local.
     """
-    scheme, sep, rest = url.partition("://")
+    scheme, sep, _ = url.partition("://")
     if not sep or scheme.lower() != "http":
         return None
-    host = rest.split("/", 1)[0].split(":", 1)[0]
-    return None if host.lower() in _LOCAL_HOSTS else host
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return _UNREADABLE_HOST
+    if not host:
+        return _UNREADABLE_HOST
+    return None if host in _LOCAL_HOSTS else host
 
 
 _FETCH = "import requests\n\nrequests.get('https://models.example.invalid/weights.bin'{})\n"

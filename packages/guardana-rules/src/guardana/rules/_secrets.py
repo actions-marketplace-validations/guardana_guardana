@@ -37,6 +37,7 @@ _COMMON_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("Slack token", _prefix_shape(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
     ("Google API key", _prefix_shape(r"AIza[0-9A-Za-z_\-]{35}")),
     ("LLM provider API key", _LLM_API_KEY),
+    ("Guardana collector key", _prefix_shape(r"gdn_[0-9a-f]{12}_[A-Za-z0-9_-]{20,}")),
 )
 
 # The PEM header covers the labels OpenSSH, OpenSSL, and GnuPG actually emit.
@@ -45,10 +46,12 @@ _PRIVATE_KEY_LABEL = r"(?:RSA |DSA |EC |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY( B
 # The private-key pattern deliberately differs per scan surface: a bare header
 # in a repository file is routinely a truncated documentation example, so the
 # file scan demands a real key body; a live endpoint reply is often truncated
-# mid-leak, so there even the header alone is signal.
+# mid-leak, so there even the header alone is signal. The body is one possessive
+# run of a class that excludes `-`, so the run can only end where END may begin and
+# the search after a header costs one pass over the text that follows it.
 _PRIVATE_KEY_WITH_BODY = (
     "private key header",
-    re.compile(rf"-----BEGIN {_PRIVATE_KEY_LABEL}-----\s*(?:[A-Za-z0-9+/=\s]{{100,}})-----END"),
+    re.compile(rf"-----BEGIN {_PRIVATE_KEY_LABEL}-----[A-Za-z0-9+/=\s]{{100,}}+-----END"),
 )
 _PRIVATE_KEY_HEADER = (
     "private key header",

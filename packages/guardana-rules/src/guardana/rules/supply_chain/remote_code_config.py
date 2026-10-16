@@ -18,7 +18,7 @@ from guardana.core.taxonomy import (
 )
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
-from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
 from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
 
 # A Hugging Face config that carries `auto_map` (or `custom_pipelines`) is wired to
@@ -153,18 +153,18 @@ class RemoteCodeConfigRule(ArtifactRule):
             return
         for path in target.iter_files((".json",)):
             if _is_config(path):
-                yield from self._scan(path)
+                yield from self._scan(path, ctx)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
+    def _scan(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         prefix = read_text_prefix(path, errors="ignore")
         if prefix is None:
-            yield self._unscanned(path, "the file could not be read")
+            yield self._unscanned(path, "the file could not be read", ctx)
             return
         raw, truncated = prefix
         if truncated:
             # A loader reads the whole file, so a key past the bound still applies.
             yield self._unscanned(
-                path, f"the file is larger than the {MAX_SCAN_BYTES}-byte read bound"
+                path, f"the file is larger than the {MAX_SCAN_BYTES}-byte read bound", ctx
             )
             return
         try:
@@ -229,7 +229,8 @@ class RemoteCodeConfigRule(ArtifactRule):
             verdict=None if code_present else lead_verdict(summary),
         )
 
-    def _unscanned(self, path: Path, reason: str) -> Finding:
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(self.meta.id, path, reason))
         return Finding(
             rule_id=self.meta.id,
             severity=Severity.LOW,

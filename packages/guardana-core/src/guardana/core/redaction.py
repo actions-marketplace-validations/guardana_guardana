@@ -21,6 +21,7 @@ from dataclasses import dataclass, field, fields, is_dataclass, replace
 from datetime import date
 from enum import Enum, StrEnum
 from functools import cache
+from itertools import pairwise
 from types import NoneType
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, cast
 
@@ -90,7 +91,7 @@ digest its saved runs already record.
 """
 
 _REDACTED = "[redacted:{label}]"
-_TRUNCATED = "… [truncated: evidence exceeded {limit} bytes]"
+_TRUNCATED = "… [truncated: evidence exceeded {limit} bytes; {digest}]"
 _WITHHELD_EVIDENCE = "[evidence withheld: metadata_only]"
 _WITHHELD_SUMMARY = re.compile(r"\[evidence withheld: metadata_only(?::[0-9a-f]{12})?\]")
 _WITHHELD_REASON = "[reason withheld: metadata_only]"
@@ -124,6 +125,7 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("anthropic-key", re.compile(rf"{_WORD_START}sk-ant-[A-Za-z0-9_-]{{16,}}")),
     ("openai-key", re.compile(rf"{_WORD_START}sk-[A-Za-z0-9_-]{{16,}}")),
     ("google-key", re.compile(rf"{_WORD_START}AIza[0-9A-Za-z_-]{{35}}")),
+    ("guardana-key", re.compile(rf"{_WORD_START}gdn_[0-9a-f]{{12}}_[A-Za-z0-9_-]{{20,}}")),
     (
         "jwt",
         re.compile(
@@ -140,6 +142,13 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ),
 )
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
+"""An e-mail address, matched from a start `_email_matches` chose and never searched for.
+
+A search retries the local part from every word boundary of a run that reaches no `@`,
+which costs time quadratic in the run.
+"""
+_LOCAL_RUN_START = re.compile(r"[\s\S]*[^A-Za-z0-9._%+-]")
+_WORD_BOUNDARY = re.compile(r"\b")
 _IP = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 
 
@@ -196,7 +205,9 @@ _SENT_VALUE_PLACEHOLDER = "[redacted:credential]"
 _SHORTEST_SECRET = 4
 """A shorter sent value is not withheld, as it would blank ordinary text wherever it occurs."""
 
-_TRUNCATED_MARKER = re.compile(re.escape(_TRUNCATED).replace(re.escape("{limit}"), r"\d+"))
+# The digest part is optional: a recording written before it carried one still holds the
+# redactor's marker.
+_TRUNCATED_MARKER = re.compile(r"… \[truncated: evidence exceeded \d+ bytes(?:; [0-9a-f]{12})?\]")
 _WITHHELD_REASON_MARKER = re.compile(re.escape(_WITHHELD_REASON))
 
 
@@ -215,6 +226,47 @@ def holds_redaction_marker(text: str) -> bool:
             _TRUNCATED_MARKER,
         )
     )
+
+
+def is_redaction_of(shown: str, original: str) -> bool:
+    """Tell whether `shown` is `original` with some spans replaced by this redactor's placeholders.
+
+    A placeholder carrying a digest stands only for text with that digest; one without
+    stands for any text. The text around the placeholders must be the same, and two
+    placeholders with nothing between them are never split by guessing.
+    """
+    placeholders = list(_ALREADY_REDACTED.finditer(shown))
+    if not placeholders:
+        return shown == original
+    literals = [
+        shown[: placeholders[0].start()],
+        *(shown[before.end() : after.start()] for before, after in pairwise(placeholders)),
+        shown[placeholders[-1].end() :],
+    ]
+    head, tail = literals[0], literals[-1]
+    if (
+        len(head) + len(tail) > len(original)
+        or not original.startswith(head)
+        or not original.endswith(tail)
+    ):
+        return False
+    cursor, end = len(head), len(original) - len(tail)
+    for index, placeholder in enumerate(placeholders):
+        following = literals[index + 1]
+        if index == len(placeholders) - 1:
+            found = end
+        else:
+            found = original.find(following, cursor + 1, end) if following else -1
+        if found < 0 or not _stands_for(placeholder.group(0), original[cursor:found]):
+            return False
+        cursor = found + len(following)
+    return True
+
+
+def _stands_for(placeholder: str, hidden: str) -> bool:
+    """Tell whether `hidden` is text `placeholder` could have been written in place of."""
+    _label, _, digest = placeholder[len("[redacted:") : -1].partition(":")
+    return bool(hidden) and (not digest or digest_of(hidden)[7:19] == digest)
 
 
 @dataclass(frozen=True, slots=True)
@@ -511,7 +563,7 @@ class EvidenceRedactor:
             found = (
                 _isolated_spans(label, pattern, text)
                 if pattern in self._isolated
-                else _spans(pattern.finditer(text))
+                else _spans(_matches(pattern, text))
             )
             claimed = _claim(claimed, rank, found)
         spans = _outside(kept, claimed)
@@ -537,9 +589,11 @@ class EvidenceRedactor:
         if len(encoded) <= limit:
             return text
         # Truncation is announced, never silent: a report that quietly drops the
-        # half of the evidence that mattered looks complete and is not.
+        # half of the evidence that mattered looks complete and is not. The digest of
+        # the whole text keeps two findings that differ only past the bound apart, since
+        # a waiver matches on the summary.
         kept = encoded[:limit].decode("utf-8", errors="ignore")
-        return kept + _TRUNCATED.format(limit=limit)
+        return kept + _TRUNCATED.format(limit=limit, digest=digest_of(text)[7:19])
 
 
 _IDENTIFIER_FIELDS = frozenset({"rule_id", "rules_run", "evaluator_id", "assessor", "stage"})
@@ -631,6 +685,36 @@ def without_lone_surrogates(text: str) -> str:
 _Claimed = list[tuple[int, int, int]]
 _Span = tuple[int, int, int, int]
 """One match as `(start, end, value_start, value_end)`; without a matched `value`, the match."""
+
+
+def _matches(pattern: re.Pattern[str], text: str) -> Iterator[re.Match[str]]:
+    """Yield what `pattern.finditer(text)` yields, finding e-mail addresses by their `@`."""
+    return _email_matches(text) if pattern is _EMAIL else pattern.finditer(text)
+
+
+def _email_matches(text: str) -> Iterator[re.Match[str]]:
+    """Yield what `_EMAIL.finditer(text)` yields, in time linear in `text`.
+
+    Every address holds exactly one `@`, so each `@` is found by literal search and
+    `_EMAIL` is tried once, from the first word boundary of the local-part run before it.
+    A later start in that run reaches the same `@` and the same domain, so it cannot
+    succeed where the first failed, and a search would report the first.
+    """
+    resume = 0
+    previous = -1
+    at = text.find("@")
+    while at != -1:
+        floor = max(resume, previous + 1)
+        last_outside = _LOCAL_RUN_START.match(text, floor, at)
+        run = last_outside.end() if last_outside else floor
+        boundary = _WORD_BOUNDARY.search(text, run, at)
+        if boundary is not None and boundary.start() < at:
+            match = _EMAIL.match(text, boundary.start())
+            if match is not None:
+                yield match
+                resume = match.end()
+        previous = at
+        at = text.find("@", at + 1)
 
 
 def _spans(matches: Iterator[re.Match[str]]) -> Iterator[_Span]:

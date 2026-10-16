@@ -200,8 +200,13 @@ def lock_of(
 
     An id a manifest declares and nothing registers raises `PackError`. Pinned
     without it, the lock would match every later build in which that check never
-    runs while the manifest still promises it.
+    runs while the manifest still promises it. So do two packs declaring one name:
+    a lock is keyed by pack name, and the second would vanish from every check.
     """
+    _refuse_shared_names(
+        ((manifest.name, distribution) for distribution, _version, manifest in packs),
+        "installed packs",
+    )
     undelivered = [
         f"{manifest.name} declares {kind} {', '.join(missing)}"
         for _distribution, _version, manifest in packs
@@ -248,6 +253,22 @@ def lock_of(
         unlocked=unlocked,
         schema_version=_written_schema(locked, unlocked),
     )
+
+
+def _refuse_shared_names(packs: Iterable[tuple[str, str]], where: str) -> None:
+    """Raise `PackError` when two `(name, distribution)` pairs share a pack name."""
+    shipped: dict[str, list[str]] = {}
+    for name, distribution in packs:
+        shipped.setdefault(name, []).append(distribution)
+    shared = {name: found for name, found in shipped.items() if len(found) > 1}
+    if shared:
+        named = "; ".join(
+            f"{name} from {', '.join(sorted(found))}" for name, found in sorted(shared.items())
+        )
+        raise PackError(
+            f"{where} declare one pack name more than once, so a lock keyed by name would "
+            f"compare only one of them: {named}"
+        )
 
 
 def _foreign(
@@ -385,8 +406,12 @@ def lock_from_dict(raw: object, source: str) -> Lock:
             f"invalid lock {source}: schema {version} cannot list an output in 'unlocked' — "
             f"a lock naming an output is schema {LOCK_SCHEMA_VERSION}"
         )
+    read = tuple(_pack(entry, source, version) for entry in packs)
+    _refuse_shared_names(
+        ((p.name, p.distribution) for p in read), f"invalid lock {source}: its packs"
+    )
     return Lock(
-        packs=tuple(_pack(entry, source, version) for entry in packs),
+        packs=read,
         unlocked=unlocked,
         # Schema 1 differs from 2 only in layout, and 2 is still written when no
         # output is pinned, so only schema 1 is a migration.
@@ -427,8 +452,11 @@ def compare(locked: Lock, installed: Lock) -> tuple[Drift, ...]:
 
     Both directions, always. A missing rule is coverage a team still believes they
     have; an added one is a check nobody reviewed running against production. Only
-    reporting the first would make the lock a floor rather than a pin.
+    reporting the first would make the lock a floor rather than a pin. Either side
+    naming one pack twice raises `PackError`, as `lock_of` and `lock_from_dict` do.
     """
+    _refuse_shared_names(((p.name, p.distribution) for p in locked.packs), "locked packs")
+    _refuse_shared_names(((p.name, p.distribution) for p in installed.packs), "installed packs")
     drift: list[Drift] = []
     by_name = {pack.name: pack for pack in installed.packs}
     for pack in locked.packs:

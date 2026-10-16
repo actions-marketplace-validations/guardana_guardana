@@ -400,3 +400,34 @@ def test_the_packs_own_evaluators_and_targets_are_still_pinned() -> None:
     assert pack.evaluators == ("acme.strict_refusal",)
     assert pack.targets == ("AcmePromptLibraryTarget",)
     assert compare(_lock(), written) == ()
+
+
+def test_two_installed_packs_of_one_name_are_refused_rather_than_one_dropped() -> None:
+    """Keyed by name, the second pack and its rules would never be compared at all."""
+    fork = replace(_manifest(), rules=())
+
+    with pytest.raises(PackError, match="acme-guardana-rules from acme-fork, acme-guardana-rules"):
+        lock_of(
+            [("acme-guardana-rules", "0.3.1", _manifest()), ("acme-fork", "9.9.9", fork)],
+            _installed(),
+        )
+
+
+def test_a_lock_file_naming_one_pack_twice_is_refused() -> None:
+    written = lock_to_dict(_lock())
+    packs = cast("list[dict[str, object]]", written["packs"])
+    written["packs"] = [*packs, {**packs[0], "distribution": "acme-fork"}]
+
+    with pytest.raises(PackError, match="more than once"):
+        lock_from_dict(written, "guardana-lock.yaml")
+
+
+def test_a_comparison_of_a_hand_built_lock_naming_one_pack_twice_is_refused() -> None:
+    twice = replace(_lock(), packs=(*_lock().packs, replace(_lock().packs[0], distribution="fork")))
+
+    with pytest.raises(PackError, match="more than once"):
+        compare(_lock(), twice)
+
+
+def test_one_pack_name_from_one_distribution_still_locks() -> None:
+    assert [pack.name for pack in _lock().packs] == ["acme-guardana-rules"]

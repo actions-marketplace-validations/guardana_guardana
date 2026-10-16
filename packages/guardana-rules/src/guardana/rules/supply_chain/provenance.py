@@ -12,7 +12,7 @@ from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules._base import ArtifactRule
 from guardana.rules.supply_chain import _samples
-from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
 from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
 from guardana.rules.supply_chain._unread_python import unread_python
 
@@ -107,7 +107,7 @@ class ProvenanceRule(ArtifactRule):
                 yield from self._scan_downloads(source)
         for path in target.iter_files((".md",)):
             if path.name.lower() in _CARD_NAMES:
-                yield from self._scan_license(path)
+                yield from self._scan_license(path, ctx)
 
     def _scan_downloads(self, source: PythonSource) -> Iterator[Finding]:
         path = source.path
@@ -125,10 +125,10 @@ class ProvenanceRule(ArtifactRule):
                 verdict=lead_verdict("unpinned model download; a provenance lead, not a certainty"),
             )
 
-    def _scan_license(self, path: Path) -> Iterator[Finding]:
+    def _scan_license(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         prefix = read_text_prefix(path, errors="ignore")
         if prefix is None:
-            yield self._unscanned(path, "the file could not be read")
+            yield self._unscanned(path, "the file could not be read", ctx)
             return
         text, truncated = prefix
         marker = _license_lead(text)
@@ -148,9 +148,10 @@ class ProvenanceRule(ArtifactRule):
                 ),
             )
         if truncated:
-            yield self._unscanned(path, f"only the first {MAX_SCAN_BYTES} bytes were read")
+            yield self._unscanned(path, f"only the first {MAX_SCAN_BYTES} bytes were read", ctx)
 
-    def _unscanned(self, path: Path, reason: str) -> Finding:
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(self.meta.id, path, reason))
         return Finding(
             rule_id=self.meta.id,
             severity=Severity.LOW,

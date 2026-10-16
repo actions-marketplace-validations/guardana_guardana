@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
 from guardana.rules.supply_chain.insecure_transport import InsecureTransportRule
@@ -88,3 +89,67 @@ def test_verify_true_is_not_flagged(tmp_path: Path) -> None:
 def test_a_syntax_error_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "broken.py").write_text("def (:\n", encoding="utf-8")
     assert [s.split(":")[0] for _, s in _findings(tmp_path)] == ["Python file not scanned"]
+
+
+def _fetching(tmp_path: Path, url: str) -> list[tuple[str, str]]:
+    (tmp_path / "a.py").write_text(f"import requests\nrequests.get({url!r})\n", encoding="utf-8")
+    return _findings(tmp_path)
+
+
+_PLAIN = "http" + "://"
+
+
+@pytest.mark.parametrize(
+    ("url", "host"),
+    [
+        (_PLAIN + "localhost:secret@attacker.example/w.bin", "attacker.example"),
+        (_PLAIN + "localhost@attacker.example/w.bin", "attacker.example"),
+        (_PLAIN + "127.0.0.1:8000@attacker.example/w.bin", "attacker.example"),
+        (_PLAIN + "user@Attacker.Example:8080/w.bin", "attacker.example"),
+        (_PLAIN + "[2001:db8::1]:8080/w.bin", "2001:db8::1"),
+        ("HTTP://weights.example/w.bin", "weights.example"),
+        ("Http://localhost@weights.example/w.bin", "weights.example"),
+    ],
+)
+def test_a_plaintext_fetch_names_the_host_it_connects_to(
+    tmp_path: Path, url: str, host: str
+) -> None:
+    findings = _fetching(tmp_path, url)
+
+    assert findings == [
+        ("MEDIUM", f"plaintext http:// fetch from {host} (weights can be swapped in transit)")
+    ]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        _PLAIN + "[::1/w.bin",
+        _PLAIN + "[not-an-address]/w.bin",
+        _PLAIN + "/w.bin",
+        _PLAIN + "user@/w.bin",
+    ],
+)
+def test_a_plaintext_fetch_whose_host_cannot_be_read_is_reported(tmp_path: Path, url: str) -> None:
+    findings = _fetching(tmp_path, url)
+
+    assert [severity for severity, _ in findings] == ["MEDIUM"]
+    assert "an unreadable host" in findings[0][1]
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        _PLAIN + "[::1]:8000/v1",
+        _PLAIN + "[::1]/v1",
+        _PLAIN + "LOCALHOST:8000/v1",
+        _PLAIN + "admin:secret@localhost:8000/v1",
+        _PLAIN + "attacker.example@127.0.0.1/v1",
+        _PLAIN + "0.0.0.0:8000/v1",
+        "https://localhost:secret@attacker.example/w.bin",
+    ],
+)
+def test_a_fetch_that_stays_on_this_machine_or_uses_tls_is_not_flagged(
+    tmp_path: Path, url: str
+) -> None:
+    assert _fetching(tmp_path, url) == []

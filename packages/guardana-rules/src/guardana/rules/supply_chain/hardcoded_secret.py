@@ -40,8 +40,10 @@ _SENSITIVE = (
     r"secret|passwd|password|pwd|token|api[_-]?key|access[_-]?key|"
     r"auth[_-]?key|private[_-]?key|client[_-]?secret|credential"
 )
+# The name around the sensitive word is bounded: two unbounded runs of the same class
+# on either side of it retry every split of a long name, which is quadratic in it.
 _ASSIGNMENT = re.compile(
-    rf"(?i)([A-Za-z0-9_.\-]*(?:{_SENSITIVE})[A-Za-z0-9_.\-]*)\s*[:=]\s*"
+    rf"(?i)([A-Za-z0-9_.\-]{{0,64}}(?:{_SENSITIVE})[A-Za-z0-9_.\-]{{0,64}})\s*[:=]\s*"
     r"[\"']([^\"'\n]{12,120})[\"']"
 )
 # Values that are plainly not real secrets: placeholders, env indirection, examples.

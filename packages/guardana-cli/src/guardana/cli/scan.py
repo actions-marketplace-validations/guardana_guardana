@@ -71,8 +71,9 @@ def _announce_baseline_health(accepted: Baseline) -> None:
         )
     for waiver in accepted.unreviewed:
         typer.echo(
-            f"warning: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) still has "
-            f"the generated placeholder text — an accepted risk needs a reason and an owner",
+            f"warning: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) has no "
+            f"reason or approver written, or still the generated placeholder — an accepted "
+            f"risk needs a reason and an owner",
             err=True,
         )
 
