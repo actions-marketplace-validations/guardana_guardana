@@ -109,15 +109,16 @@ class InMemoryStore:
         )
         run_id = submission.run.run_id if submission.run else None
         with self._lock:
-            if run_id is not None and self._holds(scope, run_id):
+            if run_id is not None and self._holds(scope, _environment_of(record), run_id):
                 return False
             self._records.append((scope, record))
         return True
 
-    def _holds(self, scope: TenantScope, run_id: str) -> bool:
-        """Whether this tenant already has that run. Called under the lock."""
+    def _holds(self, scope: TenantScope, environment: str | None, run_id: str) -> bool:
+        """Whether this project already has that run in that environment. Called under the lock."""
         return any(
             held_scope.project_id == scope.project_id
+            and _environment_of(held) == environment
             and held.submission.run is not None
             and held.submission.run.run_id == run_id
             for held_scope, held in self._records

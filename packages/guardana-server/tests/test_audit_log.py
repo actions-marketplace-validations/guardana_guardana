@@ -19,6 +19,10 @@ from guardana.server.db.migrations import apply_pending
 from guardana.server.lifecycle import record_sighting, set_status, waive
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.tenancy import TenantScope, create_organization, create_project
+from test_migrations import _apply_through
+
+_AUDIT_LOG_MIGRATION = 7
+"""The migration that creates `audit_events`, the one whose rollback cannot be logged."""
 
 _IDENTITY = "sha256:" + "c" * 64
 _PROJECT = "acme/web"
@@ -239,7 +243,7 @@ def test_rolling_back_the_audit_log_says_it_could_not_record_itself(
     and then tried to write a row into it, so a command that had already done its
     work reported an error.
     """
-    apply_pending(connection)
+    _apply_through(connection, _AUDIT_LOG_MIGRATION)
     connection.commit()
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
 

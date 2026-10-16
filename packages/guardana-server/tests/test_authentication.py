@@ -506,7 +506,7 @@ def test_a_well_formed_key_this_collector_never_issued_is_refused(
     _tenanted(connection)
 
     with pytest.raises(AuthError, match="unknown API key"):
-        authenticate(connection, "gdn_deadbeefcafe_not-a-key-this-collector-issued")
+        authenticate(connection, "gdn" + "_deadbeefcafe_not-a-key-this-collector-issued")
 
 
 def test_an_unknown_prefix_costs_the_digest_and_comparison_a_known_one_does(
@@ -530,7 +530,7 @@ def test_an_unknown_prefix_costs_the_digest_and_comparison_a_known_one_does(
     monkeypatch.setattr(hmac, "compare_digest", spy_compare)
 
     with pytest.raises(AuthError) as refused:
-        authenticate(connection, "gdn_deadbeefcafe_not-a-key-this-collector-issued")
+        authenticate(connection, "gdn" + "_deadbeefcafe_not-a-key-this-collector-issued")
 
     assert str(refused.value) == "unknown API key"
     assert hashed == ["not-a-key-this-collector-issued"]

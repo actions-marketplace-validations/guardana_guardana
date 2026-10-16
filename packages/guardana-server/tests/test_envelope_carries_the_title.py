@@ -24,7 +24,16 @@ def _client() -> TestClient:
 
 
 def _submission(taxonomy: list[dict[str, str]], version: int = SCHEMA_VERSION) -> dict[str, object]:
+    summary = {
+        "rules_run": 1,
+        "rules_executed": ["guardana.prompt.system_prompt_leak.canary"],
+        "rules_skipped": [],
+        "max_severity": "CRITICAL",
+        "unverified": 0,
+        "errors": 0,
+    }
     return {
+        **({"summary": summary} if version == SCHEMA_VERSION else {}),
         "source": "agent",
         "schema_version": version,
         "findings": [
@@ -37,6 +46,8 @@ def _submission(taxonomy: list[dict[str, str]], version: int = SCHEMA_VERSION) -
                 "taxonomy": taxonomy,
             }
         ],
+        "unverified": [],
+        "errors": [],
     }
 
 

@@ -28,11 +28,13 @@ def without_password(message: str, url: str) -> str:
     secrets: set[str] = set()
     _, scheme, rest = url.partition("://")
     if scheme:
+        # A malformed URL may carry `#` or `?` inside its password, so the userinfo is
+        # also read up to the last `@`; masking too much is safe, too little is a leak.
         authority = re.split(r"[/?#]", rest, maxsplit=1)[0]
-        userinfo, at, _ = authority.rpartition("@")
-        _, colon, password = userinfo.partition(":")
-        if at and colon and password:
-            secrets.add(password)
+        for userinfo in (authority.rpartition("@")[0], rest.rpartition("@")[0]):
+            _, colon, password = userinfo.partition(":")
+            if colon and password:
+                secrets.add(password)
     for match in _KEYWORD_PASSWORD.finditer(url):
         value = match.group(1)
         secrets.update({value, value.strip("'")})

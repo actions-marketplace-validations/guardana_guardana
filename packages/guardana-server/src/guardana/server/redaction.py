@@ -42,6 +42,7 @@ _SECRET_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("anthropic-key", re.compile(rf"{_WORD_START}sk-ant-[A-Za-z0-9_-]{{16,}}")),
     ("openai-key", re.compile(rf"{_WORD_START}sk-[A-Za-z0-9_-]{{16,}}")),
     ("google-key", re.compile(rf"{_WORD_START}AIza[0-9A-Za-z_-]{{35}}")),
+    ("guardana-key", re.compile(rf"{_WORD_START}gdn_[0-9a-f]{{12}}_[A-Za-z0-9_-]{{20,}}")),
     (
         "jwt",
         re.compile(

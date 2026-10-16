@@ -5,10 +5,12 @@ whose exit status means nothing. `0` did what was asked, `1` the database said n
 `3` the command was pointed at nothing, `4` the database could not be reached.
 """
 
+from datetime import UTC, datetime, timedelta
+
 import psycopg
 import pytest
 from conftest import DbConnection
-from guardana.server.auth import Scope, list_keys
+from guardana.server.auth import Scope, generate_key, list_keys, store_key
 from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, EXIT_UNAVAILABLE, main
 from guardana.server.db.migrations import apply_pending, read_state
 from guardana.server.envelope import DeploymentIn, EvidenceIn, FindingIn, RunIn, Submission
@@ -860,3 +862,99 @@ def test_finding_list_reports_the_worst_severity_not_the_alphabetical_one(
     main(["finding", "list"])
 
     assert "CRITICAL" in capsys.readouterr().out
+
+
+def _listed_line(capsys: pytest.CaptureFixture[str], name: str) -> str:
+    capsys.readouterr()
+    main(["key", "list", "--project", "acme/web"])
+    (line,) = [row for row in capsys.readouterr().out.splitlines() if row.endswith(f" {name}")]
+    return line
+
+
+def test_key_create_without_a_lifetime_lists_as_never_expiring(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    assert main(["key", "create", "--project", "acme/web", "--name", "forever"]) == EXIT_OK
+
+    line = _listed_line(capsys, "forever")
+
+    assert line.split()[1] == "active"
+    assert "no expiry" in line
+
+
+def test_key_create_with_a_lifetime_lists_its_expiry_date(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(["key", "create", "--project", "acme/web", "--name", "ci", "--expires-in-days", "30"])
+    with psycopg.connect(database_url) as connection:
+        (key,) = [k for k in list_keys(connection, project="acme/web") if k.name == "ci"]
+
+    line = _listed_line(capsys, "ci")
+
+    assert key.expires_at is not None
+    assert line.split()[1] == "active"
+    assert f"expires {key.expires_at.date()}" in line
+
+
+def test_key_create_refuses_a_zero_lifetime_before_it_resolves_the_project(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    main(["migrate"])
+    capsys.readouterr()
+
+    code = main(
+        ["key", "create", "--project", "acme/missing", "--name", "x", "--expires-in-days", "0"]
+    )
+
+    assert code == EXIT_INVALID_USAGE
+    assert "--expires-in-days must be 1 or more" in capsys.readouterr().err
+
+
+def test_an_expired_key_lists_as_expired_with_its_date(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web").id
+        issued, digest = generate_key("lapsed", (Scope.INGEST,))
+        expired_at = datetime.now(UTC) - timedelta(days=2)
+        store_key(
+            connection,
+            issued,
+            digest,
+            scope=TenantScope.for_project(project),
+            expires_at=expired_at,
+        )
+        connection.commit()
+
+    line = _listed_line(capsys, "lapsed")
+
+    assert line.split()[1] == "expired"
+    assert f"expired {expired_at.date()}" in line
+
+
+def test_a_revoked_key_lists_as_revoked_even_when_it_has_also_expired(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web").id
+        issued, digest = generate_key("gone", (Scope.INGEST,))
+        store_key(
+            connection,
+            issued,
+            digest,
+            scope=TenantScope.for_project(project),
+            expires_at=datetime.now(UTC) - timedelta(days=2),
+        )
+        connection.commit()
+    main(["key", "revoke", issued.prefix])
+
+    assert _listed_line(capsys, "gone").split()[1] == "revoked"

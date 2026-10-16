@@ -343,3 +343,50 @@ def test_ingest_refuses_a_violation_of_every_value_constraint_the_schema_publish
 )
 def test_every_envelope_a_release_wrote_is_accepted(document: dict[str, Any]) -> None:
     assert _post(_client(), document) == _OK
+
+
+_CHANNELS = ("findings", "unverified", "errors")
+
+
+@pytest.mark.parametrize("channel", _CHANNELS)
+def test_a_current_envelope_without_a_result_channel_is_refused_naming_it(channel: str) -> None:
+    client = _client()
+    document = _envelope()
+    del document[channel]
+
+    response = client.post("/findings", json=document)
+
+    assert response.status_code == _UNPROCESSABLE
+    assert [error["loc"] for error in response.json()["detail"]] == [["body", channel]]
+    assert client.get("/findings").json() == []
+
+
+def test_a_current_envelope_without_a_result_channel_is_never_stored_in_postgres(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with psycopg.connect(database_url) as connection:
+        apply_pending(connection)
+    served = serve(database_url, tenant(database_url), monkeypatch)
+    document = _envelope()
+    del document["findings"]
+
+    response = served.client.post("/findings", json=document, headers=bearer(served.token))
+
+    assert response.status_code == _UNPROCESSABLE
+    assert served.store.records(served.scope) == []
+
+
+def test_a_current_envelope_with_empty_result_channels_is_accepted() -> None:
+    document = _envelope()
+    for channel in _CHANNELS:
+        document[channel] = []
+
+    assert _post(_client(), document) == _OK
+
+
+def test_an_envelope_older_than_the_published_schema_keeps_its_defaults() -> None:
+    document = _envelope()
+    document["schema_version"] = 2
+    del document["errors"]
+
+    assert _post(_client(), document) == _OK

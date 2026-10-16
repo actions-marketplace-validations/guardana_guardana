@@ -39,6 +39,12 @@ SkipReasonName = Literal[
     "missing_capability", "unsafe_mode", "not_applicable", "not_recorded", "not_offered"
 ]
 _IDENTITY = re.compile(r"sha256:[0-9a-f]{64}")
+_REQUIRED_CHANNELS = {SCHEMA_VERSION: ("findings", "unverified", "errors", "summary")}
+"""The result channels and summary a version's published schema requires; an absent one is refused.
+
+Only versions with a published schema are listed: an older agent's envelope keeps the
+defaults it has always been read with.
+"""
 
 
 class TaxonomyRefIn(BaseModel):
@@ -261,11 +267,18 @@ class OffSchemaValue(NamedTuple):
 def off_schema_values(submission: Submission) -> list[OffSchemaValue]:
     """Every value in `submission` outside the published schema's enums, bounds and patterns.
 
+    A result channel the declared version requires and the agent left out is among them:
+    the model's default would otherwise store it as an empty channel, a clean run.
+
     Checked at ingest only. The models stay as loose as every earlier collector, so a
     row one of them stored still reads back; a new value outside the schema is refused
     before it is stored.
     """
-    found: list[OffSchemaValue] = []
+    found: list[OffSchemaValue] = [
+        OffSchemaValue((channel,), "Field required", None)
+        for channel in _REQUIRED_CHANNELS.get(submission.schema_version, ())
+        if channel not in submission.model_fields_set
+    ]
     for channel in ("findings", "unverified"):
         for index, finding in enumerate(getattr(submission, channel)):
             _finding_values(found, (channel, index), finding)

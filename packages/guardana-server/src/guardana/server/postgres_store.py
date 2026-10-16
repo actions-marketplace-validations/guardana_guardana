@@ -196,7 +196,8 @@ class PostgresStore:
                           %s, %s, %s, %s, %s, %s, %s, %s,
                           %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                           %s)
-                on conflict (project_id, run_id) where run_id is not null do nothing
+                on conflict (project_id, (coalesce(environment, '')), run_id)
+                    where run_id is not null do nothing
                 returning id
                 """,
                 (

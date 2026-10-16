@@ -20,6 +20,7 @@ from guardana.core.redaction import EvidenceMode, EvidenceRedactor, RedactionPol
 from guardana.core.testing import fake_aws_key, fake_github_pat, fake_jwt, fake_llm_key
 from guardana.server import create_app
 from guardana.server import redaction as collector
+from guardana.server.auth import Scope, generate_key
 from guardana.server.db.migrations import apply_pending
 from guardana.server.envelope import MAX_STRING_LENGTH, SCHEMA_VERSION, Submission
 from guardana.server.redaction import redact_submission, redact_text
@@ -316,3 +317,48 @@ def test_the_durable_store_holds_the_redacted_submission(
     for secret in _SECRETS:
         assert secret not in held
     assert "[redacted:openai-key:" in record.submission.findings[0].evidence.summary
+
+
+def _minted_key() -> str:
+    issued, _digest = generate_key("synthetic", (Scope.INGEST,))
+    return issued.token
+
+
+def test_a_collector_key_is_redacted_under_its_own_label() -> None:
+    key = _minted_key()
+    digest = hashlib.sha256(key.encode()).hexdigest()[:12]
+
+    assert redact_text(f"saw {key} here") == f"saw [redacted:guardana-key:{digest}] here"
+    assert redact_text(f"api_key={key}") == f"api_key=[redacted:guardana-key:{digest}]"
+
+
+def test_text_that_only_resembles_a_collector_key_is_kept() -> None:
+    for text in ("gdn_", "gdn_deadbeef_short", "xgdn_" + "a" * 12 + "_" + "b" * 43):
+        assert redact_text(text) == text
+
+
+def test_a_collector_key_in_a_submission_is_never_stored() -> None:
+    client = _client()
+    key = _minted_key()
+
+    assert client.post("/findings", json=_envelope(key)).status_code == _OK
+    (stored,) = client.get("/findings").json()
+
+    assert key not in json.dumps(stored)
+    assert "[redacted:guardana-key:" in stored["findings"][0]["evidence"]["summary"]
+
+
+def test_the_ingest_key_quoted_in_its_own_submission_is_never_stored(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with psycopg.connect(database_url) as connection:
+        apply_pending(connection)
+    served = serve(database_url, tenant(database_url), monkeypatch)
+
+    response = served.client.post(
+        "/findings", json=_envelope(served.token), headers=bearer(served.token)
+    )
+
+    assert response.status_code == _OK, response.text
+    (record,) = served.store.records(served.scope)
+    assert served.token not in record.submission.model_dump_json()

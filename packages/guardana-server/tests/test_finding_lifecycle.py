@@ -17,11 +17,14 @@ from conftest import DbConnection, _submission
 from guardana.server.cli.codes import EXIT_INVALID_USAGE
 from guardana.server.cli.main import main as collector
 from guardana.server.db.migrations import apply_pending
+from guardana.server.envelope import DeploymentIn
 from guardana.server.lifecycle import (
     AmbiguousIdentityError,
+    InvalidIdentityPrefixError,
     TrackedFinding,
     UnknownIdentityError,
     WaiverError,
+    _like_literal,
     list_tracked,
     record_sighting,
     set_status,
@@ -309,13 +312,14 @@ def test_an_ambiguous_prefix_is_a_usage_error_not_a_database_outage(
     create_organization(connection, "acme", "Acme")
     created = create_project(connection, "acme", "web", "Web")
     connection.commit()
+    neighbour = "sha256:" + "a" * 63 + "b"
     record_sighting(connection, created.id, _IDENTITY, datetime.datetime.now(tz=datetime.UTC))
-    record_sighting(connection, created.id, _OTHER, datetime.datetime.now(tz=datetime.UTC))
+    record_sighting(connection, created.id, neighbour, datetime.datetime.now(tz=datetime.UTC))
     connection.commit()
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
 
     code = collector(
-        ["finding", "status", "sha256:", "--project", _PROJECT, "--status", "resolved"]
+        ["finding", "status", "sha256:aaaa", "--project", _PROJECT, "--status", "resolved"]
     )
 
     assert code == EXIT_INVALID_USAGE
@@ -417,3 +421,99 @@ def test_a_second_run_seeing_the_same_finding_makes_it_two(
     _run_reporting(database_url, project, occurrences=3)
 
     assert _only(connection).runs == 2
+
+
+@pytest.mark.parametrize(
+    "prefix", ["", "%", "_", "sha256:", "aa%", "aa_", "sha256:%", "zz", " aaaa", "aaaa\\"]
+)
+def test_a_prefix_that_is_not_hexadecimal_is_refused_and_changes_nothing(
+    connection: DbConnection, project: int, prefix: str
+) -> None:
+    _seen(connection, project)
+
+    with pytest.raises(InvalidIdentityPrefixError):
+        set_status(connection, _PROJECT, prefix, status="acknowledged")
+    with pytest.raises(InvalidIdentityPrefixError):
+        waive(
+            connection,
+            _PROJECT,
+            prefix,
+            approver="alice",
+            reason="accepted",
+            expires=datetime.date(2099, 12, 31),
+        )
+    connection.rollback()
+
+    assert _only(connection).status == "open"
+
+
+def test_an_upper_case_prefix_addresses_the_finding(connection: DbConnection, project: int) -> None:
+    _seen(connection, project)
+
+    set_status(connection, _PROJECT, "sha256:AAAAAAAA", status="acknowledged")
+    connection.commit()
+
+    assert _only(connection).status == "acknowledged"
+
+
+def test_a_wildcard_prefix_is_a_usage_error_on_the_command_line(
+    connection: DbConnection,
+    project: int,
+    database_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _seen(connection, project)
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+
+    code = collector(["finding", "status", "%", "--project", _PROJECT, "--status", "resolved"])
+
+    assert code == EXIT_INVALID_USAGE
+    assert "not an identity prefix" in capsys.readouterr().err
+    assert _only(connection).status == "open"
+
+
+def test_like_metacharacters_are_escaped_in_the_pattern() -> None:
+    assert _like_literal("a%b_c\\d") == "a\\%b\\_c\\\\d"
+
+
+def _report_in(database_url: str, project_id: int, environment: str, identity: str) -> None:
+    submission = _submission(deployment=DeploymentIn(environment=environment))
+    for finding in submission.findings:
+        finding.identity = identity
+    PostgresStore(database_url).add(
+        TenantScope.for_project(project_id, environment=environment), submission
+    )
+
+
+def test_an_environment_listing_pages_only_that_environment_s_findings(
+    connection: DbConnection, project: int, database_url: str
+) -> None:
+    _report_in(database_url, project, "production", _IDENTITY)
+    for index in range(3):
+        _report_in(database_url, project, "dev", "sha256:" + f"{index:x}" * 64)
+
+    listed = list_tracked(connection, _PROJECT, environment="production", limit=1, today=_TODAY)
+    unlimited = list_tracked(connection, _PROJECT, environment="production", today=_TODAY)
+
+    assert [entry.identity for entry in listed] == [_IDENTITY]
+    assert [entry.identity for entry in unlimited] == [_IDENTITY]
+    assert listed[0].runs == 1
+
+
+def test_a_finding_seen_in_two_environments_lists_in_each_with_that_environment_s_runs(
+    connection: DbConnection, project: int, database_url: str
+) -> None:
+    _report_in(database_url, project, "production", _IDENTITY)
+    _report_in(database_url, project, "dev", _IDENTITY)
+    _report_in(database_url, project, "dev", _IDENTITY)
+
+    production = list_tracked(connection, _PROJECT, environment="production", today=_TODAY)
+    dev = list_tracked(connection, _PROJECT, environment="dev", today=_TODAY)
+    elsewhere = list_tracked(connection, _PROJECT, environment="staging", today=_TODAY)
+    everywhere = list_tracked(connection, _PROJECT, today=_TODAY)
+
+    assert [(entry.identity, entry.runs) for entry in production] == [(_IDENTITY, 1)]
+    assert [(entry.identity, entry.runs) for entry in dev] == [(_IDENTITY, 2)]
+    assert elsewhere == ()
+    assert [(entry.identity, entry.runs) for entry in everywhere] == [(_IDENTITY, 3)]

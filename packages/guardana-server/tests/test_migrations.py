@@ -670,3 +670,37 @@ def test_rolling_back_the_run_columns_keeps_the_submissions(connection: DbConnec
         cursor.execute("select source from submissions")
         assert cursor.fetchall() == [("kept",)]
     assert not (_RUN_COLUMNS & _columns(connection, "submissions"))
+
+
+def _one_run_in_two_environments(connection: DbConnection) -> None:
+    create_organization(connection, "acme", "Acme")
+    project = create_project(connection, "acme", "web", "Web")
+    with connection.cursor() as cursor:
+        cursor.executemany(
+            "insert into submissions (received_at, source, schema_version, project_id, "
+            "environment, run_id) values (now(), 'ci', 8, %s, %s, %s)",
+            [
+                (project.id, "dev", "00000000-0000-4000-8000-000000000001"),
+                (project.id, "production", "00000000-0000-4000-8000-000000000001"),
+            ],
+        )
+    connection.commit()
+
+
+def test_rolling_back_run_identity_per_environment_keeps_both_runs(
+    connection: DbConnection,
+) -> None:
+    """The older index allows one run id per project; the rollback stops rather than drop a run."""
+    apply_pending(connection)
+    _one_run_in_two_environments(connection)
+
+    with pytest.raises(MigrationError, match="could not roll back migration 8"):
+        _roll_back_through(connection, 8)
+    connection.rollback()
+
+    with connection.cursor() as cursor:
+        cursor.execute("select count(*) from submissions where run_id is not null")
+        row = cursor.fetchone()
+    assert row is not None
+    assert row[0] == 2
+    assert read_state(connection).pending == ()

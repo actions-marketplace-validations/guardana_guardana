@@ -1,4 +1,6 @@
 import json
+import re
+import uuid
 from collections.abc import Callable
 from datetime import datetime
 from typing import Protocol
@@ -92,7 +94,16 @@ def check_collector_url(url: str) -> None:
     and validating by constructing would mean a reporter exists whether or not one
     is ever used.
     """
-    scheme = urlsplit(url).scheme
+    try:
+        scheme = urlsplit(url).scheme
+        private = private_url_parts(url)
+    except ValueError:
+        # The parser's own message quotes the address whole, userinfo included, so it
+        # is replaced rather than chained.
+        raise ValueError(
+            f"reporter URL {_typed_address(url)!r} cannot be read as a URL; check it for "
+            f"a character that only looks like ':' or '/'"
+        ) from None
     if scheme not in ("http", "https"):
         # Never report the parsed scheme back: `collector.example.com:8000` parses
         # as a *scheme* of `collector.example.com`, so saying so told people their
@@ -103,7 +114,7 @@ def check_collector_url(url: str) -> None:
             f"scheme, http:// or https:// — for example https://collector.example.com or "
             f"http://127.0.0.1:8000. Without one, a bare host:port reads as a scheme."
         )
-    if "userinfo" in private_url_parts(url):
+    if "userinfo" in private:
         # urllib cannot send userinfo; it fails on the host after the run has finished.
         raise ValueError(
             "the reporter URL carries userinfo, which cannot be sent; the collector's key "
@@ -112,10 +123,18 @@ def check_collector_url(url: str) -> None:
 
 
 def _typed_address(url: str) -> str:
-    """Return what was typed as the address, without a query, a fragment or userinfo."""
+    """Return what was typed as the address, without userinfo, a query or a fragment.
+
+    Userinfo is removed first, up to the last `@`: a password may hold `?` or `#`, and
+    cutting the query first would leave the part of the password before it.
+    """
+    scheme, separator, rest = url.partition("://")
+    if not separator:
+        scheme, rest = "", url
+    rest = rest.rpartition("@")[2]
     for mark in ("?", "#"):
-        url = url.partition(mark)[0]
-    return url.rpartition("@")[2]
+        rest = rest.partition(mark)[0]
+    return f"{scheme}{separator}{rest}"
 
 
 class Reporter(Protocol):
@@ -170,9 +189,20 @@ def _moment(value: datetime | None) -> str | None:
     return None if value is None else value.isoformat()
 
 
-def _identified(finding: Finding, source: str) -> dict[str, object]:
-    """Serialize a finding, carrying the key that links it across runs."""
+_BARE_PLACEHOLDER = re.compile(r"\[redacted:[a-z0-9-]+\]")
+"""A redaction placeholder with no digest, which `hash_identifiers: false` writes."""
+
+
+def _identified(finding: Finding, source: str, run_id: str) -> dict[str, object]:
+    """Serialize a finding, carrying the key that links it across runs.
+
+    A location whose distinguishing value redaction replaced with a bare placeholder
+    names every location that differs only there, so it is linked to this run alone:
+    a waiver accepted for one such finding never covers another.
+    """
     rule_id, location = finding_identity(finding, source)
+    if _BARE_PLACEHOLDER.search(location):
+        return {**finding_to_dict(finding), "identity": digest_of(rule_id, location, run_id)}
     return {**finding_to_dict(finding), "identity": digest_of(rule_id, location)}
 
 
@@ -186,14 +216,15 @@ def _serialize(
 ) -> bytes:
     """Build the envelope; identities use `source`, the wire shows `shown_source` when given."""
     max_sev = result.max_severity()
+    run_id = run.run_id if run is not None else uuid.uuid4().hex
     payload: dict[str, object] = {
         "schema_version": ENVELOPE_SCHEMA_VERSION,
         "source": source if shown_source is None else shown_source,
-        "findings": [_identified(f, source) for f in result.findings],
+        "findings": [_identified(f, source, run_id) for f in result.findings],
         # Never dropped: a check that ran but could not grade is not a pass. The
         # collector must see it, or a dashboard renders a false all-clear on a
         # model whose CRITICAL checks silently failed to run.
-        "unverified": [_identified(f, source) for f in result.unverified],
+        "unverified": [_identified(f, source, run_id) for f in result.unverified],
         "errors": [
             {"source": e.source, "stage": e.stage, "reason": e.reason} for e in result.errors
         ],
