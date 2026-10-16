@@ -126,12 +126,16 @@ jobs:
             dist/*.whl
             dist/*.tar.gz
 
+      # `skip-existing` keeps a re-run idempotent, and this keeps it honest: a file PyPI
+      # already serves under the same name must be these bytes, or the SBOMs, the
+      # attestation and the images that follow would describe something else.
+      - name: Refuse to skip a file PyPI holds with other bytes
+        run: python3 scripts/check_pypi_digests.py dist/
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
         with:
           packages-dir: dist/
-          # Idempotent re-runs: a version already on PyPI (e.g. bootstrapped by a
-          # one-time token upload, or a re-tagged release) is skipped, not failed.
           skip-existing: true
 
       # After a successful publish, create the GitHub Release from the tag's
@@ -190,25 +194,41 @@ jobs:
             dist-reference/*.whl
             dist-reference/*.tar.gz
 
-      # A re-run keeps the first upload, as PyPI's skip-existing does, so the asset and
-      # the index never hold different bytes under one version.
+      - name: Keep the attested reference pack for the PyPI job
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: reference-pack-dist
+          path: |
+            dist-reference/*.whl
+            dist-reference/*.tar.gz
+          if-no-files-found: error
+
+      # A re-run keeps the first upload, as PyPI's skip-existing does, and only when it
+      # is these bytes: an asset already attached under the same name with other bytes
+      # is somebody else's file, and the release stops rather than keep it.
       - name: Attach the reference pack to the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
           attached=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          held=$(mktemp -d)
           for file in dist-reference/*.whl dist-reference/*.tar.gz; do
             name=$(basename "$file")
             if printf '%s\n' "$attached" | grep -qxF "$name"; then
-              echo "::notice::$name is already attached to $TAG; the first upload is kept"
+              gh release download "$TAG" --pattern "$name" --dir "$held"
+              if ! cmp -s "$file" "$held/$name"; then
+                echo "::error::$name is already attached to $TAG with other bytes than this build"
+                exit 1
+              fi
+              echo "::notice::$name is already attached to $TAG with these bytes"
             else
               gh release upload "$TAG" "$file"
             fi
           done
 
-  # The reference pack on PyPI, from the files attached to the GitHub Release, so what
-  # PyPI receives is what was attested. Off until the owner registers the pending
+  # The reference pack on PyPI, from the files the reference-pack job built and
+  # attested, so what PyPI receives is what was attested. Off until the owner registers the pending
   # trusted publisher for `guardana-reference-pack` and sets REFERENCE_PACK_PYPI; the
   # pack's version moves only when its content does, so a release that did not bump it
   # is skipped rather than failed.
@@ -218,19 +238,23 @@ jobs:
     runs-on: ubuntu-24.04
     environment: pypi
     permissions:
-      contents: read       # download the release assets
+      contents: read       # check out the digest check
       id-token: write      # OIDC trusted publishing
 
     steps:
-      - name: Download the reference pack from the GitHub Release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
-        run: |
-          gh release download "$TAG" --dir dist-reference \
-            --pattern 'guardana_reference_pack-*.whl' \
-            --pattern 'guardana_reference_pack-*.tar.gz'
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The files the previous job built and attested, not whatever the Release holds
+      # by the time this job is approved: a Release asset can be replaced in between.
+      - name: Take the attested reference pack
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reference-pack-dist
+          path: dist-reference
+
+      - name: Refuse to skip a file PyPI holds with other bytes
+        run: python3 scripts/check_pypi_digests.py dist-reference/
 
       - name: Publish the reference pack to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1

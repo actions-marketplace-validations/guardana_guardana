@@ -18,6 +18,7 @@ from typing import Any, NoReturn
 
 import pytest
 
+import check_pypi_digests
 import clean_install_check
 import export_image_requirements
 import generate_sbom
@@ -74,6 +75,7 @@ _SCRIPTS = pytest.mark.parametrize(
         (image_smoke, ("--no-build",)),
         (export_image_requirements, ("--check",)),
         (reproduce_release, ("--source",)),
+        (check_pypi_digests, ("directory",)),
     ],
     ids=[
         "release",
@@ -82,6 +84,7 @@ _SCRIPTS = pytest.mark.parametrize(
         "image_smoke",
         "export_image_requirements",
         "reproduce_release",
+        "check_pypi_digests",
     ],
 )
 
@@ -116,7 +119,7 @@ def test_an_unknown_flag_is_refused_before_anything_runs(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A misspelled flag is an error, never a default run with the typo ignored."""
-    takes_a_positional = module in {release, reproduce_release}
+    takes_a_positional = module in {release, reproduce_release, check_pypi_digests}
     argv = ["patch", "--no-such-flag"] if takes_a_positional else ["--no-such-flag"]
     with pytest.raises(SystemExit) as exit_info:
         _call_main(module, argv)
