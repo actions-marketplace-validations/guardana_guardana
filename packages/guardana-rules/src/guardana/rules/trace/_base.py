@@ -21,7 +21,7 @@ from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import Target
 from guardana.core.target.protocols import TraceReader
-from guardana.core.trace import Span, Trace
+from guardana.core.trace import Dimension, Span, Trace
 
 
 class TraceRule(Rule):
@@ -128,3 +128,12 @@ class TraceRule(Rule):
         if span is not None:
             lines.append(span.render())
         return "\n".join(lines)
+
+
+def records_actions(trace: Trace) -> bool:
+    """Whether the producer records tool calls or effects, the two ways an action shows.
+
+    A rule asking whether something happened needs one of the two, which a capability
+    set cannot say, so such a rule asks this in `examine` and declines when it is false.
+    """
+    return trace.records(Dimension.TOOLS) or trace.records(Dimension.EFFECTS)

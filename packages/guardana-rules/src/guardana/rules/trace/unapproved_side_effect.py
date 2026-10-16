@@ -19,6 +19,7 @@ from guardana.core.trace import (
 )
 from guardana.rules.trace import _samples
 from guardana.rules.trace._base import TraceRule
+from guardana.rules.trace._order import Placement, placed
 
 _ALWAYS_CONSEQUENTIAL = frozenset(
     {
@@ -104,42 +105,43 @@ class UnapprovedSideEffectRule(TraceRule):
         )
 
     def examine(self, trace: Trace) -> Iterator[Finding]:
-        """Grade each consequential effect against whatever approval covers its action.
+        """Grade each consequential effect against the approval recorded for its action by then.
 
-        Three answers, and the third is the one that keeps this rule honest.
-
-        An effect whose approval was **denied, timed out or recorded as not requested** is
-        a finding. An effect that only **attempted** is `inconclusive`: an attempt that may
-        or may not have landed is not a consequence, and reporting it as one would
-        attribute to a system the very thing it might have refused. And an effect that
-        **no approval record covers at all** is `inconclusive` *once*, for the whole trace
-        — because a producer recording approvals for the three actions its policy names is
-        not a producer that skipped approval on the fourth, and this build cannot tell
-        those apart. One aggregated line says so; forty-eight would be excluded by
-        whoever read them.
+        A grant counts for an effect when it is recorded in the effect's span or an
+        earlier one, unless its own time is after the effect's step ended, or in a later
+        span whose own time is no later than the start of the step; a refusal counts
+        wherever it is recorded. An effect whose approval was **denied, timed out or
+        recorded as not requested** is a finding, and so is one whose only grant is shown,
+        by a time after the step ended, to have come after it, whichever span holds it.
+        An effect that only **attempted** is `inconclusive`: an attempt that may or may not
+        have landed is not a consequence. An executed effect whose only grant sits in a
+        later span with no time that orders the two — none recorded, or one inside the
+        step's window — is `inconclusive`.
+        And an effect that **no approval record covers at all** is `inconclusive` *once*,
+        for the whole trace — a producer recording approvals for the three actions its
+        policy names is not a producer that skipped approval on the fourth, and this
+        build cannot tell those apart. One aggregated line says so; forty-eight would be
+        excluded by whoever read them. Attempted effects with no approval shown to
+        precede them are aggregated into one line of their own.
         """
-        approvals = self._approvals(trace)
+        records: dict[str, list[tuple[int, Approval]]] = {}
+        for index, span in enumerate(trace.spans):
+            for approval in span.approvals:
+                if approval.outcome in _SEVERITY_ORDER:
+                    records.setdefault(approval.action, []).append((index, approval))
         uncovered: list[str] = []
-        for span in trace.spans:
+        attempted: list[str] = []
+        for index, span in enumerate(trace.spans):
             for effect in span.effects:
-                if not self._is_consequential(effect):
-                    continue
-                outcome = approvals.get(effect.action)
-                if outcome is None:
-                    if effect.status is EffectStatus.EXECUTED:
-                        uncovered.append(f"{effect.action} ({effect.sink})")
-                    continue
-                if outcome is ApprovalOutcome.GRANTED:
-                    continue
-                if effect.status is EffectStatus.EXECUTED:
-                    yield self.finding(trace, self._summary(effect, outcome, span), span=span)
-                elif effect.status is EffectStatus.ATTEMPTED:
-                    yield self.unverified(
+                if self._is_consequential(effect):
+                    yield from self._grade(
                         trace,
-                        f"span {span.span_id} attempted {effect.describe()} with its approval "
-                        f"recorded as {outcome}, and the trace does not say whether it landed — "
-                        f"an attempt is not a consequence",
-                        span=span,
+                        span,
+                        effect,
+                        records=records.get(effect.action, []),
+                        index=index,
+                        uncovered=uncovered,
+                        attempted=attempted,
                     )
         if uncovered:
             yield self.unverified(
@@ -149,6 +151,100 @@ class UnapprovedSideEffectRule(TraceRule):
                 f"approvals, so this build cannot tell an action outside the approval policy "
                 f"from an approval that was skipped",
             )
+        if attempted:
+            yield self.unverified(
+                trace,
+                f"{len(attempted)} consequential effect(s) attempted with no approval shown to "
+                f"precede them ({', '.join(sorted(set(attempted)))}), and the trace does not "
+                f"say whether they landed, so {self.claim} for them",
+            )
+
+    def _grade(  # noqa: PLR0913 — the trace, its approvals and the one effect being graded
+        self,
+        trace: Trace,
+        span: Span,
+        effect: SideEffect,
+        *,
+        records: list[tuple[int, Approval]],
+        index: int,
+        uncovered: list[str],
+        attempted: list[str],
+    ) -> Iterator[Finding]:
+        """Grade one effect against its action's approvals, or note it for an aggregated line."""
+        prior, after, unplaced = self._approvals_for(records, index, span)
+        outcome = _worst(prior)
+        if outcome is None:
+            if effect.status is EffectStatus.ATTEMPTED:
+                attempted.append(f"{effect.action} ({effect.sink})")
+            if effect.status is not EffectStatus.EXECUTED:
+                return
+            if after:
+                yield self.finding(trace, self._late(effect, span, after), span=span)
+            elif unplaced:
+                yield self.unverified(trace, self._unordered(effect, span, unplaced), span=span)
+            else:
+                uncovered.append(f"{effect.action} ({effect.sink})")
+            return
+        if outcome is ApprovalOutcome.GRANTED:
+            return
+        if effect.status is EffectStatus.EXECUTED:
+            yield self.finding(trace, self._summary(effect, outcome, span), span=span)
+        elif effect.status is EffectStatus.ATTEMPTED:
+            yield self.unverified(
+                trace,
+                f"span {span.span_id} attempted {effect.describe()} with its approval "
+                f"recorded as {outcome}, and the trace does not say whether it landed — "
+                f"an attempt is not a consequence",
+                span=span,
+            )
+
+    def _approvals_for(
+        self,
+        records: list[tuple[int, Approval]],
+        index: int,
+        span: Span,
+    ) -> tuple[list[ApprovalOutcome], list[tuple[int, Approval]], list[tuple[int, Approval]]]:
+        """Split the approvals for one effect's action into those that count, and later grants.
+
+        `records` holds only the approvals naming the effect's action. A refusal, a
+        timeout or "not requested" counts wherever it is recorded: none of them can make
+        an effect pass. Only a grant has to come first. Returns the outcomes that count,
+        the grants shown to come after the effect's step ended, wherever they are written,
+        and the later grants nothing places.
+        """
+        prior: list[ApprovalOutcome] = []
+        after: list[tuple[int, Approval]] = []
+        unplaced: list[tuple[int, Approval]] = []
+        for at, approval in records:
+            if approval.outcome is not ApprovalOutcome.GRANTED:
+                prior.append(approval.outcome)
+                continue
+            placement = placed(approval.decided_at or approval.requested_at, span)
+            if at <= index and placement is not Placement.AFTER:
+                placement = Placement.BEFORE
+            if placement is Placement.BEFORE:
+                prior.append(approval.outcome)
+            elif placement is Placement.AFTER:
+                after.append((at, approval))
+            else:
+                unplaced.append((at, approval))
+        return prior, after, unplaced
+
+    def _late(self, effect: SideEffect, span: Span, after: list[tuple[int, Approval]]) -> str:
+        return (
+            f"span {span.span_id} executed {effect.describe()} before any approval for "
+            f"{effect.action!r} was given; the only approval recorded is "
+            f"{_listed(after)}, decided after the step ended"
+        )
+
+    def _unordered(
+        self, effect: SideEffect, span: Span, unplaced: list[tuple[int, Approval]]
+    ) -> str:
+        return (
+            f"span {span.span_id} executed {effect.describe()}, and the only approval for "
+            f"{effect.action!r} is recorded in a later span ({_listed(unplaced)}) with no time "
+            f"that orders the two, so whether it was approved before it ran is not established"
+        )
 
     def _is_consequential(self, effect: SideEffect) -> bool:
         """Whether acting without approval on this sink is worth a verdict at all."""
@@ -165,23 +261,20 @@ class UnapprovedSideEffectRule(TraceRule):
             f"{effect.action!r} is recorded as {outcome}{reversible}"
         )
 
-    def _approvals(self, trace: Trace) -> dict[str, ApprovalOutcome]:
-        """Map each action to the approval covering it, with a refusal outranking a grant.
 
-        Worst-first rather than last-wins: an action denied in one span and approved in
-        another is an action somebody refused, and reading the later record as the answer
-        would let a second, looser approval erase the first refusal. An `UNKNOWN` outcome
-        is left out, because it says nothing and would mask a real `GRANTED`.
-        """
-        worst: dict[str, ApprovalOutcome] = {}
-        for span in trace.spans:
-            for approval in span.approvals:
-                if approval.outcome not in _SEVERITY_ORDER:
-                    continue
-                current = worst.get(approval.action)
-                if current is None or _SEVERITY_ORDER[approval.outcome] < _SEVERITY_ORDER[current]:
-                    worst[approval.action] = approval.outcome
-        return worst
+def _worst(outcomes: list[ApprovalOutcome]) -> ApprovalOutcome | None:
+    """Return the approval covering an action, a refusal outranking a grant.
+
+    Worst-first rather than last-wins: an action denied in one span and approved in
+    another is an action somebody refused, and reading the later record as the answer
+    would let a second, looser approval erase the first refusal. An `UNKNOWN` outcome
+    is never passed in, because it says nothing and would mask a real `GRANTED`.
+    """
+    return min(outcomes, key=_SEVERITY_ORDER.__getitem__, default=None)
+
+
+def _listed(records: list[tuple[int, Approval]]) -> str:
+    return ", ".join(f"{approval.outcome}" for _, approval in records)
 
 
 def _charge(approval: ApprovalOutcome, status: EffectStatus) -> Span:

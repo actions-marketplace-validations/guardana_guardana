@@ -230,6 +230,12 @@ def _notes(
             f"note: the trace is incomplete ({trace.truncated}), so a step this file does "
             f"not contain may still have happened"
         )
+    if trace.unreadable:
+        lines.append(
+            f"note: {trace.unreadable} record(s) of this file could not be read, so a step "
+            f"they held may still have happened — `guardana analyze-trace` reports each as "
+            f"an error"
+        )
     return lines
 
 
@@ -267,6 +273,7 @@ def _document(  # noqa: PLR0913, PLR0917 — one already-computed report fact pe
         "producer": trace.provenance.producer,
         "spans": len(trace.spans),
         "truncated": None if trace.truncated is None else str(trace.truncated),
+        "unreadable_records": trace.unreadable,
         "trace_rules_loaded": trace_rule_count,
         "messages_without_text": _messages_without_text(trace)[0],
         "dimensions": [

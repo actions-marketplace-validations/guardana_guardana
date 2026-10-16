@@ -39,7 +39,9 @@ class TenantBoundaryRule(ContractRule[TenantBoundary]):
         verified nothing, however green it looks.
 
         A query or a document that names no tenant is unattributed: one named tenant
-        elsewhere says nothing about which tenant it served, so it declines by name.
+        elsewhere says nothing about which tenant it served, so it declines by name. A
+        retrieval that names no source cannot be held against a `sources:` selector at
+        all, so it declines too rather than falling outside the assertion.
         """
         sources = self.assertion.sources
         selected = [
@@ -47,6 +49,18 @@ class TenantBoundaryRule(ContractRule[TenantBoundary]):
             for span in trace.spans
             if span.retrieval is not None and matches_any(span.retrieval.source or "", sources)
         ]
+        sourceless = [
+            span.span_id
+            for span in trace.spans
+            if span.retrieval is not None and span.retrieval.source is None
+        ]
+        if sources and sourceless:
+            yield self.unverified(
+                trace,
+                f"{len(sourceless)} retrieval(s) record no source (span(s) "
+                f"{', '.join(sourceless)}), so whether they came from a store matching "
+                f"{', '.join(sources)} is not established and {self.claim} for them",
+            )
         if sources and not selected:
             yield self.unverified(
                 trace,

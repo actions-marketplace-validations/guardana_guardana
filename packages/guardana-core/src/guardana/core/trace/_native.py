@@ -450,6 +450,18 @@ def _required_member(raw: Mapping[str, Any], key: str, enum: type[_E], at: str) 
     return member
 
 
+def _required_text(raw: Mapping[str, Any], key: str, at: str) -> str:
+    """Read a string the schema requires, refusing its absence rather than naming it `unknown`.
+
+    A rule compares these values, so a stand-in matches nothing and the record would be
+    graded as though it did not concern the action or boundary it was written about.
+    """
+    value = _text(raw, key, at)
+    if value is None:
+        raise TraceLoadError(f"{_at(at, key)} is required, a string")
+    return value
+
+
 def _object(raw: Mapping[str, Any], key: str, at: str) -> dict[str, Any] | None:
     """Read an object the schema defines, None when absent; refuse any other value.
 
@@ -708,8 +720,8 @@ def _session(identity: Mapping[str, Any], at: str) -> SessionRef | None:
 def _delegation(raw: dict[str, Any], at: str) -> Delegation:
     _closed(raw, "span.delegations[]", at)
     return Delegation(
-        actor=_text(raw, "actor", at) or "unknown",
-        boundary=_text(raw, "boundary", at) or "unknown",
+        actor=_required_text(raw, "actor", at),
+        boundary=_required_text(raw, "boundary", at),
         on_behalf_of=_text(raw, "on_behalf_of", at),
         credential=_credential(raw, at),
         scopes=_strings(raw, "scopes", at),
@@ -720,7 +732,7 @@ def _consent(raw: dict[str, Any], at: str) -> Consent:
     _closed(raw, "span.consents[]", at)
     granted = _bool(raw, "granted", at)
     return Consent(
-        client=_text(raw, "client", at) or "unknown",
+        client=_required_text(raw, "client", at),
         granted=granted if granted is not None else False,
         scopes=_strings(raw, "scopes", at),
         subject=_text(raw, "subject", at),
@@ -732,7 +744,7 @@ def _policy(raw: dict[str, Any], at: str) -> PolicyDecision:
     _closed(raw, "span.policy_decisions[]", at)
     return PolicyDecision(
         outcome=_required_member(raw, "outcome", PolicyOutcome, at),
-        action=_text(raw, "action", at) or "unknown",
+        action=_required_text(raw, "action", at),
         policy=_text(raw, "policy", at),
         rationale=_text(raw, "rationale", at),
     )
@@ -775,7 +787,7 @@ def _approval(raw: dict[str, Any], at: str) -> Approval:
     _closed(raw, "span.approvals[]", at)
     approver, approver_kind = _approver(raw, at)
     return Approval(
-        action=_text(raw, "action", at) or "unknown",
+        action=_required_text(raw, "action", at),
         outcome=_required_member(raw, "outcome", ApprovalOutcome, at),
         approver=approver,
         approver_kind=approver_kind,
@@ -788,7 +800,7 @@ def _effect(raw: dict[str, Any], at: str) -> SideEffect:
     _closed(raw, "span.effects[]", at)
     return SideEffect(
         sink=_required_member(raw, "sink", SinkKind, at),
-        action=_text(raw, "action", at) or "unknown",
+        action=_required_text(raw, "action", at),
         target=_text(raw, "target", at),
         status=_member(raw, "status", EffectStatus, at) or EffectStatus.ATTEMPTED,
         reversible=_bool(raw, "reversible", at),

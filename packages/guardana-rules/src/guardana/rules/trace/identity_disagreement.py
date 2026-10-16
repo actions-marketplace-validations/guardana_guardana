@@ -11,6 +11,10 @@ from guardana.core.trace import CredentialKind, CredentialRef, Identity, Span, S
 from guardana.rules.trace import _samples
 from guardana.rules.trace._base import TraceRule
 
+_NEVER_AUDIENCE_BOUND = frozenset(
+    {CredentialKind.API_KEY, CredentialKind.BASIC, CredentialKind.MTLS}
+)
+
 
 class IdentityDisagreementRule(TraceRule):
     """A token's audience is not the resource it was presented to.
@@ -62,16 +66,26 @@ class IdentityDisagreementRule(TraceRule):
     def examine(self, trace: Trace) -> Iterator[Finding]:
         """Compare audience against claimed resource, and decline where either is absent.
 
-        Two thirds of a disagreement is not a disagreement: a span recording an audience
-        and no resource, or a resource and no audience, is skipped rather than reported.
-        An empty audience means nobody wrote one down — which is the same fact as an
-        absent claim, and not evidence of a mismatch.
+        Two thirds of a disagreement is not a disagreement, so a presented token whose
+        audience or callee nobody recorded is never reported as a mismatch — and never
+        passed either: those presentations are declined in one aggregated line. An empty
+        audience means nobody wrote one down, which is the same fact as an absent claim.
+        A credential stated to be a kind that is never audience-bound — an API key, basic
+        credentials, a client certificate — and naming no audience is not part of the
+        question. One of kind `other` is undecided, because a trace that omits the kind
+        reads as `other` and may be carrying a bearer token.
         """
+        undecided: list[str] = []
         for span in trace.spans:
             identity = span.identity
             credential = identity.credential if identity is not None else None
+            if credential is None:
+                continue
+            if not credential.audience and credential.kind in _NEVER_AUDIENCE_BOUND:
+                continue
             resource = identity.claimed_resource if identity is not None else None
-            if credential is None or resource is None or not credential.audience:
+            if resource is None or not credential.audience:
+                undecided.append(span.span_id)
                 continue
             if any(self._covers(audience, resource) for audience in credential.audience):
                 continue
@@ -82,6 +96,12 @@ class IdentityDisagreementRule(TraceRule):
                 f"a token accepted outside its audience is a token that can be replayed from "
                 f"one service against another",
                 span=span,
+            )
+        if undecided:
+            yield self.unverified(
+                trace,
+                f"{len(undecided)} presented token(s) (span {', '.join(undecided)}) record no "
+                f"audience or no callee, so {self.claim} for them",
             )
 
     def _covers(self, audience: str, resource: str) -> bool:

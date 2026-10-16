@@ -210,6 +210,9 @@ def _read_native(path: Path, records: "_Records") -> TraceRead:
     if header is None:
         raise TraceLoadError(f"{path} has no records, so there is no trace to analyse")
     truncated = truncated or _incompleteness(header, footer, encountered)
+    _refuse_if_empty(
+        path, spans=len(spans), unreadable=len(unreadable), cut=header.truncated or truncated
+    )
     return TraceRead(
         trace=Trace(
             trace_id=header.trace_id,
@@ -232,6 +235,20 @@ def _read_native(path: Path, records: "_Records") -> TraceRead:
         ),
         unreadable=tuple(unreadable),
     )
+
+
+def _refuse_if_empty(
+    path: Path, *, spans: int, unreadable: int, cut: TraceTruncation | None
+) -> None:
+    """Refuse a whole file that holds a header and not one span record.
+
+    A run over it would examine nothing and report clean. A file cut short keeps
+    reading, because the rules decline over what was not read.
+    """
+    if not spans and not unreadable and cut is None:
+        raise TraceLoadError(
+            f"{path} has a header and no span records, so there is no trace to analyse"
+        )
 
 
 def _parsed_span(raw: str, number: int) -> dict[str, object] | None:
@@ -329,7 +346,9 @@ def _read_otel(path: Path, records: "_Records") -> TraceRead:
         unreadable=tuple(unreadable)
         + tuple(
             UnreadableRecord(
-                0, "a GenAI message event carried content in no shape this build reads"
+                0,
+                "a span carried content this build could not read: a GenAI message event "
+                "in no shape it knows, or attributes or events its exporter dropped",
             )
             for _ in range(unread_content)
         ),

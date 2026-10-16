@@ -85,14 +85,26 @@ def test_one_credential_used_twice_within_one_boundary_is_ordinary() -> None:
     assert graded(CredentialPassthroughRule(), trace) == ()
 
 
-def test_two_hops_nobody_digested_are_not_evidence_of_reuse() -> None:
-    """The fail-closed direction: the alternative turns every two-hop trace into a finding."""
+def test_two_hops_nobody_digested_are_declined_never_reported_as_reuse() -> None:
+    """Undigested credentials are no evidence of reuse, and no evidence of its absence."""
     bare = CredentialRef(kind=CredentialKind.BEARER)
     trace = trace_of(
         span("s1", delegations=(Delegation(actor="a", boundary="a->b", credential=bare),)),
         span("s2", delegations=(Delegation(actor="b", boundary="b->c", credential=bare),)),
     )
-    assert graded(CredentialPassthroughRule(), trace) == ()
+
+    results = graded(CredentialPassthroughRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "carry no digest" in inconclusive(results)[0].evidence.summary
+
+
+def test_an_undigested_hop_with_no_other_boundary_is_not_a_question() -> None:
+    bare = CredentialRef(kind=CredentialKind.BEARER)
+    hop = (Delegation(actor="a", boundary="a->b", credential=bare),)
+
+    assert graded(CredentialPassthroughRule(), trace_of(span("s1", delegations=hop))) == ()
 
 
 def test_the_same_passthrough_is_reported_once_not_once_per_pair() -> None:
@@ -134,15 +146,41 @@ def test_a_prefix_is_not_a_match_because_a_lookalike_host_is_the_attack() -> Non
 
 
 @pytest.mark.parametrize(
-    "identity",
+    ("identity", "declined"),
     [
-        Identity(credential=CredentialRef(audience=()), claimed_resource="https://b/"),
-        Identity(credential=CredentialRef(audience=("https://a/",)), claimed_resource=None),
-        Identity(claimed_resource="https://b/"),
+        (
+            Identity(
+                credential=CredentialRef(kind=CredentialKind.BEARER, audience=()),
+                claimed_resource="https://b/",
+            ),
+            1,
+        ),
+        (Identity(credential=CredentialRef(audience=("https://a/",)), claimed_resource=None), 1),
+        (
+            Identity(
+                credential=CredentialRef(kind=CredentialKind.API_KEY, audience=()),
+                claimed_resource="https://b/",
+            ),
+            0,
+        ),
+        (Identity(credential=CredentialRef(audience=()), claimed_resource="https://b/"), 1),
+        (Identity(claimed_resource="https://b/"), 0),
+    ],
+    ids=[
+        "bearer-without-audience",
+        "no-callee",
+        "not-audience-bound",
+        "kind-not-stated",
+        "no-credential",
     ],
 )
-def test_two_thirds_of_a_disagreement_is_not_a_disagreement(identity: Identity) -> None:
-    assert graded(IdentityDisagreementRule(), trace_of(span("s1", identity=identity))) == ()
+def test_two_thirds_of_a_disagreement_is_declined_never_reported(
+    identity: Identity, declined: int
+) -> None:
+    results = graded(IdentityDisagreementRule(), trace_of(span("s1", identity=identity)))
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == declined
 
 
 # ── session_as_identity ─────────────────────────────────────────────────────────
@@ -165,7 +203,9 @@ def test_a_read_only_step_identified_by_a_session_is_a_different_question() -> N
     """Firing on every recorded read would bury the case where an unidentified caller wrote."""
     trace = trace_of(
         span(
-            "s1", identity=Identity(session=SessionRef(id="sess-1")), tool=ToolExecution(name="get")
+            "s1",
+            identity=Identity(session=SessionRef(id="sess-1")),
+            tool=ToolExecution(name="get", mutates=False),
         )
     )
     assert graded(SessionAsIdentityRule(), trace) == ()
@@ -191,7 +231,9 @@ def test_a_tool_whose_mutation_is_unknown_does_not_count_as_changing_something()
             tool=ToolExecution(name="delete_everything", mutates=None),
         )
     )
-    assert graded(SessionAsIdentityRule(), trace) == ()
+    results = graded(SessionAsIdentityRule(), trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
 
 
 # ── consent_scope_exceeded ──────────────────────────────────────────────────────
@@ -329,13 +371,15 @@ def test_a_refusal_of_something_that_then_did_not_happen_is_the_system_working()
     assert graded(PolicyDecisionIgnoredRule(), trace) == ()
 
 
-def test_an_action_recorded_before_the_decision_was_not_permitted_by_it() -> None:
-    """A decision is about what follows it. Looking backwards would invent a bypass."""
+def test_an_action_written_before_the_decision_is_no_bypass_but_unordered_is_declined() -> None:
+    """Looking backwards would invent a bypass; write order alone does not say it came first."""
     trace = trace_of(
         span("s1", tool=ToolExecution(name="pay")),
         span("s2", policy_decisions=(PolicyDecision(outcome=PolicyOutcome.DENY, action="pay"),)),
     )
-    assert graded(PolicyDecisionIgnoredRule(), trace) == ()
+    results = graded(PolicyDecisionIgnoredRule(), trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
 
 
 def test_a_similar_tool_name_is_not_the_refused_action() -> None:

@@ -19,7 +19,7 @@ from guardana.core.trace import (
     TraceTruncation,
 )
 from guardana.rules.trace import _samples
-from guardana.rules.trace._base import TraceRule
+from guardana.rules.trace._base import TraceRule, records_actions
 
 
 class SessionAsIdentityRule(TraceRule):
@@ -79,13 +79,41 @@ class SessionAsIdentityRule(TraceRule):
         `changes_something` is conservative on purpose: an executed side effect, or a
         tool the producer stated mutates. A tool whose mutation is unknown does not
         count, because guessing from its name would put this verdict on a heuristic
-        nobody measured.
+        nobody measured. A trace recording neither tool calls nor effects cannot show a
+        change at all, so a session-only step there is declined rather than passed; so is
+        one in a trace where no span records an executed effect or a tool whose mutation
+        the producer stated, because a requested tool call shows no change either way.
+        Otherwise each session-only step is decided on its own: one that ran a tool whose
+        mutation is unknown and shows no executed effect is declined, in one aggregated
+        line, whatever other spans state about their own tools.
         """
-        for span in trace.spans:
+        bare = [
+            span
+            for span in trace.spans
+            if span.identity is not None and span.identity.is_session_only
+        ]
+        if bare and not records_actions(trace):
+            yield self.unverified(
+                trace,
+                f"{len(bare)} step(s) identified only by a session, and this trace records "
+                f"neither tool calls nor effects, so {self.claim}",
+            )
+            return
+        if bare and not any(_shows_whether_it_changed(span) for span in trace.spans):
+            yield self.unverified(
+                trace,
+                f"{len(bare)} step(s) identified only by a session, and no span in this trace "
+                f"records an executed effect or whether a tool it ran mutates, so {self.claim}",
+            )
+            return
+        undecided: list[str] = []
+        for span in bare:
             identity = span.identity
-            if identity is None or not identity.is_session_only:
+            if identity is None:
                 continue
             if not span.changes_something():
+                if _mutation_unknown(span):
+                    undecided.append(span.span_id)
                 continue
             session = identity.session
             protocol = f" ({session.protocol})" if session is not None and session.protocol else ""
@@ -96,6 +124,25 @@ class SessionAsIdentityRule(TraceRule):
                 f"to, so anything holding the id inherits what the session could do",
                 span=span,
             )
+        if undecided:
+            yield self.unverified(
+                trace,
+                f"{len(undecided)} step(s) identified only by a session (span "
+                f"{', '.join(undecided)}) ran a tool whose mutation is not recorded and show no "
+                f"executed effect, so {self.claim} for them",
+            )
+
+
+def _mutation_unknown(span: Span) -> bool:
+    """Whether this span ran a tool without saying whether it mutates, and shows no effect."""
+    return span.tool is not None and span.tool.mutates is None and not span.executed_effects()
+
+
+def _shows_whether_it_changed(span: Span) -> bool:
+    """Whether this span records an executed effect or a tool whose mutation is stated."""
+    return bool(span.executed_effects()) or (
+        span.tool is not None and span.tool.mutates is not None
+    )
 
 
 _CREDENTIAL = CredentialRef(kind=CredentialKind.BEARER, digest="sha256:token")

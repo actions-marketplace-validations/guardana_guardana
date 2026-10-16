@@ -79,9 +79,29 @@ class CredentialPassthroughRule(TraceRule):
         """Compare every credentialed hop against every other, by digest.
 
         Only digests are compared, never values — `CredentialRef` has no field for a
-        value. A hop whose credential nobody digested is not evidence of reuse and is
-        skipped, which is the fail-closed direction: the alternative turns every
-        two-hop trace into a finding.
+        value. A hop whose credential nobody digested is not evidence of reuse, so it is
+        never reported as passthrough; nor is it passed over: when it could pair with a
+        credentialed hop across another boundary, the comparison is declined in one
+        aggregated line.
+        """
+        yield from self._compared(trace)
+        undigested = self._undigested(trace)
+        if undigested:
+            yield self.unverified(
+                trace,
+                f"{len(undigested)} credentialed hop(s) ({'; '.join(undigested)}) carry no "
+                f"digest beside a credentialed hop across another boundary, so {self.claim} "
+                f"for them",
+            )
+
+    def _compared(self, trace: Trace) -> Iterator[Finding]:
+        """Report every digest presented across two different boundaries.
+
+        Different boundaries is the whole condition: one credential used twice within one
+        boundary is one client talking to one service twice, which is ordinary. Indexed by
+        digest and boundary rather than compared pair by pair, so the cost grows with the
+        hops, not their square; each pair of boundaries is reported once, at the first hop
+        on each side, in the order the hops were recorded.
         """
         hops: list[tuple[str, Delegation]] = [
             (span.span_id, delegation)
@@ -90,38 +110,43 @@ class CredentialPassthroughRule(TraceRule):
         ]
         if len(hops) < _HOPS_NEEDED_TO_COMPARE:
             return
-        reported: set[tuple[str, ...]] = set()
-        for index, (span_id, hop) in enumerate(hops):
-            for other_span, other in hops[index + 1 :]:
-                if not self._is_passthrough(hop, other):
-                    continue
-                key = (self._digest(hop), *sorted((hop.boundary, other.boundary)))
-                if key in reported:
-                    continue
-                reported.add(key)
-                yield self.finding(
-                    trace,
-                    f"the same credential ({hop.credential.kind if hop.credential else '?'}, "
-                    f"digest {self._digest(hop)}) was presented across two trust boundaries: "
-                    f"{hop.boundary!r} by {hop.actor} in span {span_id}, then "
-                    f"{other.boundary!r} by {other.actor} in span {other_span} — the upstream "
-                    f"service reads the caller's credential as its own client's",
-                    span=trace.span(other_span),
-                )
+        first: dict[str, dict[str, int]] = {}
+        pairs: list[tuple[int, int]] = []
+        for index, (_, hop) in enumerate(hops):
+            seen = first.setdefault(self._digest(hop), {})
+            if hop.boundary in seen:
+                continue
+            pairs.extend((earlier, index) for earlier in seen.values())
+            seen[hop.boundary] = index
+        for earlier, index in sorted(pairs):
+            span_id, hop = hops[earlier]
+            other_span, other = hops[index]
+            yield self.finding(
+                trace,
+                f"the same credential ({hop.credential.kind if hop.credential else '?'}, "
+                f"digest {self._digest(hop)}) was presented across two trust boundaries: "
+                f"{hop.boundary!r} by {hop.actor} in span {span_id}, then "
+                f"{other.boundary!r} by {other.actor} in span {other_span} — the upstream "
+                f"service reads the caller's credential as its own client's",
+                span=trace.span(other_span),
+            )
 
-    def _is_passthrough(self, hop: Delegation, other: Delegation) -> bool:
-        """Whether these two hops are the same credential across different boundaries.
-
-        Different boundaries is the whole condition. The same credential used twice
-        *within* one boundary is one client talking to one service twice, which is
-        ordinary; carrying it across is the defect.
-        """
-        return (
-            hop.credential is not None
-            and other.credential is not None
-            and hop.credential.is_same_as(other.credential)
-            and hop.boundary != other.boundary
-        )
+    def _undigested(self, trace: Trace) -> list[str]:
+        """Name the credentialed hops without a digest that another boundary's hop could match."""
+        hops = [
+            (span.span_id, delegation)
+            for span in trace.spans
+            for delegation in span.delegations
+            if delegation.credential is not None
+        ]
+        # Every hop's own boundary is in the set, so a second member is another boundary.
+        if len({hop.boundary for _, hop in hops}) <= 1:
+            return []
+        return [
+            f"{hop.actor} across {hop.boundary!r} in span {span_id}"
+            for span_id, hop in hops
+            if hop.credential is not None and not hop.credential.digest
+        ]
 
     def _digest(self, hop: Delegation) -> str:
         return hop.credential.digest or "" if hop.credential is not None else ""

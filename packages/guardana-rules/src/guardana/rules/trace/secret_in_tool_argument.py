@@ -75,7 +75,9 @@ class SecretInToolArgumentRule(TraceRule):
 
         Both places, because they are different records of the same call and a producer may
         emit either: an `execute_tool` span carries the arguments as an attribute, while a
-        chat span carries them inside an assistant message's `tool_call` part.
+        chat span carries them inside an assistant message's `tool_call` part. A call whose
+        arguments neither record holds — matched by call id where both carry one — was not
+        examined, and is declined in one aggregated line rather than passed.
         """
         for span in trace.spans:
             for tool_name, arguments in self._arguments(span):
@@ -87,6 +89,13 @@ class SecretInToolArgumentRule(TraceRule):
                         f"whatever holds this trace",
                         span=span,
                     )
+        unread = _unrecorded_calls(trace)
+        if unread:
+            yield self.unverified(
+                trace,
+                f"{len(unread)} tool call(s) record no arguments ({'; '.join(unread)}), so "
+                f"{self.claim} for them",
+            )
 
     def _arguments(self, span: Span) -> Iterator[tuple[str, str]]:
         if span.tool is not None and span.tool.arguments:
@@ -108,6 +117,36 @@ class SecretInToolArgumentRule(TraceRule):
                 found = match.group(0)
                 if found not in ALLOWLIST:
                     yield label, found
+
+
+def _unrecorded_calls(trace: Trace) -> list[str]:
+    """Name the tool calls whose arguments no record of the call holds."""
+    argued = {
+        call
+        for span in trace.spans
+        for call in (
+            *((span.tool.call_id,) if span.tool and span.tool.arguments is not None else ()),
+            *(
+                part.call_id
+                for message in span.messages
+                for part in message.tool_calls()
+                if part.arguments is not None
+            ),
+        )
+        if call is not None
+    }
+    unread: list[str] = []
+    for span in trace.spans:
+        tool = span.tool
+        if tool is not None and tool.arguments is None and tool.call_id not in argued:
+            unread.append(f"{tool.name} in span {span.span_id}")
+        unread.extend(
+            f"{part.tool_name or 'an unnamed tool'} in span {span.span_id}"
+            for message in span.messages
+            for part in message.tool_calls()
+            if part.arguments is None and part.call_id not in argued
+        )
+    return unread
 
 
 def _request(*, header: str | None = None) -> Span:
