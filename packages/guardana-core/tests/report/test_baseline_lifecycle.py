@@ -197,3 +197,28 @@ def test_load_baseline_excludes_expired_waivers(tmp_path: Path) -> None:
     )
 
     assert load_baseline(path) == frozenset()
+
+
+@pytest.mark.parametrize(
+    ("reason", "approved_by"),
+    [("", "security@example.com"), ("   ", "security@example.com"), ("sandboxed", " \t")],
+)
+def test_a_waiver_with_a_blank_reason_or_approver_is_unreviewed(
+    tmp_path: Path, reason: str, approved_by: str
+) -> None:
+    waiver = {"fingerprint": "abc", "reason": reason, "approved_by": approved_by}
+    path = _write(tmp_path, {"version": BASELINE_VERSION, "waivers": [waiver]})
+
+    assert [w.fingerprint for w in read_baseline(path).unreviewed] == ["abc"]
+
+
+def test_a_version_one_waiver_is_asked_for_a_reason_but_not_an_approver(tmp_path: Path) -> None:
+    waivers = [{"fingerprint": "kept", "reason": "sandboxed"}, {"fingerprint": "blank"}]
+    path = _write(tmp_path, {"version": 1, "waivers": waivers})
+
+    assert [w.fingerprint for w in read_baseline(path).unreviewed] == ["blank"]
+
+
+def test_a_waiver_built_in_code_without_an_approver_is_unreviewed() -> None:
+    assert Waiver("abc", reason="sandboxed").is_unreviewed
+    assert not Waiver("abc", reason="sandboxed", approved_by="security@example.com").is_unreviewed

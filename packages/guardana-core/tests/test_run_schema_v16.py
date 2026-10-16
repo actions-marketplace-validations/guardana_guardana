@@ -14,6 +14,7 @@ from typing import Any
 
 import pytest
 from _documents import (
+    counted,
     run_manifest,
     saved_run_at_v15,
     saved_run_at_v16,
@@ -154,7 +155,8 @@ def test_every_unmeasured_reason_survives_being_saved_and_read_back(
 ) -> None:
     result = scan_result()
     changed = replace(result.assessments[-1], reason=reason)
-    saved = run_to_dict(replace(result, assessments=(changed,)), run_manifest())
+    written = replace(result, assessments=(changed,))
+    saved = run_to_dict(written, counted(run_manifest(), written))
 
     assert not _errors(saved)
     assert load_report(_write(saved, tmp_path)).result.assessments == (changed,)

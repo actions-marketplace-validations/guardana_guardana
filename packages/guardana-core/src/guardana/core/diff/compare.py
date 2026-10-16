@@ -6,6 +6,7 @@ definitions of "worse" in one project would drift apart, and the one that drifte
 would be the one nobody was reading.
 """
 
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -13,6 +14,7 @@ from pathlib import PurePosixPath
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.measurement import measure
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
+from guardana.core.redaction import is_redaction_of
 from guardana.core.report import Finding, ScanResult, StopReason, split_ref
 
 _NO_VERDICT_CONFIDENCE = 1.0
@@ -28,14 +30,15 @@ def finding_identity(finding: Finding, root: str) -> Identity:
     to empty — which is what lets a model swap (`…#llama3` to `…#llama4`) compare
     at all instead of reading as every check vanishing and every check appearing.
     Against files it is the path, with the line dropped, so an edit above a
-    finding is not a new finding.
+    finding is not a new finding. A location the run's privacy policy redacted still
+    names the target it was redacted from: the run records the target unredacted.
 
     Deliberately not `Finding.fingerprint`: that one includes the evidence summary,
     which for a dynamic finding is the evaluator's rationale — and three built-in
     evaluators quote the model verbatim in it. Comparing on that would report
     movement on every re-run of an unchanged system.
     """
-    if finding.target_ref == root:
+    if finding.target_ref == root or is_redaction_of(finding.target_ref, root):
         return (finding.rule_id, "")
     path, _line = split_ref(finding.target_ref)
     return (finding.rule_id, _within(path, root))
@@ -146,6 +149,9 @@ def compare(
     regraded = _grading_changed(shared, before_context.grading, after_context.grading)
     excluded = retried.keys() | regraded
     listed_after = _listed(after, after_context.root)
+    # Two file scans read the same bytes the same way every time, so a count that rose
+    # there is a new problem, not sampling.
+    static = before.scope is not None and after.scope is not None
 
     changes: list[Change] = []
     unchanged = 0
@@ -171,7 +177,7 @@ def compare(
             and listed_after is not None
             and location
             and not _is_listed(location, listed_after)
-            else _classify(was, now)
+            else _classify(was, now, static=static)
         )
         if kind is None:
             unchanged += 1
@@ -344,7 +350,9 @@ def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
 
     **So does a recorded error**, with no policy switch in front of it: a refused pack
     or a rule that raised left its findings out of the run, and the comparison cannot
-    tell those absent findings from fixed ones.
+    tell those absent findings from fixed ones. **And so does a run whose every rule
+    declined**: it executed rules, so it passes the "executed nothing" refusal, and it
+    established exactly as much as a run that did not.
     """
     sides = (("first", before), ("second", after))
     return (
@@ -366,6 +374,12 @@ def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
             f"rather than clean"
             for label, result in sides
             if result.errors
+        ),
+        *(
+            f"every rule the {label} run executed declined, so it verified nothing and "
+            f"an unchanged result is unknown rather than clean"
+            for label, result in sides
+            if result.rules_run and result.verified_nothing
         ),
     )
 
@@ -467,6 +481,8 @@ def _state(entries: list[tuple[Finding, bool, Outcome]]) -> CheckState:
         confidence=max(_confidence(f) for f, _w in relevant),
         count=len(relevant),
         waived=all(w for _f, w in relevant),
+        unwaived=sum(1 for _f, w in relevant if not w),
+        evidence=tuple(sorted((f.evidence.summary, w) for f, w in relevant)),
     )
 
 
@@ -474,13 +490,15 @@ def _confidence(finding: Finding) -> float:
     return _NO_VERDICT_CONFIDENCE if finding.verdict is None else finding.verdict.confidence
 
 
-def _classify(was: CheckState | None, now: CheckState | None) -> tuple[ChangeKind | None, str]:
+def _classify(
+    was: CheckState | None, now: CheckState | None, *, static: bool
+) -> tuple[ChangeKind | None, str]:
     if was is None and now is not None:
         return _appeared(now)
     if was is not None and now is None:
         return _cleared(was)
     if was is not None and now is not None:
-        return _moved(was, now)
+        return _moved(was, now, static=static)
     # Unreachable: an identity is only in the map because one run or the other put
     # it there. Returned rather than asserted — an assert disappears under -O.
     return None, ""
@@ -498,22 +516,33 @@ def _cleared(was: CheckState) -> tuple[ChangeKind, str]:
     return ChangeKind.CLARIFIED, "a check that could not grade now comes back clean"
 
 
-def _moved(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, str]:
+def _moved(was: CheckState, now: CheckState, *, static: bool) -> tuple[ChangeKind | None, str]:
     """Classify a check that is present in both runs."""
     if was.outcome == "unverified" and now.outcome == "fail":
         return ChangeKind.PROVEN, "a check that could not grade now proves the problem"
     if was.outcome == "fail" and now.outcome == "unverified":
         return ChangeKind.BLINDED, "a proven problem can no longer be graded, not fixed"
-    return _same_outcome(was, now)
+    return _same_outcome(was, now, static=static)
 
 
-def _same_outcome(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, str]:
-    """Classify a check whose verdict held, by whatever else moved around it."""
+def _same_outcome(
+    was: CheckState, now: CheckState, *, static: bool
+) -> tuple[ChangeKind | None, str]:
+    """Classify a check whose verdict held, by whatever else moved around it.
+
+    Between two file scans, more findings in one place than before, more of them
+    unwaived, is a new problem there: `APPEARED`, whatever the waiver flag says. So is
+    an unwaived finding whose evidence the earlier run never reported there, which is
+    how a new secret that replaced a removed one keeps the count.
+    """
     if now.severity > was.severity:
         return (
             ChangeKind.ESCALATED,
             f"severity rose from {was.severity.name} to {now.severity.name}",
         )
+    appeared = _new_here(was, now) if static and now.outcome == "fail" else None
+    if appeared is not None:
+        return ChangeKind.APPEARED, appeared
     if now.severity < was.severity:
         return (
             ChangeKind.DE_ESCALATED,
@@ -525,6 +554,23 @@ def _same_outcome(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, 
     if now.count != was.count:
         return ChangeKind.COUNT_CHANGED, f"{was.count} finding(s) became {now.count}"
     return None, ""
+
+
+def _new_here(was: CheckState, now: CheckState) -> str | None:
+    """Say what is new in one place between two file scans, or None when nothing is."""
+    if now.count > was.count and now.unwaived > was.unwaived:
+        return (
+            f"{now.count - was.count} more {now.severity.name} finding(s) of this rule here "
+            f"than before ({was.count} became {now.count}, {now.unwaived} not waived)"
+        )
+    reported = Counter(summary for summary, _waived in was.evidence)
+    new = Counter(summary for summary, waived in now.evidence if not waived) - reported
+    if new:
+        return (
+            f"{new.total()} {now.severity.name} finding(s) of this rule here that the earlier "
+            f"run did not report, though the count stayed {now.count}"
+        )
+    return None
 
 
 def _coverage_changes(before: frozenset[str], after: frozenset[str]) -> list[Change]:

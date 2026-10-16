@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _documents import run_manifest, saved_run_at_v7, scan_result
+from _documents import counted, run_manifest, saved_run_at_v7, scan_result
 from guardana.core.assessment import Assessment, AssessmentStatus
 from guardana.core.fingerprint import digest_of
 from guardana.core.manifest.coverage import coverage_digest
@@ -142,9 +142,9 @@ def test_the_trials_of_one_case_survive_being_saved_and_read(tmp_path: Path) -> 
     )
     rules = (RuleRecord(id=_RULE, digest="sha256:1", declared_requests=3, trial_summary=summary),)
 
-    report = load_report(
-        _write(run_to_dict(written, replace(run_manifest(), rules=rules)), tmp_path)
-    )
+    manifest = counted(replace(run_manifest(), rules=rules), written)
+
+    report = load_report(_write(run_to_dict(written, manifest), tmp_path))
 
     assert report.result.assessments == trials
     assert [a.trial for a in report.result.assessments] == [1, 2, 3]

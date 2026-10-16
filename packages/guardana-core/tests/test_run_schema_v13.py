@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from _documents import run_manifest, saved_run_at_v12, saved_run_at_v13, scan_result
+from _documents import counted, run_manifest, saved_run_at_v12, saved_run_at_v13, scan_result
 from guardana.core.assessment import UnmeasuredReason
 from guardana.core.evaluator.base import Expectation
 from guardana.core.evaluator.canary import CanaryEvaluator
@@ -166,7 +166,8 @@ def test_every_v13_unmeasured_reason_survives_being_saved_and_read_back(
 ) -> None:
     result = scan_result()
     changed = replace(result.assessments[-1], reason=reason)
-    saved = run_to_dict(replace(result, assessments=(changed,)), run_manifest())
+    written = replace(result, assessments=(changed,))
+    saved = run_to_dict(written, counted(run_manifest(), written))
 
     assert not _errors(saved)
     assert load_report(_write(saved, tmp_path)).result.assessments == (changed,)

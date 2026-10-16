@@ -146,12 +146,13 @@ def test_the_loader_and_the_schema_refuse_the_same_malformed_trust(breakage: str
     assert _errors(document), f"the v12 schema accepts {breakage}, which the loader refuses"
 
 
-def test_a_hand_written_document_without_a_scope_reads_it_as_unknown(tmp_path: Path) -> None:
+def test_a_hand_written_document_without_a_scope_is_refused(tmp_path: Path) -> None:
     document = _document()
     del document["scope"]
 
-    assert load_report(_write(document, tmp_path)).result.scope is None
-    assert _errors(document), "a writer must still write the key"
+    assert _errors(document), "the published schema requires the key"
+    with pytest.raises(ReportLoadError, match="has no scope"):
+        load_report(_write(document, tmp_path))
 
 
 # Version 11 forward

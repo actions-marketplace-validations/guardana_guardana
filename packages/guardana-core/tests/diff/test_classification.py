@@ -150,8 +150,7 @@ def test_removing_a_waiver_is_reported_too() -> None:
 
 
 def test_more_findings_from_the_same_check_are_reported_but_not_a_regression() -> None:
-    """Under a live model this number is sampling; a genuinely new problem lands in
-    a new location, which is a new identity and a regression in its own right."""
+    """Under a live model this number is sampling, not a new problem."""
     before = _run(findings=(_finding(),))
     after = _run(findings=(_finding(), _finding(rationale="complied differently")))
 

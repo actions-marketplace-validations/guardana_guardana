@@ -251,3 +251,42 @@ def test_scan_write_baseline_whose_write_fails_part_way_keeps_the_earlier_baseli
 
     assert result.exit_code == ExitCode.INVALID_USAGE, result.output
     assert out.read_bytes() == earlier
+
+
+def test_update_keeps_and_names_a_waiver_whose_file_the_run_excluded(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    (project / "other.py").write_text("VALUE = 1\n", encoding="utf-8")
+    out = tmp_path / "b.yaml"
+    runner.invoke(app, ["baseline", "create", str(project), "--output", str(out)])
+    created = yaml.safe_load(out.read_text(encoding="utf-8"))["waivers"]
+    profile = tmp_path / "narrow.yaml"
+    profile.write_text("rules:\n  paths_exclude: ['app.py']\n", encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["baseline", "update", str(project), "--file", str(out), "--profile", str(profile)]
+    )
+
+    said = " ".join(result.output.split())
+    assert result.exit_code == ExitCode.OK, said
+    assert created
+    assert yaml.safe_load(out.read_text(encoding="utf-8"))["waivers"] == created
+    assert "app.py, so whether it is fixed is unknown" in said
+    assert f"{len(created)} of the kept not re-examined" in said
+    assert "removed:" not in said
+
+
+def test_update_keeps_a_waiver_that_names_no_rule(tmp_path: Path) -> None:
+    project = _project(tmp_path)
+    out = tmp_path / "b.yaml"
+    out.write_text(
+        yaml.safe_dump({"version": 2, "waivers": [{"fingerprint": "0123456789abcdef"}]}),
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["baseline", "update", str(project), "--file", str(out)])
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert [w["fingerprint"] for w in yaml.safe_load(out.read_text("utf-8"))["waivers"]] == [
+        "0123456789abcdef"
+    ]
+    assert "names no rule" in " ".join(result.output.split())

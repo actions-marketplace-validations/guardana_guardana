@@ -163,6 +163,20 @@ def test_migrate_rewrites_a_version_one_file_in_place(tmp_path: Path) -> None:
     assert load_report(out).manifest.migrated_from == 1
 
 
+def test_migrate_in_place_leaves_an_older_run_that_would_not_load_untouched(
+    tmp_path: Path,
+) -> None:
+    hollow = tmp_path / "hollow.json"
+    original = json.dumps({"schema_version": REPORT_SCHEMA_VERSION - 1, "run": {}})
+    hollow.write_text(original, encoding="utf-8")
+
+    result = runner.invoke(app, ["run", "migrate", str(hollow)])
+
+    assert result.exit_code == _INVALID_USAGE, result.output
+    assert "would not load" in " ".join(result.output.split())
+    assert hollow.read_text(encoding="utf-8") == original
+
+
 def test_migrate_keeps_the_unknowns_unknown(tmp_path: Path) -> None:
     # Migration must not be a place where blanks quietly become numbers.
     out = tmp_path / "new.json"

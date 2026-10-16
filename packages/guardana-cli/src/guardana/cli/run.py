@@ -15,7 +15,12 @@ from guardana.core.manifest import RunManifest
 from guardana.core.manifest.load import ManifestLoadError
 from guardana.core.manifest.serialize import manifest_to_dict
 from guardana.core.report import ReportLoadError, load_report
-from guardana.core.report.load import MAX_REPORT_BYTES, MIGRATABLE_VERSIONS, migrate_forward
+from guardana.core.report.load import (
+    MAX_REPORT_BYTES,
+    MIGRATABLE_VERSIONS,
+    migrate_forward,
+    report_from_dict,
+)
 from guardana.core.report.run import REPORT_SCHEMA_VERSION
 from guardana.core.trace.limits import MAX_TRACE_BYTES
 from guardana.core.verify import exchanges_path
@@ -269,6 +274,14 @@ def migrate(
         # itself, so a migration that half-succeeded would overwrite the only copy
         # of the evidence with a document that cannot be read back.
         typer.echo(f"error: {path} cannot be migrated: {exc}", err=True)
+        raise typer.Exit(code=_INVALID_USAGE) from exc
+    try:
+        report_from_dict(migrated, path)
+    except ReportLoadError as exc:
+        typer.echo(
+            f"error: {path} cannot be migrated: the migrated run would not load ({exc})",
+            err=True,
+        )
         raise typer.Exit(code=_INVALID_USAGE) from exc
     destination = output if output is not None else path
     _write(

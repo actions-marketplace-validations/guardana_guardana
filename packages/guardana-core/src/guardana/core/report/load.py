@@ -143,6 +143,15 @@ def load_report(path: Path) -> RunReport:
         raw = json.loads(data.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ReportLoadError(f"{path} is not a readable Guardana run: {exc}") from exc
+    return report_from_dict(raw, path)
+
+
+def report_from_dict(raw: object, path: Path) -> RunReport:
+    """Read a run already parsed from JSON, exactly as `load_report` reads the file at `path`.
+
+    `path` only names the document in a refusal. A writer checks with this that what
+    it is about to save is a run the reader will accept.
+    """
     if not isinstance(raw, dict):
         raise ReportLoadError(f"{path} is not a Guardana run: the top level must be an object")
     migrated_from = _check_version(raw, path)
@@ -155,10 +164,172 @@ def load_report(path: Path) -> RunReport:
         # unreadable file is not.
         if migrated_from is not None:
             raw = migrate_forward(raw, migrated_from)
+        else:
+            _require_fields(raw, path)
         manifest = manifest_from_dict(raw.get("run"), migrated_from=migrated_from)
     except ManifestLoadError as exc:
         raise ReportLoadError(f"{path}: {exc}") from exc
-    return RunReport(manifest=manifest, result=_result(raw, manifest, path))
+    result = _result(raw, manifest, path)
+    if migrated_from is None:
+        _check_counts(result, manifest, path)
+    return RunReport(manifest=manifest, result=result)
+
+
+_REQUIRED_FIELDS: dict[tuple[str, ...], tuple[str, ...]] = {
+    (): (
+        "schema_version",
+        "run",
+        "findings",
+        "unverified",
+        "waived",
+        "errors",
+        "observations",
+        "assessments",
+        "scope",
+    ),
+    ("run",): (
+        "run_id",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "migrated_from",
+        "source",
+        "guardana",
+        "target",
+        "deployment",
+        "configuration",
+        "execution",
+        "usage",
+        "rules",
+        "evaluators",
+        "coverage",
+        "result_summary",
+        "privacy",
+        "exchanges",
+        "recording",
+        "recipe",
+        "fixtures",
+    ),
+    ("run", "source"): ("kind", "provider", "run_url"),
+    ("run", "guardana"): ("version", "commit", "distribution_versions"),
+    ("run", "target"): (
+        "type",
+        "ref",
+        "fingerprint",
+        "fingerprint_inputs",
+        "capabilities",
+        "document",
+    ),
+    ("run", "deployment"): (
+        "ai_system",
+        "environment",
+        "deployment_id",
+        "commit_sha",
+        "image_digest",
+        "model_digest",
+        "model_name",
+        "model_revision",
+    ),
+    ("run", "configuration"): (
+        "profile_name",
+        "profile_digest",
+        "system_prompt_digest",
+        "tool_manifest_digest",
+        "retriever_digest",
+        "dataset_digest",
+        "adapter_digest",
+        "provider",
+        "plugins",
+    ),
+    ("run", "execution"): (
+        "concurrency",
+        "timeout_seconds",
+        "seed",
+        "temperature",
+        "max_requests",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_duration_seconds",
+        "max_requests_per_minute",
+        "trials",
+    ),
+    ("run", "usage"): (
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "requests_missing_token_counts",
+        "estimated_cost",
+        "wall_time_seconds",
+        "judge",
+    ),
+    ("run", "coverage"): ("digest", "taxonomies", "protocols", "shortfall"),
+    ("run", "result_summary"): (
+        "findings",
+        "unverified",
+        "waived",
+        "errors",
+        "observations",
+        "rules_run",
+        "rules_skipped",
+        "max_severity",
+        "gate",
+        "stopped_by",
+        "assessments",
+        "measured",
+    ),
+    ("run", "privacy"): ("evidence_mode", "redaction_policy_digest"),
+}
+"""Every key the current schema's published document requires, by the object holding it.
+
+The writer emits each of them on every run, so one missing from a run of this schema was
+deleted or never written, and a reader that defaulted it would read a stopped run as
+complete, a coverage gap as none, or a skipped rule as run.
+"""
+
+
+def _require_fields(raw: dict[str, Any], path: Path) -> None:
+    """Refuse a current-schema run without a key its writer always emits.
+
+    A nested object that is absent or null is checked no further here: its own key's
+    presence is checked one level up, and the published schema says which may be null.
+    An older schema keeps the reading its migration documents.
+    """
+    missing: list[str] = []
+    for where, keys in _REQUIRED_FIELDS.items():
+        holder: object = raw
+        for key in where:
+            holder = holder.get(key) if isinstance(holder, dict) else None
+        if isinstance(holder, dict):
+            missing += [".".join((*where, key)) for key in keys if key not in holder]
+    if missing:
+        raise ReportLoadError(
+            f"{path} is schema {REPORT_SCHEMA_VERSION} and has no {', '.join(missing)}; "
+            f"every run of this schema records each of them, so it is refused rather "
+            f"than read as empty"
+        )
+
+
+def _check_counts(result: ScanResult, manifest: RunManifest, path: Path) -> None:
+    """Refuse a current-schema run whose channels hold other counts than its summary."""
+    summary = manifest.result_summary
+    recorded = {
+        "findings": (summary.findings, len(result.findings)),
+        "unverified": (summary.unverified, len(result.unverified)),
+        "waived": (summary.waived, len(result.waived)),
+        "errors": (summary.errors, len(result.errors)),
+        "observations": (summary.observations, len(result.observations)),
+        "assessments": (summary.assessments, len(result.assessments)),
+    }
+    differing = [
+        f"{channel} holds {held} where run.result_summary counts {counted}"
+        for channel, (counted, held) in recorded.items()
+        if counted != held
+    ]
+    if differing:
+        raise ReportLoadError(
+            f"{path} disagrees with its own summary: {'; '.join(differing)} — it is refused "
+            f"rather than read as either"
+        )
 
 
 def _check_version(raw: dict[str, Any], path: Path) -> int | None:

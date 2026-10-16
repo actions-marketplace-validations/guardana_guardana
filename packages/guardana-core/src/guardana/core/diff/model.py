@@ -90,8 +90,9 @@ class ChangeKind(StrEnum):
     """The same check at the same outcome, over a different number of findings.
 
     Reported and never gated: under a live model this number is a function of
-    sampling, and under a static scan a genuinely new problem lands in a new
-    location, which is a new identity and a regression in its own right.
+    sampling. Between two file scans a rise in unwaived findings is not this kind but
+    `APPEARED`, since a second problem in a file that already held one keeps the
+    file's identity; a fall stays here.
     """
 
     @property
@@ -146,6 +147,15 @@ class CheckState:
 
     count: int
     waived: bool
+    unwaived: int = 0
+    """How many of `count` no waiver covers; read by the comparison, never written by it."""
+    evidence: tuple[tuple[str, bool], ...] = ()
+    """Each finding's evidence summary and whether a waiver covers it, sorted; compared only.
+
+    Two findings of one rule in one file differ only here, so a new one that replaced a
+    fixed one keeps the count and still shows. Repeats are kept: a secret's summary
+    shows only its first characters, and two keys may share them.
+    """
 
 
 @dataclass(frozen=True, slots=True)

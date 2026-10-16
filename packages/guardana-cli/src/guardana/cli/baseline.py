@@ -31,6 +31,7 @@ from guardana.core.report import (
     ScanResult,
     relativize_findings,
     serialize_baseline,
+    split_ref,
 )
 from guardana.core.report.baseline import Baseline, Waiver, read_baseline
 from guardana.core.report.load import ReportLoadError, load_report
@@ -220,8 +221,9 @@ def _report_health(baseline: Baseline) -> int:
         problems += 1
     for waiver in baseline.unreviewed:
         typer.echo(
-            f"unreviewed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) still has "
-            f"the generated placeholder text — an accepted risk needs a reason and an owner"
+            f"unreviewed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) has no "
+            f"reason or approver written, or still the generated placeholder — an accepted "
+            f"risk needs a reason and an owner"
         )
         problems += 1
     return problems
@@ -310,6 +312,10 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     Deliberately one-directional: it removes waivers that are no longer needed and
     never adds new ones. Adding is what `create` does, and it should be a decision
     somebody makes rather than something an update does on their behalf.
+
+    A waiver is removed only when this run could have reported its finding: its rule
+    ran and, for a file run, its file was listed. Any other waiver is kept and named,
+    because a check that did not look cannot say the finding is gone.
     """
     if target is not None and path is not None:
         raise typer.BadParameter("pass either a path or --target, not both")
@@ -326,17 +332,44 @@ def update(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is
     # waiver together with the reason and the approver a person wrote.
     refuse_an_incomplete_baseline(result, prof.policy, file)
     current = {f.fingerprint for f in result.findings}
-    kept = [w for w in baseline.waivers if w.fingerprint in current]
-    dropped = [w for w in baseline.waivers if w.fingerprint not in current]
+    unexamined = {
+        w.fingerprint: why
+        for w in baseline.waivers
+        if w.fingerprint not in current and (why := _not_examined(w, result)) is not None
+    }
+    kept = [w for w in baseline.waivers if w.fingerprint in current or w.fingerprint in unexamined]
+    dropped = [w for w in baseline.waivers if w not in kept]
     _write_waivers(file, kept)
+    for waiver in kept:
+        if waiver.fingerprint in unexamined:
+            typer.echo(
+                f"kept: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) — "
+                f"{unexamined[waiver.fingerprint]}, so whether it is fixed is unknown"
+            )
     for waiver in dropped:
         typer.echo(f"removed: {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) is fixed")
-    waived_now = {w.fingerprint for w in kept}
+    waived_now = replace(baseline, waivers=tuple(kept)).active()
     unwaived = [f for f in result.findings if f.fingerprint not in waived_now]
     typer.echo(
-        f"{len(kept)} waiver(s) kept, {len(dropped)} removed. "
-        f"{len(unwaived)} finding(s) are not waived by this file."
+        f"{len(kept)} waiver(s) kept, {len(dropped)} removed, {len(unexamined)} of the kept "
+        f"not re-examined. {len(unwaived)} finding(s) are not waived by this file."
     )
+
+
+def _not_examined(waiver: Waiver, result: ScanResult) -> str | None:
+    """Say why `result` could not have reported `waiver`'s finding, or None when it could."""
+    if not waiver.rule:
+        return "it names no rule, so no run can show its finding is gone"
+    if waiver.rule not in result.rules_run:
+        return f"{waiver.rule} did not run"
+    if result.scope is None or not waiver.location:
+        return None
+    path, _line = split_ref(waiver.location)
+    head = path.split("#", 1)[0]
+    listed = set(result.scope.files)
+    if head in listed or head.rsplit(":", 1)[0] in listed:
+        return None
+    return f"this run did not list {head}"
 
 
 def _write_waivers(file: Path, waivers: Sequence[Waiver]) -> None:

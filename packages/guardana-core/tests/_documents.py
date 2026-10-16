@@ -200,12 +200,14 @@ def run_manifest() -> RunManifest:
                 "guard": JudgeUsage(requests=12, requests_missing_token_counts=12),
             },
         ),
+        # Counts what `scan_result` holds: a saved run whose summary disagrees with its
+        # channels is refused.
         result_summary=ResultSummary(
-            findings=3,
-            unverified=2,
+            findings=1,
+            unverified=1,
             waived=1,
-            errors=4,
-            observations=5,
+            errors=1,
+            observations=1,
             rules_run=("guardana.prompt.system_prompt_leak.canary", "guardana.prompt.jailbreak"),
             rules_skipped=(_SKIPPED, _NOT_OFFERED),
             max_severity="HIGH",
@@ -410,6 +412,20 @@ _UNRECORDED = replace(
     reason=UnmeasuredReason.NOT_RECORDED,
 )
 """A trial the recording held no reply for, its other fields set only so a reader must read them."""
+
+
+def counted(manifest: RunManifest, result: ScanResult) -> RunManifest:
+    """Return `manifest` with its summary counting what `result` holds, as a writer's does."""
+    summary = replace(
+        manifest.result_summary,
+        findings=len(result.findings),
+        unverified=len(result.unverified),
+        waived=len(result.waived),
+        errors=len(result.errors),
+        observations=len(result.observations),
+        assessments=len(result.assessments),
+    )
+    return replace(manifest, result_summary=summary)
 
 
 def scan_result() -> ScanResult:

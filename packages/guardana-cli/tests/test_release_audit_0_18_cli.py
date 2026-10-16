@@ -108,6 +108,12 @@ def test_run_inspect_shows_how_honest_the_judge_was(tmp_path: Path) -> None:
         "schema_version": REPORT_SCHEMA_VERSION,
         "run": manifest_to_dict(manifest),
         "findings": [],
+        "unverified": [],
+        "waived": [],
+        "errors": [],
+        "observations": [],
+        "assessments": [],
+        "scope": None,
     }
     path.write_text(json.dumps(document), encoding="utf-8")
 
