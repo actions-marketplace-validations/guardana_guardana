@@ -168,6 +168,18 @@ class A2aCallerIdentityRule(A2aRule):
                 "whether it requires one could not be shown" + (f" ({said})" if said else ""),
             )
             return
+        unsettled = [
+            f"{reply.method}: {reply.detail}" for reply in sent if reply.answer is A2aAnswer.OTHER
+        ]
+        if security is A2aSecurity.REQUIRED and unsettled:
+            # One refused read says nothing about another method's guard, so a read that
+            # met neither a refusal nor an answer is declined by name rather than dropped.
+            yield self.unverified(
+                view,
+                f"the card requires a credential, and a caller presenting none met "
+                f"{'; '.join(unsettled)}, which neither refuses nor answers, so whether "
+                f"those methods check a credential could not be shown",
+            )
         not_found = [reply.method for reply in sent if reply.answer is A2aAnswer.NOT_FOUND]
         if security is A2aSecurity.REQUIRED and not_found:
             yield self.unverified(

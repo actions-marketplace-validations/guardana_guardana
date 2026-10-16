@@ -6,6 +6,7 @@ which records every request as the wire would carry it.
 """
 
 import ipaddress
+import json
 from collections.abc import Mapping
 from typing import Any
 from urllib.error import HTTPError
@@ -601,3 +602,67 @@ def test_an_interface_on_another_host_is_judged_by_its_url_alone() -> None:
 
     assert view.jsonrpc_interface_is_local is False
     assert view.jsonrpc_interface_judged_by_url is True
+
+
+class _ListingAs(ScriptedA2aAgent):
+    """Answers every `ListTasks` with one scripted result; everything else as configured."""
+
+    def __init__(self, result: Mapping[str, object]) -> None:
+        super().__init__(URL, callers=CALLERS, enforced=False, tasks={"": [TASK]})
+        self.listing = dict(result)
+
+    def __call__(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
+        self,
+        url: str,
+        *,
+        method: str = "POST",
+        body: bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
+        discovery: DiscoveryScope | None = None,
+    ) -> RawReply:
+        asked = json.loads(body or b"{}") if method == "POST" else {}
+        if asked.get("method") != "ListTasks":
+            return super().__call__(url, method=method, body=body, headers=headers)
+        self.requests.append((method, url, dict(headers or {})))
+        payload = {"jsonrpc": "2.0", "id": asked["id"], "result": self.listing}
+        return RawReply(200, {"Content-Type": "application/json"}, json.dumps(payload).encode())
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"tasks": "not-a-list"},
+        {"tasks": {"id": TASK}},
+        {"tasks": [], "nextPageToken": "more"},
+        {"tasks": [], "nextPageToken": 7},
+    ],
+    ids=["tasks-a-string", "tasks-an-object", "empty-page-with-a-token", "token-not-a-string"],
+)
+def test_a_listing_nobody_can_read_whole_is_no_answer(result: Mapping[str, object]) -> None:
+    listed = _target(_ListingAs(result)).a2a().anonymous.list_tasks
+
+    assert listed is not None
+    assert listed.answer is A2aAnswer.OTHER
+    assert not listed.lists_tasks
+
+
+@pytest.mark.parametrize(
+    ("result", "shows"),
+    [
+        ({"tasks": [], "nextPageToken": ""}, False),
+        ({"tasks": [], "nextPageToken": None}, False),
+        ({"tasks": []}, False),
+        ({"tasks": [{"id": TASK}], "nextPageToken": "more"}, True),
+        ({"tasks": [], "nextPageToken": "more", "totalSize": 3}, True),
+    ],
+    ids=["last-page", "null-token", "no-token", "a-task-and-more", "empty-page-totalling-three"],
+)
+def test_a_listing_read_whole_or_showing_a_task_is_an_answer(
+    result: Mapping[str, object], shows: bool
+) -> None:
+    listed = _target(_ListingAs(result)).a2a().anonymous.list_tasks
+
+    assert listed is not None
+    assert listed.answer is A2aAnswer.ANSWERED
+    assert listed.lists_tasks is shows

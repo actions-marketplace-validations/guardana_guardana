@@ -50,7 +50,7 @@ def test_an_unparseable_judge_fails_closed() -> None:
         Exchange.single_reply("Paris"), _EXPECT
     )
     assert verdict.outcome == "fail"
-    assert verdict.confidence == 0.3
+    assert verdict.confidence == 1.0
 
 
 def test_a_pass_named_beside_a_fail_is_not_read_as_pass() -> None:

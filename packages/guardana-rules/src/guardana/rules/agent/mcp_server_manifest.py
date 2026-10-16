@@ -320,6 +320,7 @@ def _readable_text(tool: McpTool) -> Iterator[tuple[str, str]]:
     invisible character is as much a smuggled instruction as one described with
     it, and the model is shown both.
     """
+    yield f"the name of {tool.name!r}", tool.name
     yield f"the description of {tool.name!r}", tool.description
     if tool.title:
         yield f"the title of {tool.name!r}", tool.title
@@ -363,10 +364,17 @@ def _pin_of(document: object) -> _Pin:
     tools = document.get("tools")
     if not isinstance(tools, dict):
         raise ValueError("a pinned manifest needs a 'tools' object")  # noqa: TRY004
+    malformed = sorted(
+        str(name) for name, digest in tools.items() if not digest or not isinstance(digest, str)
+    )
+    if malformed:
+        # Dropping the entry would approve the tool's removal on the strength of a pin
+        # that never said what was approved.
+        raise ValueError(f"the approved entry of {malformed[0]!r} is not a digest string")
     server = document.get("server")
     return _Pin(
         version=version,
-        tools={name: digest for name, digest in tools.items() if isinstance(digest, str)},
+        tools=dict(tools),
         server=server if isinstance(server, str) and server else None,
     )
 

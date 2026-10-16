@@ -121,6 +121,29 @@ def test_an_unusable_pin_is_inconclusive(tmp_path: Path) -> None:
     assert [o for _, o in outcomes] == ["inconclusive"]
 
 
+@pytest.mark.parametrize("entry", [None, 7, ""])
+def test_a_pin_entry_that_is_no_digest_makes_the_pin_unusable(
+    tmp_path: Path, entry: object
+) -> None:
+    pin = tmp_path / "mcp.pin.json"
+    document = {"schema_version": 2, "server": "https://mcp.example/api", "tools": {"gone": entry}}
+    pin.write_text(json.dumps(document), encoding="utf-8")
+
+    outcomes = _run(_target([]), pin)
+
+    assert [o for _, o in outcomes] == ["inconclusive"]
+    assert "'gone'" in outcomes[0][0]
+
+
+def test_a_hidden_character_in_a_tool_name_is_a_finding(tmp_path: Path) -> None:
+    tools = [("read\u200bfile", _BENIGN)]
+    pin = _approve(tmp_path, tools)
+
+    summaries = [s for s, _ in _run(_target(tools), pin)]
+
+    assert any("hidden Unicode in the name of" in s for s in summaries)
+
+
 def test_an_unchanged_manifest_matches_its_pin(tmp_path: Path) -> None:
     pin = _approve(tmp_path, [("read_file", _BENIGN)])
 

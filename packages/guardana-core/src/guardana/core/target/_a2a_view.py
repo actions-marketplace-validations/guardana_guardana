@@ -28,6 +28,7 @@ from guardana.core.target._a2a_wire import (
     UNSUPPORTED_OPERATION,
     VERSION_NOT_SUPPORTED,
     a2a_defined,
+    continues,
     listed_count,
     request_body,
     request_headers,
@@ -614,16 +615,12 @@ class _Probe:
                     f"the agent answered {method} with -32009: it does not support "
                     f"A2A {A2A_VERSION}"
                 )
+        if result is not None and method == "ListTasks":
+            self._remember(result)
+            return _listing(reply, result)
         if result is not None:
-            if method == "ListTasks":
-                self._remember(result)
             return A2aReply(
-                method,
-                A2aAnswer.ANSWERED,
-                f"a result (HTTP {reply.status})",
-                reply.status,
-                listed=listed_count(result),
-                total_size=total_size(result),
+                method, A2aAnswer.ANSWERED, f"a result (HTTP {reply.status})", reply.status
             )
         said = f"JSON-RPC error {code} (HTTP {reply.status})"
         if code == TASK_NOT_FOUND:
@@ -679,6 +676,30 @@ def observe(
         url, credential=credential, other_credential=other_credential, meter=meter, send=send
     )
     return A2aView(probe), probe
+
+
+def _listing(reply: RawReply, result: Mapping[str, object]) -> A2aReply:
+    """Class a `ListTasks` result: a listing, or a page nobody can read as the whole of one.
+
+    An empty page naming a further page has not said whether that page lists a task, so
+    it is no answer that the caller is shown none.
+    """
+    listed = listed_count(result)
+    size = total_size(result)
+    more = continues(result)
+    status = reply.status
+    if listed is None:
+        unread = f"a result whose tasks is not a list (HTTP {status})"
+    elif more is None:
+        unread = f"a result whose nextPageToken is not a string (HTTP {status})"
+    elif more and listed == 0 and not size:
+        unread = f"an empty page naming a further page that was not read (HTTP {status})"
+    else:
+        said = f"a result (HTTP {status})"
+        return A2aReply(
+            "ListTasks", A2aAnswer.ANSWERED, said, status, listed=listed, total_size=size
+        )
+    return A2aReply("ListTasks", A2aAnswer.OTHER, unread, status, total_size=size)
 
 
 def _unanswered(url: str, exc: McpError) -> Callable[[], Exception]:

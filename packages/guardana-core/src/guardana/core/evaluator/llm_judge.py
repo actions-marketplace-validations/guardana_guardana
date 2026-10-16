@@ -15,9 +15,11 @@ from guardana.core.evaluator.base import (
 from guardana.core.exchange import Exchange
 
 DEFAULT_CONFIDENCE = 0.8
-# A judge whose reply carries no verdict token has told us nothing. We fail
-# closed (surface it) at reduced confidence so a policy can still filter it.
-_UNPARSEABLE_CONFIDENCE = 0.3
+# A judge whose reply carries no verdict token has told us nothing, and its reply is
+# shaped by the text it grades. It fails closed at full confidence: `min_confidence`
+# filters noisy verdicts, and dropping one nobody read would let a reply that confuses
+# the judge pass the gate.
+_UNPARSEABLE_CONFIDENCE = 1.0
 
 # The judge is asked to lead with PASS/FAIL. Markdown in front of it (`**FAIL**`,
 # `# PASS`) is skipped; a verdict word anywhere later may be negated or quoted, so
@@ -266,7 +268,9 @@ def sampled_verdict(  # noqa: PLR0913 — one keyword per fact the verdict recor
     a single sample cannot measure agreement, so it reports the conservative
     default. No parseable PASS/FAIL in any sample fails closed, and a tie fails.
     A pass needs a readable verdict from every sample: an unreadable one could
-    have been the dissent, so a pass short of that is inconclusive.
+    have been the dissent, so a pass short of that is inconclusive. A failure's
+    agreement is counted among the readable samples, so unreadable ones never
+    dilute it below a policy's `min_confidence`.
     """
     replies = [judge(prompt).strip() for _ in range(samples)]
     votes = [v for v in (_parse_verdict(r) for r in replies) if v is not None]
@@ -287,7 +291,7 @@ def sampled_verdict(  # noqa: PLR0913 — one keyword per fact the verdict recor
     passes = votes.count("pass")
     outcome: Outcome = "fail" if fails >= passes else "pass"  # ties fail closed
     winning = max(fails, passes)
-    total = len(replies)  # unparseable samples dilute confidence
+    total = len(replies)
     if outcome == "pass" and len(votes) < total:
         return Verdict(
             outcome="inconclusive",
@@ -298,14 +302,16 @@ def sampled_verdict(  # noqa: PLR0913 — one keyword per fact the verdict recor
             ),
             evaluator_id=evaluator_id,
         )
-    raw = DEFAULT_CONFIDENCE if total == 1 else winning / total
+    read = len(votes)
+    raw = DEFAULT_CONFIDENCE if read == 1 else winning / read
     confidence, basis = calibrated(raw)
+    unread = f", {total - read} unreadable" if read < total else ""
     return Verdict(
         outcome=outcome,
         confidence=confidence,
         rationale=(
-            f"[prompt_version={prompt_version}] {winning}/{total} judge sample(s) "
-            f"agreed on {outcome.upper()}; {basis}. {replies[-1][:160]}"
+            f"[prompt_version={prompt_version}] {winning}/{read} readable judge sample(s) "
+            f"agreed on {outcome.upper()}{unread}; {basis}. {replies[-1][:160]}"
         ),
         evaluator_id=evaluator_id,
     )

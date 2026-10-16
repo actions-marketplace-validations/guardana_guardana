@@ -81,10 +81,25 @@ def task_ids(result: Mapping[str, object]) -> tuple[str, ...]:
     return tuple(task_id for task_id in ids if isinstance(task_id, str) and task_id)
 
 
-def listed_count(result: Mapping[str, object]) -> int:
-    """How many task entries a `ListTasks` result holds, ids or not."""
+def listed_count(result: Mapping[str, object]) -> int | None:
+    """How many task entries a `ListTasks` result holds, ids or not; None when `tasks` is no list.
+
+    None is a result nobody can read as a listing: zero would turn it into an answered
+    listing that showed nothing.
+    """
     tasks = result.get("tasks")
-    return len(tasks) if isinstance(tasks, list) else 0
+    return len(tasks) if isinstance(tasks, list) else None
+
+
+def continues(result: Mapping[str, object]) -> bool | None:
+    """Whether a `ListTasks` result names a further page; None when its token is no string.
+
+    An absent, null or empty `nextPageToken` is the last page.
+    """
+    token = result.get("nextPageToken")
+    if token is None:
+        return False
+    return bool(token) if isinstance(token, str) else None
 
 
 def total_size(result: Mapping[str, object]) -> int | None:

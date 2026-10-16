@@ -57,6 +57,9 @@ from guardana.core.target._url import display_url
 TIMEOUT_SECONDS = 30
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 
+_SSE_STARTS = ("event:", "data:", "id:", "retry:", ":")
+_SSE_LINE_END = re.compile(r"\r\n|\r|\n")
+
 _SAFE_SCHEMES = frozenset({"http", "https"})
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
@@ -99,33 +102,82 @@ class RawReply:
         lowered = name.lower()
         return next((v for k, v in self.headers.items() if k.lower() == lowered), None)
 
-    def json_object(self) -> Mapping[str, object] | None:
-        """Parse the body as a JSON object, or None when it is not one.
+    def json_object(self, answering: int | str | None = None) -> Mapping[str, object] | None:
+        """Parse the body as a JSON object, or None when it is not one or was cut short.
 
         Understands an SSE frame, because a streamable-HTTP MCP server routinely
         answers a POST with `text/event-stream` — this client asks for it by name
         in every `Accept` header. Reading only bare JSON here made a perfectly good
         tool listing look like a refusal, which silenced three checks at once.
+        `answering` is the JSON-RPC id of the pending request, as `json_text` reads it.
+
+        A body longer than `MAX_RESPONSE_BYTES` was read only as far as the ceiling,
+        so its tail is unknown and nothing parsed from its head is the whole reply.
         """
+        if len(self.body) > MAX_RESPONSE_BYTES:
+            return None
         try:
-            payload = json.loads(json_text(self.body))
-        except ValueError:
+            payload = json.loads(json_text(self.body, answering))
+        except (ValueError, McpError):
             return None
         return payload if isinstance(payload, dict) else None
 
 
-def json_text(raw: bytes) -> str:
-    """Return the JSON in a reply body, unwrapping an SSE frame when there is one.
+def json_text(raw: bytes, answering: int | str | None = None) -> str:
+    """Return the JSON in a reply body, unwrapping an SSE stream when there is one.
+
+    From a stream, only a complete event that is a JSON-RPC response is taken: the one
+    whose `id` is `answering`, or, when no id is given, the only response the stream
+    holds. A stream holding none, or more than one candidate, raises `McpError`, since
+    adopting any other event would grade a reply to a request nobody sent.
 
     One definition, used by the JSON-RPC reader and by the authorization
     observations, because two readers of the same wire format drift and the one
     that drifts reports the wrong thing quietly.
     """
-    text = raw.decode("utf-8", errors="replace").strip()
-    if not text.startswith(("event:", "data:", ":")):
-        return text
-    data = [line[5:].strip() for line in text.splitlines() if line.startswith("data:")]
-    return data[-1] if data else ""
+    text = raw.decode("utf-8", errors="replace")
+    if not text.lstrip().startswith(_SSE_STARTS):
+        return text.strip()
+    responses = [data for data in _sse_events(text) if _is_response(data, answering)]
+    if len(responses) != 1:
+        wanted = "a response" if answering is None else f"the response to request {answering!r}"
+        raise McpError(
+            f"the event stream holds {len(responses)} complete event(s) that could be "
+            f"{wanted}, not exactly one"
+        )
+    return responses[0]
+
+
+def _sse_events(text: str) -> list[str]:
+    """Return the data of each complete event in an SSE stream, in order.
+
+    An event is complete only once a blank line ends it; the specification has a
+    client discard one the stream stops inside, and a line the stream stops inside.
+    """
+    events: list[str] = []
+    data: list[str] = []
+    for line in _SSE_LINE_END.split(text)[:-1]:
+        if not line:
+            if data:
+                events.append("\n".join(data))
+            data = []
+        elif line.startswith("data:"):
+            data.append(line[5:].removeprefix(" "))
+    return events
+
+
+def _is_response(data: str, answering: int | str | None) -> bool:
+    """Whether one event's data is a JSON-RPC response, to `answering` when an id is given."""
+    try:
+        message = json.loads(data)
+    except ValueError:
+        return False
+    if not isinstance(message, dict) or "method" in message:
+        return False
+    if answering is None:
+        return True
+    asked = message.get("id")
+    return type(asked) is type(answering) and asked == answering
 
 
 class RedirectRefusedError(McpError):

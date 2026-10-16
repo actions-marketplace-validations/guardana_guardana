@@ -8,7 +8,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import Capability, McpAuthorizationView, TargetKind, display_url
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP07_2025
 from guardana.rules.mcp import _samples
-from guardana.rules.mcp._base import McpAuthorizationRule
+from guardana.rules.mcp._base import McpAuthorizationRule, further_issuers
 
 _ISS_SUPPORTED = "authorization_response_iss_parameter_supported"
 
@@ -24,7 +24,8 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
     parameter **MUST** advertise `authorization_response_iss_parameter_supported`
     in its metadata, and one that advertises nothing gives a client no way to tell
     whether an authorization response came back from the server it started the flow
-    with.
+    with. Only the first authorization server the resource names is fetched, so the rule
+    declines for every further one rather than pass what it never read.
 
     That is the mix-up attack. A client talking to two authorization servers — one
     of them attacker-influenced — can be walked into redeeming a code at the wrong
@@ -119,12 +120,20 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
                 "guardana.mcp.authorization_discovery reports why the document is missing",
             )
             return
-        if (document.content or {}).get(_ISS_SUPPORTED) is True:
-            return
-        yield self.finding(
-            view,
-            f"the authorization server metadata at {display_url(document.url)} does not advertise "
-            f"'{_ISS_SUPPORTED}', so a client redeeming an authorization code here cannot "
-            f"tell that the response came from the issuer it started the flow with "
-            f"(RFC 9207)",
-        )
+        if (document.content or {}).get(_ISS_SUPPORTED) is not True:
+            yield self.finding(
+                view,
+                f"the authorization server metadata at {display_url(document.url)} does not "
+                f"advertise '{_ISS_SUPPORTED}', so a client redeeming an authorization code here "
+                f"cannot tell that the response came from the issuer it started the flow with "
+                f"(RFC 9207)",
+            )
+        further = further_issuers(view)
+        if further:
+            named = ", ".join(display_url(issuer) for issuer in further)
+            yield self.unverified(
+                view,
+                f"the protected resource metadata names further authorization servers "
+                f"({named}) whose metadata this run did not fetch, so whether they "
+                f"advertise '{_ISS_SUPPORTED}' was never seen",
+            )

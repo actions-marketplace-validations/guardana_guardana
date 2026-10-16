@@ -67,6 +67,28 @@ def test_an_authorization_server_on_a_private_address_is_a_finding() -> None:
     assert any("inside the network running this scan" in line for line in summaries(reported))
 
 
+def test_a_refused_address_named_after_the_first_authorization_server_is_a_finding() -> None:
+    issuers = ["https://93.184.215.14", "https://169.254.169.254"]
+    server = guarded(resource_metadata={**CONFORMING_RESOURCE, "authorization_servers": issuers})
+
+    reported = findings(RULE, server, credential=CREDENTIAL)
+
+    assert outcomes(reported) == [None, None]
+    assert "169.254.169.254" in reported[0].evidence.summary
+    assert not [url for _, url, _ in server.requests if "169.254.169.254" in url]
+
+
+def test_a_further_authorization_server_left_unread_is_inconclusive() -> None:
+    issuers = ["https://93.184.215.14", "https://93.184.215.15"]
+    server = guarded(resource_metadata={**CONFORMING_RESOURCE, "authorization_servers": issuers})
+
+    reported = findings(RULE, server, credential=CREDENTIAL)
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert "93.184.215.15" in reported[0].evidence.summary
+    assert not [url for _, url, _ in server.requests if "93.184.215.15" in url]
+
+
 def test_a_local_server_may_point_at_a_local_authorization_server() -> None:
     # Otherwise this rule is noise on the first machine anybody tries it on.
     document = {

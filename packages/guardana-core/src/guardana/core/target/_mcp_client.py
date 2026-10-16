@@ -36,7 +36,6 @@ from guardana.core.target._mcp_http import (
     RawReply,
     RedirectRefusedError,
     Sender,
-    json_text,
     send,
 )
 from guardana.core.target._mcp_wire import (
@@ -89,6 +88,8 @@ The answer repeats the id, so an unbounded one would make every answer as large 
 server chose.
 """
 _METHOD_NOT_FOUND = -32601
+_HTTP_REQUEST_ID = 1
+"""The id of every HTTP request: each is its own exchange, and its reply is read by this id."""
 
 MAX_LISTING_PAGES = 16
 """How many pages of one listing are read; a server that names more is refused, never cut short."""
@@ -352,7 +353,7 @@ class HttpMcpTransport:
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         """Send one JSON-RPC request and return its `result`."""
-        reply = self._post(self._wire.body(method, params), method)
+        reply = self._post(self._wire.body(method, params, request_id=_HTTP_REQUEST_ID), method)
         self._raise_for(reply)
         return self._result_of(reply)
 
@@ -385,7 +386,7 @@ class HttpMcpTransport:
         status = reply.status
         if status in _CREDENTIAL_STATUSES and self._credential is not None:
             raise http_failure(reply, self._ref)
-        error = error_member(_payload(reply))
+        error = error_member(_payload(reply, _HTTP_REQUEST_ID))
         if error is not None:
             if status in _SUCCESS:
                 message = f"MCP server at {self._ref} returned an error: {dict(error)!r}"
@@ -408,7 +409,7 @@ class HttpMcpTransport:
             raise unreadable(reply, self._ref)
 
     def _result_of(self, reply: RawReply) -> Mapping[str, object]:
-        payload = _payload(reply)
+        payload = _payload(reply, _HTTP_REQUEST_ID)
         result = payload.get("result") if payload is not None else None
         if not isinstance(result, dict):
             raise unreadable(reply, self._ref)
@@ -1138,15 +1139,9 @@ def unreadable(reply: RawReply, ref: str) -> UnreadableReply:
     )
 
 
-def _payload(reply: RawReply) -> Mapping[str, object] | None:
-    """Parse a reply body as a JSON object, or None when it is not one or is too long to read."""
-    if len(reply.body) > MAX_RESPONSE_BYTES:
-        return None
-    try:
-        payload = json.loads(json_text(reply.body))
-    except ValueError:
-        return None
-    return payload if isinstance(payload, dict) else None
+def _payload(reply: RawReply, answering: int) -> Mapping[str, object] | None:
+    """Parse the reply to request `answering` as a JSON object, or None when there is none."""
+    return reply.json_object(answering)
 
 
 def _reason(status: int) -> str:

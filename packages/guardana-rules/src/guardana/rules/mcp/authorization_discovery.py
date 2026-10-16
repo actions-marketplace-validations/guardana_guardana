@@ -16,7 +16,7 @@ from guardana.core.target import (
 )
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP07_2025
 from guardana.rules.mcp import _samples
-from guardana.rules.mcp._base import McpAuthorizationRule
+from guardana.rules.mcp._base import McpAuthorizationRule, further_issuers
 
 _PKCE_METHOD = "S256"
 _HTTP_ERROR = 400
@@ -44,6 +44,8 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
 
     Only a `404` or `410` reads as a document not published. A metadata address that
     answered any other error status said nothing about the document, so the rule declines.
+    Only the first authorization server the document names is fetched, so the rule also
+    declines for every further one: what those advertise was never read.
 
     It declines on a server that answered an anonymous caller: discovery is never
     attempted there, so whatever surface it publishes went unread, and
@@ -144,6 +146,19 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
             return
         yield from self._resource_document(view, resource)
         yield from self._authorization_server(view)
+        yield from self._further_issuers(view)
+
+    def _further_issuers(self, view: McpAuthorizationView) -> Iterator[Finding]:
+        """Decline for every authorization server named after the first: none is read."""
+        further = further_issuers(view)
+        if further:
+            named = ", ".join(display_url(issuer) for issuer in further)
+            yield self.unverified(
+                view,
+                f"the protected resource metadata names further authorization servers "
+                f"({named}) whose metadata this run did not fetch, so whether they "
+                f"advertise {_PKCE_METHOD} PKCE and identify their issuer was never seen",
+            )
 
     def _resource_document(
         self, view: McpAuthorizationView, resource: Document

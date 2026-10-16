@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import suppress
 from dataclasses import replace
 from pathlib import Path
@@ -62,7 +62,7 @@ from guardana.cli._reporting import installed_reporter_or_check, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import calibrations_or_exit, detect_deployment, detect_source
 from guardana.cli._safety_flags import parse_impact
-from guardana.cli._sidecar import digest_of, refuse_writing_over_named_inputs
+from guardana.cli._sidecar import digest_of, refuse_writing_over_named_inputs, same_file
 from guardana.cli._target_locator import resolve_target
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
@@ -291,18 +291,17 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     refuse_collector_beside("--write-mcp-pin", write_mcp_pin, collector=bool(collector))
     refuse_output_beside("--write-mcp-pin", write_mcp_pin, output)
     refuse_incomparable_output(output, format)
-    refuse_writing_over_named_inputs(
-        output,
-        [
-            ("--profile", profile),
-            *rule_flag_inputs(rules),
-            ("--adapter", adapter),
-            ("--system-prompt-file", system_prompt_file),
-            ("--fixtures", fixtures),
-            ("--mcp-pin", mcp_pin),
-            ("--mcp-registry-entry", mcp_registry_entry),
-        ],
-    )
+    named_inputs = [
+        ("--profile", profile),
+        *rule_flag_inputs(rules),
+        ("--adapter", adapter),
+        ("--system-prompt-file", system_prompt_file),
+        ("--fixtures", fixtures),
+        ("--mcp-pin", mcp_pin),
+        ("--mcp-registry-entry", mcp_registry_entry),
+    ]
+    refuse_writing_over_named_inputs(output, named_inputs)
+    _refuse_a_pin_over_an_input(write_mcp_pin, named_inputs)
     seeded = _fixtures(fixtures, elsewhere=target is not None or mcp is not None or a2a is not None)
     if seeded is not None:
         refuse_writing_over_named_inputs(
@@ -311,6 +310,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
     deployment = detect_deployment(ai_system, environment, deployment_id)
     prof = resolve_profile(profile, preset)
     refuse_writing_over_named_inputs(output, profile_file_inputs(prof))
+    _refuse_a_pin_over_an_input(write_mcp_pin, profile_file_inputs(prof))
     warn_without_a_reporter(prof.delivery_required, reporter)
     prof = replace(
         prof,
@@ -467,7 +467,7 @@ def probe(  # noqa: C901, PLR0913, PLR0915, PLR0917 — Typer surface, target mo
                 return
             _finish_probe(
                 examined,
-                display_url(mcp),
+                _mcp_source(mcp, examined),
                 deployment,
                 outputs=outputs,
                 output=output,
@@ -532,6 +532,20 @@ def _fixtures(path: Path | None, *, elsewhere: bool) -> Fixtures | None:
             "an A2A agent or a pack's --target holds none"
         )
     return read_fixtures(path)
+
+
+def _refuse_a_pin_over_an_input(pin: Path | None, named: Iterable[tuple[str, Path | None]]) -> None:
+    """Exit `3` when `--write-mcp-pin` names a file this command reads, before anything is sent."""
+    if pin is None:
+        return
+    for name, given in named:
+        if given is not None and not given.is_dir() and same_file(pin, given):
+            typer.echo(
+                f"error: --write-mcp-pin {pin} is {given}, which {name} names, and the pin "
+                f"would replace it — choose another --write-mcp-pin",
+                err=True,
+            )
+            raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
 
 def _given(flags: dict[str, object]) -> list[str]:
@@ -702,6 +716,18 @@ def _keeping(
 def _missing_target() -> Target:
     """Type-safe fallback that is unreachable when a custom locator is present."""
     raise typer.BadParameter("pass --target scheme://locator")
+
+
+def _mcp_source(address: str, verification: Verification) -> str:
+    """Name the probed server as a run may show it and send it to a collector.
+
+    A URL is shown without its secrets; a command is named by the target's ref, which
+    withholds the values of its arguments, because a command line is where an stdio
+    server is handed its token.
+    """
+    if address.startswith(("http://", "https://")):
+        return display_url(address)
+    return verification.manifest.target.ref
 
 
 def _finish_probe(  # noqa: PLR0913 — what the command does with a finished run

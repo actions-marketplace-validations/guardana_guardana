@@ -64,6 +64,7 @@ _SESSION_SAMPLES = 3
 _HTTP_ERROR = 400
 _ABSENT = frozenset({404, 410})
 """The statuses that say a metadata document does not exist; any other error leaves it unread."""
+_NOT_OPENABLE = "the address is not a URL a client may open"
 _SUCCESS = range(200, 300)
 _NOT_THE_ERA = frozenset({400, 404, 405})
 """Statuses a server gives a handshake it does not implement, when no JSON-RPC error says more."""
@@ -199,6 +200,12 @@ class Discovery:
     resource: "Document | None" = None
     authorization: "Document | None" = None
     refused: tuple["Document", ...] = ()
+    unread_issuers: tuple[str, ...] = ()
+    """Further authorization servers the resource names whose metadata was not fetched.
+
+    Only the first is read; each other one is held to the address guard without a
+    request, and one the guard passed is listed here, since what it serves was never seen.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,6 +337,11 @@ class McpAuthorizationView:
     def refused_addresses(self) -> tuple[Document, ...]:
         """Every discovery address this client would not follow, and why."""
         return self._discovered().refused
+
+    @property
+    def unread_issuers(self) -> tuple[str, ...]:
+        """Further authorization servers the resource names, which passed the guard unread."""
+        return self._discovered().unread_issuers
 
     @property
     def foreign_token(self) -> ForeignToken:
@@ -542,17 +554,32 @@ class _Probe:
         resource, refused = self._first_readable(
             _resource_metadata_urls(self._url, anonymous.challenge), scope
         )
-        issuer = _first_issuer(resource)
-        if issuer is None:
+        issuers = _issuers(resource)
+        if not issuers:
             return Discovery(resource=resource, refused=tuple(refused))
+        first, others = issuers[0], issuers[1:]
+        unread: list[str] = []
+        elsewhere: list[Document] = []
+        for issuer in others:
+            turned_down = _refused_unfetched(issuer, scope)
+            elsewhere.extend(turned_down)
+            if not turned_down:
+                unread.append(issuer)
         try:
-            candidates = _authorization_server_urls(issuer)
+            candidates = _authorization_server_urls(first)
         except ValueError:
-            unusable = Document(url=issuer, refused="the address is not a URL a client may open")
-            return Discovery(resource=resource, refused=(*refused, unusable))
+            unusable = Document(url=first, refused=_NOT_OPENABLE)
+            return Discovery(
+                resource=resource,
+                refused=(*refused, unusable, *elsewhere),
+                unread_issuers=tuple(unread),
+            )
         authorization, more = self._first_readable(candidates, scope)
         return Discovery(
-            resource=resource, authorization=authorization, refused=tuple(refused + more)
+            resource=resource,
+            authorization=authorization,
+            refused=(*refused, *more, *elsewhere),
+            unread_issuers=tuple(unread),
         )
 
     def foreign_token(self, anonymous: Anonymous) -> ForeignToken:
@@ -1213,14 +1240,30 @@ def challenge_parameters(challenge: str | None) -> dict[str, str]:
     return {name.lower(): value for name, value in _CHALLENGE_PARAM.findall(challenge)}
 
 
-def _first_issuer(resource: Document | None) -> str | None:
-    """Read the first authorization server a metadata document names."""
+def _issuers(resource: Document | None) -> tuple[str, ...]:
+    """Read every authorization server a metadata document names, in order, each once."""
     if resource is None or resource.content is None:
-        return None
+        return ()
     issuers = resource.content.get("authorization_servers")
     if not isinstance(issuers, list):
-        return None
-    return next((entry for entry in issuers if isinstance(entry, str) and entry), None)
+        return ()
+    named = (entry for entry in issuers if isinstance(entry, str) and entry)
+    return tuple(dict.fromkeys(named))
+
+
+def _refused_unfetched(issuer: str, scope: DiscoveryScope) -> list[Document]:
+    """Hold every metadata address of `issuer` to the guard, sending nothing; return refusals."""
+    try:
+        candidates = _authorization_server_urls(issuer)
+    except ValueError:
+        return [Document(url=issuer, refused=_NOT_OPENABLE)]
+    refused = []
+    for url in candidates:
+        address = ascii_host(url)
+        refusal = refusal_for(address, local_target=scope.local_target)
+        if refusal is not None:
+            refused.append(Document(url=address, refused=refusal))
+    return refused
 
 
 def _resource_metadata_urls(server: str, challenge: str | None) -> tuple[str, ...]:

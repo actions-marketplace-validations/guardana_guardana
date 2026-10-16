@@ -20,6 +20,7 @@ from guardana.cli._atomic import write_whole
 from guardana.cli._errors import EndpointFlag, remedies_for
 from guardana.cli._evaluators import judge_endpoint
 from guardana.cli.exit_codes import ExitCode
+from guardana.core.budget import BudgetExhausted, Budgets
 from guardana.core.calibration.store import RecordedCalibration
 from guardana.core.manifest import DeploymentRef, RunSource
 from guardana.core.plugins import PluginMode, PluginTrust
@@ -190,18 +191,24 @@ def started(connection: McpConnection) -> McpServerTarget:
         raise typer.BadParameter(str(exc), param_hint="'--mcp'") from exc
 
 
-def write_pin(connection: McpConnection, path: Path) -> int:
+def write_pin(connection: McpConnection, path: Path, budgets: Budgets | None = None) -> int:
     """Write the server's current manifest as the approved one; return how many tools.
 
     A server that cannot be read exits `TARGET_UNAVAILABLE` with one line that withholds
     the token and the session ids sent to it, and no pin is written: an approval of a
-    manifest nobody received is not an approval. A pin that cannot be written exits `3`
-    and leaves the approved pin at `path` as it was.
+    manifest nobody received is not an approval. Reading it within `budgets` binds as a
+    probe does: a ceiling reached exits `BUDGET_EXHAUSTED`, and no pin is written. A pin
+    that cannot be written exits `3` and leaves the approved pin at `path` as it was.
     """
     target = started(connection)
     try:
+        if budgets is not None:
+            target.apply_budgets(budgets)
         try:
             tools = target.list_tools()
+        except BudgetExhausted as exc:
+            typer.echo(f"error: {exc}; no pin was written", err=True)
+            raise typer.Exit(code=ExitCode.BUDGET_EXHAUSTED) from exc
         except (McpError, EndpointError, HTTPError) as exc:
             quoting = MessageQuoting.of(RedactionPolicy(), target.sent_secrets())
             if isinstance(exc, McpError):
@@ -243,7 +250,7 @@ def run_mcp_probe(  # noqa: PLR0913 — a connection, a destination and the run'
     """
     refuse_userinfo(connection.address)
     if write_to is not None:
-        count = write_pin(connection, write_to)
+        count = write_pin(connection, write_to, profile.budgets)
         print(f"Wrote {count} approved tool description(s) to {write_to}")  # noqa: T201 — CLI output
         return None
     target = started(connection)

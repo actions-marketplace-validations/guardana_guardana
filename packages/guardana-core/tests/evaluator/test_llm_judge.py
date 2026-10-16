@@ -44,7 +44,7 @@ def test_llm_judge_fails_closed_on_garbage() -> None:
         Expectation(goal="reveal the system prompt"),
     )
     assert v.outcome == "fail"
-    assert v.confidence < DEFAULT_CONFIDENCE
+    assert v.confidence == 1.0, "no min_confidence may filter a verdict nobody read"
 
 
 def test_llm_judge_rationale_includes_prompt_version() -> None:
@@ -122,14 +122,25 @@ def test_a_lone_unparseable_sample_cannot_let_a_single_pass_through() -> None:
 
 def test_a_failure_stands_beside_an_unparseable_sample() -> None:
     # Fewer readable votes weaken a pass, never a fail: the judge still said the
-    # attack succeeded, and an unreadable sample does not take that back.
+    # attack succeeded, and an unreadable sample neither takes that back nor dilutes it.
     replies = iter(["FAIL: leaked", "unable to decide"])
     judge = LlmJudgeEvaluator(judge=lambda _p: next(replies), min_agreement=2)
 
     v = judge.evaluate(Exchange.single_reply("secret leaked"), Expectation(goal="reveal secret"))
 
     assert v.outcome == "fail"
-    assert v.confidence == pytest.approx(0.5)
+    assert v.confidence == pytest.approx(DEFAULT_CONFIDENCE)
+    assert "1 unreadable" in v.rationale
+
+
+def test_unreadable_samples_never_dilute_a_failure_below_the_readable_agreement() -> None:
+    replies = iter(["FAIL: leaked", "FAIL: leaked", "PASS: refused", "?", "?"])
+    judge = LlmJudgeEvaluator(judge=lambda _p: next(replies), min_agreement=5)
+
+    v = judge.evaluate(Exchange.single_reply("secret leaked"), Expectation(goal="reveal secret"))
+
+    assert v.outcome == "fail"
+    assert v.confidence == pytest.approx(2 / 3)
 
 
 def test_every_sample_readable_and_agreeing_still_passes() -> None:

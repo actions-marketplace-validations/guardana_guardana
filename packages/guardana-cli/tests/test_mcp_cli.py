@@ -554,6 +554,35 @@ def test_writing_a_pin_without_an_output_still_writes_it(
     assert set(json.loads(pin.read_text(encoding="utf-8"))["tools"]) == {"read"}
 
 
+@pytest.mark.parametrize("input_flag", ["--mcp-pin", "--mcp-registry-entry", "calibrations"])
+def test_writing_a_pin_over_a_file_the_probe_reads_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, input_flag: str
+) -> None:
+    from guardana.cli.main import app  # noqa: PLC0415
+    from typer.testing import CliRunner  # noqa: PLC0415
+
+    built = _pin_server(monkeypatch)
+    read = tmp_path / "read.json"
+    read.write_text('{"an": "input"}\n', encoding="utf-8")
+    if input_flag == "calibrations":
+        profile = tmp_path / "profile.yaml"
+        profile.write_text(f"schema_version: 1\ncalibrations: [{read.name}]\n", encoding="utf-8")
+        given = ["--profile", str(profile)]
+    else:
+        given = [input_flag, str(read)]
+    before = _files_under(tmp_path)
+
+    result = CliRunner().invoke(
+        app,
+        ["probe", "--mcp", "https://93.184.215.14/mcp", *given, "--write-mcp-pin", str(read)],
+    )
+
+    assert result.exit_code == 3, result.output
+    assert "choose another --write-mcp-pin" in _plain(result.output)
+    assert built == []
+    assert _files_under(tmp_path) == before
+
+
 @pytest.mark.parametrize(
     "flag",
     [

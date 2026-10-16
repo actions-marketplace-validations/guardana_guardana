@@ -15,6 +15,7 @@ from guardana.core.target import EndpointUnreachable, UnreadableReply
 from guardana.core.target._mcp_client import StdioMcpTransport, open_conversation
 from guardana.core.target._mcp_http import MAX_RESPONSE_BYTES
 from guardana.core.target._mcp_wire import LEGACY_VERSION
+from guardana.core.target.mcp import _stdio_ref
 
 pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
@@ -437,3 +438,36 @@ def test_a_server_that_does_not_read_its_input_is_unreachable_within_the_deadlin
     assert len(outcome) == 1
     assert isinstance(outcome[0], EndpointUnreachable)
     assert "0.5 seconds" in str(outcome[0])
+
+
+def test_an_stdio_server_is_named_by_its_whole_command_line() -> None:
+    one = _stdio_ref(["python", "server_a.py"])
+
+    assert one == _stdio_ref(["python", "server_a.py"])
+    assert one != _stdio_ref(["python", "server_b.py"])
+    assert one.startswith("mcp+stdio://python#argv-")
+    assert _stdio_ref(["mcp-server"]) == "mcp+stdio://mcp-server"
+
+
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        (["srv", "--token", "secret-one"], ["srv", "--token", "secret-two"]),
+        (["srv", "--api-key=secret-one"], ["srv", "--api-key=secret-two"]),
+        (["env", "API_KEY=secret-one", "srv"], ["env", "API_KEY=secret-two", "srv"]),
+        (["srv", "https://u:secret-one@db.invalid"], ["srv", "https://u:secret-two@db.invalid"]),
+    ],
+    ids=["flag-then-value", "flag-equals-value", "assignment", "url-userinfo"],
+)
+def test_a_value_that_looks_like_a_credential_is_withheld_from_the_name(
+    first: list[str], second: list[str]
+) -> None:
+    named = _stdio_ref(first)
+
+    assert named == _stdio_ref(second)
+    assert "secret" not in named
+
+
+def test_an_argument_that_names_no_credential_is_part_of_the_name() -> None:
+    assert _stdio_ref(["srv", "--port", "1"]) != _stdio_ref(["srv", "--port", "2"])
+    assert _stdio_ref(["env", "MODE=a", "srv"]) != _stdio_ref(["env", "MODE=b", "srv"])

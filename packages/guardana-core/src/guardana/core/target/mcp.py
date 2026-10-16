@@ -1,7 +1,9 @@
+import re
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
 from guardana.core.budget import Budgets
+from guardana.core.fingerprint import digest_of
 from guardana.core.target._mcp_authorization import McpAuthorizationView
 from guardana.core.target._mcp_authorization import observe as observe_authorization
 from guardana.core.target._mcp_client import (
@@ -51,6 +53,118 @@ _LONE_SENDER = (
     "a supplied sender needs a discovery_sender too: pass the same scripted server, or "
     "guardana.core.target.send for the built-in pinned client"
 )
+
+
+_SECRET_WORDS = frozenset(
+    {
+        "apikey",
+        "apikeys",
+        "auth",
+        "authorization",
+        "bearer",
+        "cookie",
+        "credential",
+        "credentials",
+        "jwt",
+        "key",
+        "pass",
+        "passphrase",
+        "passwd",
+        "password",
+        "passwords",
+        "pat",
+        "privatekey",
+        "pwd",
+        "secret",
+        "secrets",
+        "session",
+        "token",
+        "tokens",
+    }
+)
+_SECRET_SUFFIXES = (
+    "accesskey",
+    "apikey",
+    "credential",
+    "passphrase",
+    "passwd",
+    "password",
+    "privatekey",
+    "secret",
+    "token",
+)
+"""Endings that name a secret inside one word, as `accesstoken` or `clientsecret` do."""
+_NAME_WORDS = re.compile(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])")
+_ASSIGNMENT = re.compile(r"([A-Za-z_][A-Za-z0-9_.-]*)=")
+_HEADER = re.compile(r"[ \t]*([A-Za-z][A-Za-z0-9-]*)[ \t]*:[ \t]*\S")
+_USERINFO = re.compile(r"://[^/?#]*@")
+_WITHHELD = "[withheld]"
+_ARGV_DIGEST_CHARS = 16
+
+
+def _stdio_ref(command: Sequence[str]) -> str:
+    """Name an stdio server by its whole command line, never by its executable alone.
+
+    Two servers started by one interpreter differ only in their arguments, so a ref
+    that dropped them let one server's pin approve another. A command with arguments
+    is named `mcp+stdio://<executable>#argv-<digest>`; the digest covers every argument
+    with each value that looks like a credential withheld, so the ref neither carries
+    a secret nor changes when one is rotated. A bare executable keeps its plain name.
+    """
+    if len(command) == 1:
+        return f"mcp+stdio://{command[0]}"
+    digest = digest_of(*_shown_argv(command)).split(":", 1)[1][:_ARGV_DIGEST_CHARS]
+    return f"mcp+stdio://{command[0]}#argv-{digest}"
+
+
+def _shown_argv(command: Sequence[str]) -> Iterator[str]:
+    """Yield the command line with every value that looks like a credential withheld.
+
+    A value is withheld after a flag whose name says it is a secret (`--token X`,
+    `--api-key=X`), in an assignment or a header whose name does (`API_KEY=X`,
+    `Authorization: Bearer X`), alone or as a flag's value, and wherever a URL carries
+    userinfo.
+    """
+    withhold_next = False
+    for argument in command:
+        if withhold_next:
+            withhold_next = False
+            yield _WITHHELD
+            continue
+        if argument.startswith("-"):
+            name, equals, value = argument.partition("=")
+            secret = _names_a_secret(name)
+            if equals:
+                yield f"{name}={_WITHHELD if secret else _shown_value(value)}"
+                continue
+            withhold_next = secret
+            yield argument
+            continue
+        yield _shown_value(argument)
+
+
+def _shown_value(value: str) -> str:
+    """Return `value`, or its form with the secret it carries withheld."""
+    assignment = _ASSIGNMENT.match(value)
+    if assignment is not None and _names_a_secret(assignment.group(1)):
+        return f"{assignment.group(1)}={_WITHHELD}"
+    header = _HEADER.match(value)
+    if header is not None and _names_a_secret(header.group(1)):
+        return f"{header.group(1)}: {_WITHHELD}"
+    if _USERINFO.search(value):
+        return _WITHHELD
+    return value
+
+
+def _names_a_secret(name: str) -> bool:
+    """Tell whether a flag or variable name says its value is a secret.
+
+    Read word by word, so `--api-key`, `--authToken` and `API_KEY` name one while
+    `--keys-dir` and `--author` do not: withholding those would let two servers that
+    differ only there share one ref.
+    """
+    words = [word.lower() for word in _NAME_WORDS.findall(name)]
+    return any(word in _SECRET_WORDS or word.endswith(_SECRET_SUFFIXES) for word in words)
 
 
 class McpServerTarget(Target):
@@ -154,7 +268,7 @@ class McpServerTarget(Target):
                 # raised `IndexError`, which no caller catches — so a target that
                 # should refuse with a sentence crashed with a traceback instead.
                 raise McpError("an stdio MCP server needs a command to run")
-            self._ref = f"mcp+stdio://{command[0]}"
+            self._ref = _stdio_ref(command)
             return StdioMcpTransport(command, ref=self._ref)
         if url is not None:
             self._ref = display_url(url)

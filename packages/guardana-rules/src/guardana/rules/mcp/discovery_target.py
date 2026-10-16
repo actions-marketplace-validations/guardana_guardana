@@ -36,9 +36,11 @@ class McpDiscoveryTargetRule(McpAuthorizationRule):
     normal setup, and reporting it would make this rule noise on the first machine
     anybody tries it on.
 
-    A protected resource document that came back but could not be read, or whose
-    address answered an error other than `404` or `410`, hides the authorization server
-    it names, so the rule declines there. One that was never published names nothing,
+    Every authorization server the resource document names is held to the guard; only
+    the first one's metadata is fetched, so the rule declines while another one passed
+    the guard unread. A protected resource document that came back but could not be read,
+    or whose address answered an error other than `404` or `410`, hides the authorization
+    server it names, so the rule declines there. One that was never published names nothing,
     and leaves nothing unseen. A server that answered an anonymous caller is never
     asked for discovery at all, so the rule declines there too.
     """
@@ -129,6 +131,14 @@ class McpDiscoveryTargetRule(McpAuthorizationRule):
                 view,
                 f"the server directed this client to {address} during authorization "
                 f"discovery, which was not fetched because {document.refused}",
+            )
+        if view.unread_issuers:
+            named = ", ".join(display_url(issuer) for issuer in view.unread_issuers)
+            yield self.unverified(
+                view,
+                f"the protected resource metadata names further authorization servers "
+                f"({named}) whose metadata this run did not fetch, so the addresses they "
+                f"direct a client to were never seen",
             )
         resource = view.protected_resource
         if resource is not None and resource.error is not None:

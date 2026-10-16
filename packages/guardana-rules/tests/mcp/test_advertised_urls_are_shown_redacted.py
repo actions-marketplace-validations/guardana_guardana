@@ -123,6 +123,7 @@ def test_the_authorization_server_address_is_shown_without_its_query() -> None:
         SimpleNamespace(
             server=ROUTABLE,
             anonymous=Anonymous(status=401),
+            protected_resource=None,
             authorization_server=Document(
                 url=f"https://93.184.215.14/.well-known/oauth-authorization-server?key={_PLANTED}",
                 status=200,

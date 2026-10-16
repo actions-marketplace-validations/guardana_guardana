@@ -36,12 +36,20 @@ _BASE64_BLOB = re.compile(r"[A-Za-z0-9+/]{48,}={0,2}")
 
 
 def _mcp_tools(doc: object) -> list[dict[str, object]] | None:
-    """Return the tool objects if `doc` is an MCP tool manifest, else None (shape gate)."""
+    """Return the tool objects if `doc` is an MCP tool manifest, else None (shape gate).
+
+    A tool's `description` is optional, so a named tool under a `tools` member is one.
+    A bare list says less about what it holds, so there a named object counts as a tool
+    only beside a `description` or an `inputSchema`.
+    """
+    listed = isinstance(doc, dict) and "tools" in doc
     tools = doc.get("tools") if isinstance(doc, dict) else doc
     if not isinstance(tools, list):
         return None
     objects = [t for t in tools if isinstance(t, dict)]
-    is_tool_shape = any("name" in t and "description" in t for t in objects)
+    is_tool_shape = any(
+        "name" in t and (listed or "description" in t or "inputSchema" in t) for t in objects
+    )
     return objects if is_tool_shape else None
 
 
@@ -51,10 +59,12 @@ def _manifest(description: str) -> str:
 
 
 def _iter_strings(node: object) -> Iterator[str]:
+    """Yield every string in `node`, keys included: a schema's property names reach the model."""
     if isinstance(node, str):
         yield node
     elif isinstance(node, dict):
-        for value in node.values():
+        for key, value in node.items():
+            yield from _iter_strings(key)
             yield from _iter_strings(value)
     elif isinstance(node, list):
         for item in node:
@@ -130,7 +140,8 @@ class McpToolPoisoningRule(ArtifactRule):
             yield self._unscanned(path, f"only the first {MAX_SCAN_BYTES} bytes were read")
             return
         try:
-            doc = json.loads(raw)
+            # Clients in other languages read a manifest that opens with a byte order mark.
+            doc = json.loads(raw.removeprefix("\ufeff"))
         except ValueError:
             return
         tools = _mcp_tools(doc)

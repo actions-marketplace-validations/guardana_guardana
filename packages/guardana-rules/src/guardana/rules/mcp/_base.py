@@ -117,3 +117,17 @@ class McpAuthorizationRule(McpReporting):
     @abstractmethod
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Grade the observation, yielding a finding or an unverified verdict per claim."""
+
+
+def further_issuers(view: McpAuthorizationView) -> tuple[str, ...]:
+    """Return the authorization servers the resource names after the first, in its order.
+
+    Only the first one's metadata is ever fetched, so whatever these advertise was not seen.
+    """
+    resource = view.protected_resource
+    content = None if resource is None else resource.content
+    issuers = None if content is None else content.get("authorization_servers")
+    if not isinstance(issuers, list):
+        return ()
+    named = list(dict.fromkeys(entry for entry in issuers if isinstance(entry, str) and entry))
+    return tuple(named[1:])
