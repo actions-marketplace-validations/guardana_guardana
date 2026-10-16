@@ -723,7 +723,7 @@ differently-named profile <em>files</em> as you like and select one with <code>-
 (<code>--max-requests</code>, <code>--max-input-tokens</code>, <code>--max-output-tokens</code>,
 <code>--max-duration</code>, <code>--max-requests-per-minute</code>), which win over the file; <code>grade</code> and
 <code>plan probe</code> take them too. A flag sets only the ceiling it
-names — it never clears one the profile configured.</p>
+names — it never clears one the profile configured. A duration that overflows to infinity is refused with exit <code>3</code>.</p>
 <p>Ceilings are checked <strong>before each request</strong>, so <code>max_requests: 200</code> means 200
 requests were sent and never 201. A retry is a request: a call that is rate-limited
 twice and then answered spends three. Token and duration ceilings can only be checked

@@ -350,8 +350,7 @@ where it cannot create the temporary file, or an <code>--output</code> that is t
 <code>&lt;stem&gt;.exchanges.jsonl</code> is refused the same way.</p>
 <p><strong>A migration that cannot carry a field refuses, and writes nothing.</strong> The default
 destination is the file itself, so a half-done migration would overwrite the only copy
-of the evidence. A test validates the written <em>artifact</em>, not only the objects the
-migration loads, parametrised over every field a version-1 run could be missing.</p>
+of the evidence. <code>run migrate</code> reads the migrated document back before writing; if it would not load, the command exits <code>3</code> and writes nothing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
 <a href="https://github.com/guardana/guardana/blob/main/schemas/run-v18.schema.json"><code>schemas/run-v18.schema.json</code></a>, identified by

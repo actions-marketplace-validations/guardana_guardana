@@ -316,7 +316,7 @@ gives its size only.</p>
 </code></pre>
 <p>Truncation announces itself the same way. A report that quietly dropped the half
 of the evidence that mattered would look complete and would not be — the same
-dishonesty the <code>unverified</code> channel exists to prevent.</p>
+dishonesty the <code>unverified</code> channel exists to prevent. A truncated evidence summary ends <code>… [truncated: evidence exceeded N bytes; &lt;12 hex digest of the whole redacted text&gt;]</code>, so findings differing only past the bound keep distinct fingerprints.</p>
 <h2 id="why-placeholders-are-hashed">Why placeholders are hashed</h2>
 <p><code>hash_identifiers</code> replaces a redacted value with a short digest of that value, so
 two occurrences of the same secret stay comparable across runs without the value
@@ -324,7 +324,9 @@ being stored. That matters more than it looks: a finding's <strong>fingerprint</
 computed from its evidence summary, and a baseline waiver matches on that
 fingerprint. A placeholder that changed between runs would silently expire every
 waiver you had.</p>
-<p><strong>A digest can confirm a guess.</strong> Placeholder digests and <code>case_id</code> are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. <code>hash_identifiers: false</code> writes a bare label instead of a digest.</p>
+<p><strong>A digest can confirm a guess.</strong> Placeholder digests and <code>case_id</code> are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. <code>hash_identifiers: false</code> writes a bare label instead of a digest. With this setting,
+a finding whose location holds a bare placeholder gets a collector identity tied to
+its run, so it never merges across runs and a waiver on it covers only that run.</p>
 <p>The <strong>label</strong> is the other half, and it is what tells you which key to rotate:</p>
 <pre><code class="language-text">[redacted:github-token:1a2b3c4d5e6f]
 </code></pre>

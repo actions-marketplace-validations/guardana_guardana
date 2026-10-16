@@ -155,7 +155,8 @@ blank and never `pass`.
 
 `finding list` groups every sighting by the identity the engine computes — the rule
 and where it was found, never the evaluator's rationale, which moves on every
-re-run — and shows how many runs saw it, first and last. That is the "has this been
+re-run — and shows how many runs saw it, first and last. `--environment E` lists only
+findings seen in E, filters before the limit, and counts runs within E. That is the "has this been
 there since Tuesday, or is it new" question.
 
 **Runs, not sightings.** One run's rule can report the same identity several times
@@ -164,10 +165,10 @@ and the identity is the rule plus the path — so counting rows would answer "ho
 often was this printed" while the column claims to answer the other question. A
 finding a single scan reported three times reads `1 runs`.
 
-**A retried job is stored once.** The same run id in the same project is accepted
-with `200` and `"duplicate": true` instead of being stored again: a retry is not a
-failure and must not turn a pipeline red, and counting it twice would make a
-regression answer from a duplicate. An agent older than 0.9 sends no run id,
+**A retried job is stored once.** The same run id in the same project and environment is accepted
+with `200` and `"duplicate": true`, keeping the first submission whatever the retry
+holds: a retry is not a failure and must not turn a pipeline red, and counting it twice
+would make a regression answer from a duplicate. An agent older than 0.9 sends no run id,
 identifies nothing, and is stored every time — which is honest, not clever.
 
 ## Triage: what somebody decided about a finding
@@ -183,7 +184,9 @@ guardana-collector finding waive  1854bc20 --project acme/web \
   --approver alice --reason "vendor fix due in September" --expires 2026-09-30
 ```
 
-Identities are `sha256:…`, so every command takes a **unique prefix**, like git.
+Identities are `sha256:…`, so every command takes a **unique, non-empty hexadecimal
+prefix**, optionally beginning with `sha256:`, and matches it literally. A prefix of any
+other form is refused with exit `3`.
 An ambiguous one is refused with the candidates listed and nothing is changed:
 acting on the wrong finding is worse than being asked to type four more
 characters.
@@ -366,7 +369,7 @@ submissions *and* the keys first and raises rather than doing it.
 
 `POST /findings` redacts recognisable secrets with engine patterns and `[redacted:<label>:<12 hex digits>]`; a value reaching past a recognised key becomes one placeholder with it; placeholders the engine writes remain unchanged. Redacted fields: `source`; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).
 
-Post-redaction overflow (4,096 characters: `source`/error sources; 65,536: other text fields) returns `422`; nothing is stored.
+Post-redaction overflow (4,096 characters: `source`/error sources; 65,536: other text fields) returns `422`; nothing is stored. A v8 envelope without `findings`, `unverified`, `errors` or `summary` also returns `422`, naming the missing field.
 
 Across accepted envelope versions, published-schema violations return `422`, one error entry (`loc`, `msg`, `input`) per value: severity outside exact-case `INFO`/`LOW`/`MEDIUM`/`HIGH`/`CRITICAL`; verdict outcome outside `pass`/`fail`/`inconclusive`; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside `pass`/`fail`/`indeterminate`; evidence mode outside `metadata_only`/`redacted`/`full`; a skip reason outside `missing_capability`/`unsafe_mode`/`not_applicable`/`not_recorded`/`not_offered`; an identity that is present but not `sha256:` followed by 64 lower-case hex digits. Permitted `null` remains accepted.
 
@@ -437,7 +440,9 @@ guardana-collector key revoke <prefix>
 **`--project` is required, and this command does not guess** even when exactly one
 project exists. Issuing a credential against a tenant nobody named has the same
 shape as a default credential, and `bootstrap` already covers the case where there
-is only one.
+is only one. `--expires-in-days` must be at least `1`; a smaller value exits `3` and
+stores nothing. `key list` shows each key as `active`, `expired` or `revoked`, with
+its expiry.
 
 ```bash
 export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
@@ -603,7 +608,10 @@ curl -s -X POST https://collector.example.com/findings \
   -d '{"schema_version": 8, "source": "ci/acme-web",
        "findings": [{"rule_id": "acme.synthetic_check", "severity": "HIGH",
                      "title": "Synthetic finding", "target_ref": "app/settings.py:3",
-                     "evidence": {"summary": "a synthetic example"}}]}'
+                     "evidence": {"summary": "a synthetic example"}}],
+       "unverified": [], "errors": [],
+       "summary": {"rules_run": 1, "rules_executed": ["acme.synthetic_check"],
+                   "rules_skipped": [], "max_severity": "HIGH", "unverified": 0, "errors": 0}}'
 curl -s -H "Authorization: Bearer $READ_KEY" "https://collector.example.com/findings?limit=1"
 curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/trend   # {"HIGH": 1} on a fresh project
 ```

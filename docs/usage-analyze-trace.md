@@ -37,7 +37,13 @@ When no approval appears before a payment, three worlds fit the file:
 A tool that reads that absence as world 1 fires on every well-governed system. One that
 reads it as world 2 passes on the one system that really skipped it. So Guardana reads it
 as neither: **a dimension your producer does not record makes the rules that need it not
-run**, and the command says which ones and why.
+run**, and the command says which ones and why. A grant or consent recorded in the action's
+own span or an earlier-written span counts unless its own time (`decided_at`, else
+`requested_at`; a consent's `recorded_at`) is after the action span's `ended_at`. One recorded
+in a later span counts when that time is not after the action span's `started_at`, gives a
+finding when it is after `ended_at`, and is inconclusive when it falls inside the span's
+window or no time orders them. An attempted consequential effect with no approval shown
+to precede it is inconclusive.
 
 ```
 $ guardana analyze-trace otel-export.jsonl
@@ -131,7 +137,11 @@ read with exit `3`, naming the span and the field. A field with a fixed list of 
 a span's `kind`, a tool's `status`, a memory `action`, a credential's `kind`, an effect's
 `sink` and `status`, a policy or approval `outcome`, `approver_kind`, the header's
 `truncated` — accepts exactly the values the schema lists, in lower case: `"Shell"` and
-`"bash"` are refused, never read as `other`. An effect's `sink` and a policy decision's or
+`"bash"` are refused, never read as `other`. Missing `delegations[].actor`,
+`delegations[].boundary`, `consents[].client`, `policy_decisions[].action`,
+`approvals[].action` or `effects[].action` stops the read with exit `3`, as does a
+native trace with no spans that is not cut short. The `tenant_boundary` contract with
+`sources:` is inconclusive for a retrieval that records no source. An effect's `sink` and a policy decision's or
 an approval's `outcome` are required. Write `other` or `unknown` when that is what you
 mean. Read leniently, `"sink": "Shell"` would reach no contract forbidding a shell, and
 `"terminated": "true"` would withdraw the promise that makes a missing footer
@@ -198,9 +208,9 @@ half.
 | `guardana.trace.secret_in_tool_argument` | a credential appears in a recorded tool argument | messages/tools |
 | `guardana.trace.credential_passthrough` | one credential crossed two trust boundaries — the confused deputy | delegation |
 | `guardana.trace.identity_disagreement` | a token's audience is not the resource it was presented to | identity |
-| `guardana.trace.session_as_identity` | a step that changed something identified itself with a session and nothing else | identity |
-| `guardana.trace.consent_scope_exceeded` | a hop exercised a scope no consent granted | consent |
-| `guardana.trace.policy_decision_ignored` | a policy said no — or could not say — and the action happened anyway | policy |
+| `guardana.trace.session_as_identity` | a step that changed something identified itself with a session and nothing else | identity, and tools or effects |
+| `guardana.trace.consent_scope_exceeded` | a hop exercised a scope no consent granted | consent + delegation |
+| `guardana.trace.policy_decision_ignored` | a policy said no — or could not say — and the action happened anyway | policy, and tools or effects |
 | `guardana.trace.unapproved_side_effect` | a consequential effect executed with its approval denied or never sought | approval + effects |
 | `guardana.trace.cross_tenant_retrieval` | a retrieval for one tenant returned a document belonging to another | retrieval |
 | `guardana.trace.handoff_authority_expansion` | an agent exercised a scope wider than the handoff carried to it | delegation + handoff |

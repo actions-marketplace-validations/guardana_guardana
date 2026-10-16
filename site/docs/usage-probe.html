@@ -342,7 +342,7 @@ the run (exit <code>4</code>).</p>
 <tr>
 <td><code>--write-mcp-pin PATH</code></td>
 <td>none</td>
-<td>Write the server's current manifest as approved, and exit without reporting. It produces no report, so <code>--output</code> or any <code>--reporter</code> beside it is refused with exit <code>3</code> before anything is sent.</td>
+<td>Write the server's current manifest as approved, and exit without reporting. It produces no report, so <code>--output</code> or any <code>--reporter</code> beside it is refused with exit <code>3</code> before anything is sent. A destination the command reads — a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names — is also refused with exit <code>3</code> before anything is sent or read.</td>
 </tr>
 <tr>
 <td><code>--mcp-registry-entry PATH</code></td>
@@ -513,7 +513,7 @@ its own path is ordinary.</p>
 <h3 id="the-manifest-and-pinning-it">The manifest, and pinning it</h3>
 <p>A tool declaration is fed to the agent's model as trusted context, so an
 instruction hidden in one is indirect prompt injection with an audience of one.
-Guardana scans the whole declaration — description, title, input and output
+Guardana scans the whole declaration — name, description, title, input and output
 schema, annotations — because a property description is read by the model exactly
 like the tool description.</p>
 <p>Drift is only detectable against something you approved:</p>
@@ -552,7 +552,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.authorization_discovery</code></td>
-<td>A protected server publishes Protected Resource Metadata (RFC 9728) naming an authorization server, identifies <em>this</em> origin as its resource, and points at an authorization server whose metadata names the <code>issuer</code> it was fetched for (absent or different, a client must not use it — RFC 8414) and advertises PKCE</td>
+<td>A protected server publishes Protected Resource Metadata (RFC 9728) naming an authorization server, identifies <em>this</em> origin as its resource, and points at an authorization server whose metadata names the <code>issuer</code> it was fetched for (absent or different, a client must not use it — RFC 8414) and advertises PKCE; only the first server's metadata is fetched, so <code>authorization_discovery</code> and <code>issuer_identification</code> are <code>inconclusive</code> for each later server</td>
 </tr>
 <tr>
 <td><code>guardana.mcp.token_audience</code></td>
@@ -568,7 +568,7 @@ saying plainly when it could not reach a verdict:</p>
 </tr>
 <tr>
 <td><code>guardana.mcp.discovery_target</code></td>
-<td>Every discovery address the server advertises is one a client may follow</td>
+<td>Every discovery address the server advertises is one a client may follow; every advertised authorization server is checked against the address guard, but only the first is fetched. A refused later address is a finding; an unfetched one that passes the guard is <code>inconclusive</code></td>
 </tr>
 <tr>
 <td><code>guardana.mcp.issuer_identification</code></td>
@@ -811,7 +811,7 @@ checks that need a credential report <code>inconclusive</code>, naming the schem
 </tr>
 <tr>
 <td><code>guardana.a2a.task_visibility</code></td>
-<td>An anonymous <code>ListTasks</code> lists no task, and neither the second caller nor a caller presenting no credential can read a task the first caller listed as its own (<code>high</code> each). An anonymous listing answered with an error that is neither a refusal nor a result, or an anonymous read answered with anything but a refusal, a task-not-found or a result, is <code>inconclusive</code></td>
+<td>An anonymous <code>ListTasks</code> lists no task, and neither the second caller nor a caller presenting no credential can read a task the first caller listed as its own (<code>high</code> each). An anonymous listing with a non-list <code>tasks</code>, a non-string <code>nextPageToken</code>, an empty page naming a further page or an error that is neither a refusal nor a result is <code>inconclusive</code>, as is an anonymous read answered with anything but a refusal, a task-not-found or a result</td>
 </tr>
 </tbody>
 </table></div>

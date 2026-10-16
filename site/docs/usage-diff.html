@@ -253,9 +253,11 @@ guardana diff before.json after.json
 </table></div>
 <p><code>2</code> is not a softer <code>0</code>. A comparison nobody could make and a comparison that
 found nothing wrong are opposite answers, and only one of them is safe to print
-next to a green build. You will see <code>2</code> for a run saved by Guardana 0.5 or
-earlier (no schema version), a truncated file, two different kinds of target, two
-runs with no rule in common, or a pair of arguments passed in the wrong order.</p>
+next to a green build. You will see <code>2</code> for a run with no schema version, a truncated file, a current-schema
+run missing a required key or whose channel lengths disagree with <code>result_summary</code>,
+two different kinds of target, two runs with no rule in common, a pair of arguments
+passed in the wrong order, or when either run executed rules but every rule declined,
+verifying nothing.</p>
 <p>You will also see <code>2</code> when either run recorded an error — a refused pack, a rule that
 raised, a file nobody could read. Those checks never ran, so a finding missing from that
 run is unknown rather than fixed, and the error's source is named.</p>
@@ -328,9 +330,7 @@ findings yesterday, four today&quot; it would trip constantly, someone would swi
 off, and a scanner nobody runs is the worst outcome available.</p>
 <p>So the comparison works on <strong>state</strong>, not on tallies: a model either fails a check
 or it does not, and that is far steadier than how many prompts it failed. A
-changed count is reported and never gates on its own. Under a static scan nothing
-is lost by that — a genuinely new problem lands in a new file, which is a new
-check and a regression in its own right.</p>
+falling count is reported as <code>count_changed</code> and never gates on its own. When both runs record file scope, a rising count with more unwaived static findings at the same rule and file is an <code>appeared</code> regression, as is an unwaived finding whose evidence the earlier run does not report there, even if the count stays the same. Findings that differ only in characters their evidence hides cannot be told apart.</p>
 <p>The second filter is confidence. Your policy's <code>min_confidence</code> applies to
 regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.</p>
 <p><strong>Neither filter applies to <code>blinded</code>, <code>coverage_lost</code> or <code>left_scan</code></strong>, and severity is the one

@@ -210,7 +210,7 @@
 <p>That is the output for <a href="https://github.com/guardana/guardana/blob/main/examples/custom_rule/README.md"><code>examples/custom_rule</code></a>, installed as
 the distribution <code>acme-guardana-rules</code>. Every command starts with only Guardana's own
 distributions, so an installed pack is admitted by name.</p>
-<p>Scripted fixtures send nothing over the network. They test classification, but cannot show whether prompts or tool results carry an attack.</p>
+<p>Scripted fixtures send their replies to a judge configured by the profile for grading; nothing else is contacted. They test classification, but cannot show whether prompts or tool results carry an attack.</p>
 <h2 id="declaring-fixtures-in-a-yaml-rule">Declaring fixtures in a YAML rule</h2>
 <pre><code class="language-yaml">id: acme.demo.canary
 title: Our support agent never repeats its instructions
@@ -262,7 +262,7 @@ fixtures:
 </tbody>
 </table></div>
 <p>Each sample runs on its own. A sample comes out <code>inconclusive</code> when the rule yields an
-inconclusive verdict or reports a coverage shortfall, whatever else it yielded; otherwise
+inconclusive verdict or reports a coverage shortfall, when recorded cases are all ungraded, or when a suite declines to conclude, whatever else it yields; otherwise
 <code>finding</code> when it yields anything, and <code>clean</code> when it yields nothing.</p>
 <p><code>reply</code> builds an endpoint over a scripted transport. That is enough because a YAML
 rule's <code>target_kind</code> is <code>endpoint</code> by construction — its double is always a model.</p>

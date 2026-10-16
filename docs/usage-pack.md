@@ -250,10 +250,11 @@ have; one that appeared is a check nobody reviewed running against production.
 | the build has drifted | fail | `1` |
 | plugin trust refused an installed extension; nothing was pinned or compared | **indeterminate** | `2` |
 | nothing installed declares a manifest, so there is nothing to pin | **indeterminate** | `2` |
+| two installed packs declare the same name; no lock is written or compared | **indeterminate** | `2` |
 | a pack declares an id nothing registers under that group; no lock is written or compared | **indeterminate** | `2` |
 | `pack lock`: a pack declares an evaluator, target or output another distribution registers; no lock is written | **indeterminate** | `2` |
 | `--check`: an evaluator, target or output the lock pins is now registered by another distribution | fail (`removed`) | `1` |
-| the lock could not be read, or was taken against another `extension_api` | refused | `3` |
+| the lock cannot be read, names one pack twice, or has a different `extension_api` | refused | `3` |
 
 **A lock from a different extension contract is refused rather than compared.**
 `extension_api` is what says which `Rule` shape the digests beside it were computed

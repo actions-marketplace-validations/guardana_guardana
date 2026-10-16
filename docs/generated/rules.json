@@ -2457,6 +2457,7 @@
       "detection": "invariant",
       "requires": [
         "read_consent",
+        "read_delegation",
         "read_trace"
       ],
       "estimated_requests": 0,

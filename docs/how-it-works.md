@@ -97,7 +97,7 @@ An Evaluator grades a model reply into a **Verdict** with an `outcome` (pass, fa
 - `llm_judge`: an LLM judge behind a trusted endpoint, with a versioned rubric and confidence measured by agreement across samples. It is wired from config.
 - `guard`: an opt-in external safety classifier, such as Llama Guard.
 
-If an evaluator cannot grade a reply, it returns `inconclusive`, never `pass`. That includes no reply, no planted canary, or an unparseable judge answer. A final assistant turn with blank text makes `Exchange.reply_text` `None`, so graders share the same empty-reply decision.
+An evaluator returns `inconclusive`, never `pass`, for no reply or no planted canary. If none of a judge's samples has a readable PASS/FAIL, the result is a failure at full confidence, never filtered by `min_confidence`. A final assistant turn with blank text makes `Exchange.reply_text` `None`, so graders share the same empty-reply decision.
 
 ### Finding / Report — the normalized result
 

@@ -30,8 +30,7 @@ waivers:
 
 **A generated baseline waives its findings as soon as a scan reads it and states
 that it is unreviewed.** Every waiver has placeholder text for its reason and
-approver. `scan` warns about each such waiver; `verify` fails while the text
-remains. Gate on `guardana baseline verify` to require review. An unedited baseline lists findings somebody silenced in a
+approver. `scan` warns about each such waiver; `verify` fails for generated placeholders or a blank or whitespace-only reason or approver (v1: reason only). Gate on `guardana baseline verify` to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.
 
 ## Flags
@@ -85,7 +84,7 @@ looking complete; for `update`, it would delete every waiver as "fixed".
 
 ## `update` only removes, and only on a complete scan
 
-It drops waivers for findings that no longer occur and **never adds new ones**.
+It drops waivers for findings confirmed absent and **never adds new ones**; a waiver whose rule did not run or whose file the run does not list is retained and listed as `kept: … unknown`.
 Accepting a risk is a decision somebody makes; `create` is where that happens.
 An update that quietly widened a baseline would be the same failure as a gate that
 weakens itself.

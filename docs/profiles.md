@@ -408,7 +408,7 @@ Every ceiling is optional, and `probe` takes the same five as flags
 (`--max-requests`, `--max-input-tokens`, `--max-output-tokens`,
 `--max-duration`, `--max-requests-per-minute`), which win over the file; `grade` and
 `plan probe` take them too. A flag sets only the ceiling it
-names — it never clears one the profile configured.
+names — it never clears one the profile configured. A duration that overflows to infinity is refused with exit `3`.
 
 Ceilings are checked **before each request**, so `max_requests: 200` means 200
 requests were sent and never 201. A retry is a request: a call that is rate-limited

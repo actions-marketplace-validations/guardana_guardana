@@ -428,7 +428,12 @@ two things for it: an inconclusive &quot;not scanned&quot; result on the unverif
 <code>unexamined_component</code> shortfall whose name is the file's path and whose detail reads
 <code>&lt;rule id&gt; could not read it: &lt;reason&gt;</code>. The file is not named a second time by format.
 With no switch over it, a scan holding one such file is <code>indeterminate</code> (exit <code>2</code>) under
-every preset, <code>ci</code> included, unless a finding fails it. Every cell a notebook reader runs is
+every preset, <code>ci</code> included, unless a finding fails it. The dependency, model-config and
+model-card rules likewise report a file they could not read whole, including at the
+16 MiB read bound, as an <code>unexamined_component</code> shortfall (<code>indeterminate</code>, exit <code>2</code>).
+The secret scan and MCP tool-manifest scan read every text/JSON file, data files included,
+and report one they could not read whole at that bound as unverified; that result fails
+the gate only under <code>fail_on_inconclusive: true</code>. Every cell a notebook reader runs is
 read: the top-level <code>cells</code> by their <code>source</code>; the <code>code</code> of a v1 code cell, which nbformat
 runs from a notebook that declares no version; and the cells of each <code>worksheets</code> entry by
 their <code>input</code>, which nbformat runs instead of the top-level cells when it upgrades a v2 or v3

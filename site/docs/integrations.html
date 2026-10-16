@@ -304,11 +304,11 @@ jobs:
 <tr>
 <td><code>fail-on-findings</code></td>
 <td><code>true</code></td>
-<td>Fail the job when the gate trips (exit <code>1</code>)</td>
+<td>Fail the job when the gate trips (exit <code>1</code>); accepts only <code>true</code> or <code>false</code>, otherwise the step fails</td>
 </tr>
 </tbody>
 </table></div>
-<p>The SARIF is uploaded even when the gate fails, so alerts always land; set
+<p>A separate install step fails the job if the CLI cannot be installed. The scan writes SARIF through <code>--output</code> and refuses a destination it reads or cannot create; exit <code>0</code> or <code>1</code> counts only with a SARIF file this scan writes, so <code>--help</code>, a snapshot mode or an unwritable SARIF path does not pass. The SARIF is uploaded even when the gate fails, so alerts always land; set
 <code>fail-on-findings: false</code> to make findings advisory. That input waives exit <code>1</code>
 and nothing else: a scan that did not finish — any other non-zero
 <a href="exit-codes.html">exit code</a>, such as <code>3</code> for a path that does not exist or <code>4</code> for

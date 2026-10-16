@@ -48,9 +48,11 @@ guardana diff before.json after.json
 
 `2` is not a softer `0`. A comparison nobody could make and a comparison that
 found nothing wrong are opposite answers, and only one of them is safe to print
-next to a green build. You will see `2` for a run saved by Guardana 0.5 or
-earlier (no schema version), a truncated file, two different kinds of target, two
-runs with no rule in common, or a pair of arguments passed in the wrong order.
+next to a green build. You will see `2` for a run with no schema version, a truncated file, a current-schema
+run missing a required key or whose channel lengths disagree with `result_summary`,
+two different kinds of target, two runs with no rule in common, a pair of arguments
+passed in the wrong order, or when either run executed rules but every rule declined,
+verifying nothing.
 
 You will also see `2` when either run recorded an error — a refused pack, a rule that
 raised, a file nobody could read. Those checks never ran, so a finding missing from that
@@ -110,9 +112,7 @@ off, and a scanner nobody runs is the worst outcome available.
 
 So the comparison works on **state**, not on tallies: a model either fails a check
 or it does not, and that is far steadier than how many prompts it failed. A
-changed count is reported and never gates on its own. Under a static scan nothing
-is lost by that — a genuinely new problem lands in a new file, which is a new
-check and a regression in its own right.
+falling count is reported as `count_changed` and never gates on its own. When both runs record file scope, a rising count with more unwaived static findings at the same rule and file is an `appeared` regression, as is an unwaived finding whose evidence the earlier run does not report there, even if the count stays the same. Findings that differ only in characters their evidence hides cannot be told apart.
 
 The second filter is confidence. Your policy's `min_confidence` applies to
 regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.

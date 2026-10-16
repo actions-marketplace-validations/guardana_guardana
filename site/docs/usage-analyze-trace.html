@@ -224,7 +224,13 @@ wrong at all;</li>
 <p>A tool that reads that absence as world 1 fires on every well-governed system. One that
 reads it as world 2 passes on the one system that really skipped it. So Guardana reads it
 as neither: <strong>a dimension your producer does not record makes the rules that need it not
-run</strong>, and the command says which ones and why.</p>
+run</strong>, and the command says which ones and why. A grant or consent recorded in the action's
+own span or an earlier-written span counts unless its own time (<code>decided_at</code>, else
+<code>requested_at</code>; a consent's <code>recorded_at</code>) is after the action span's <code>ended_at</code>. One recorded
+in a later span counts when that time is not after the action span's <code>started_at</code>, gives a
+finding when it is after <code>ended_at</code>, and is inconclusive when it falls inside the span's
+window or no time orders them. An attempted consequential effect with no approval shown
+to precede it is inconclusive.</p>
 <pre><code>$ guardana analyze-trace otel-export.jsonl
 read 2 span(s) from otel-export.jsonl as otel (producer: opentelemetry)
 note: this producer does not record identity, delegation, consent, policy, approval,
@@ -312,7 +318,11 @@ read with exit <code>3</code>, naming the span and the field. A field with a fix
 a span's <code>kind</code>, a tool's <code>status</code>, a memory <code>action</code>, a credential's <code>kind</code>, an effect's
 <code>sink</code> and <code>status</code>, a policy or approval <code>outcome</code>, <code>approver_kind</code>, the header's
 <code>truncated</code> — accepts exactly the values the schema lists, in lower case: <code>&quot;Shell&quot;</code> and
-<code>&quot;bash&quot;</code> are refused, never read as <code>other</code>. An effect's <code>sink</code> and a policy decision's or
+<code>&quot;bash&quot;</code> are refused, never read as <code>other</code>. Missing <code>delegations[].actor</code>,
+<code>delegations[].boundary</code>, <code>consents[].client</code>, <code>policy_decisions[].action</code>,
+<code>approvals[].action</code> or <code>effects[].action</code> stops the read with exit <code>3</code>, as does a
+native trace with no spans that is not cut short. The <code>tenant_boundary</code> contract with
+<code>sources:</code> is inconclusive for a retrieval that records no source. An effect's <code>sink</code> and a policy decision's or
 an approval's <code>outcome</code> are required. Write <code>other</code> or <code>unknown</code> when that is what you
 mean. Read leniently, <code>&quot;sink&quot;: &quot;Shell&quot;</code> would reach no contract forbidding a shell, and
 <code>&quot;terminated&quot;: &quot;true&quot;</code> would withdraw the promise that makes a missing footer
@@ -406,17 +416,17 @@ half.</p>
 <tr>
 <td><code>guardana.trace.session_as_identity</code></td>
 <td>a step that changed something identified itself with a session and nothing else</td>
-<td>identity</td>
+<td>identity, and tools or effects</td>
 </tr>
 <tr>
 <td><code>guardana.trace.consent_scope_exceeded</code></td>
 <td>a hop exercised a scope no consent granted</td>
-<td>consent</td>
+<td>consent + delegation</td>
 </tr>
 <tr>
 <td><code>guardana.trace.policy_decision_ignored</code></td>
 <td>a policy said no — or could not say — and the action happened anyway</td>
-<td>policy</td>
+<td>policy, and tools or effects</td>
 </tr>
 <tr>
 <td><code>guardana.trace.unapproved_side_effect</code></td>

@@ -209,7 +209,7 @@ exit `3` before the judge is asked anything.
 | `--evaluator ID` | which evaluator to measure; defaults to `llm_judge` |
 | `--corpus PATH` | labelled JSONL; defaults to the bundled starter |
 | `--profile PATH` | resolve config-wired evaluators (`llm_judge`, `guard`) from `guardana.yaml` |
-| `--max-ece FLOAT` | fail the build when expected calibration error exceeds this |
+| `--max-ece FLOAT` | fail the build when expected calibration error exceeds this; must be finite and within [0, 1], otherwise exit `3` |
 | `--record PATH` | write the measurement where runs can carry it |
 | `--plugins [all\|builtins\|allowlist\|disabled]` | which installed plugins to load; defaults to `builtins`, or the profile's `plugins:` |
 | `--allow-plugin TEXT` | distribution to trust; repeatable, needs `--plugins allowlist` |

@@ -4358,7 +4358,22 @@
         }
       ],
       "kind": "dataclass",
-      "methods": {}
+      "methods": {
+        "__post_init__": {
+          "async": false,
+          "decorators": [],
+          "kind": "function",
+          "parameters": [
+            {
+              "annotation": null,
+              "has_default": false,
+              "kind": "positional_or_keyword",
+              "name": "self"
+            }
+          ],
+          "returns": "None"
+        }
+      }
     },
     "guardana.core.Finding": {
       "bases": [],

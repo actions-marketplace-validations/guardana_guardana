@@ -141,6 +141,14 @@ again. `grade` sends nothing to the collector.
 
 `--preset release` fails when a selected check has a coverage gap or reaches no verdict. MCP and A2A rules on a chat endpoint are `not_applicable`, not coverage gaps; a chat rule missing tools or seeded fixtures can still leave `probe --preset release` `indeterminate`. A rule demanded by id remains a `demanded_check` shortfall even when its protocol is inapplicable. A profile can select rules the endpoint serves ([profiles](profiles.md#release-complete-coverage-or-no-pass)). A `scan` of a path that holds no file other than `.guardanaignore` files is `indeterminate` (exit `2`) under every preset, and `plan scan` refuses it. A scan cannot tell a directory holding the wrong files from the one the build meant to produce.
 
+### Some unreadable files stay unverified
+
+The secret scan and the MCP manifest scan report a text or JSON file over the 16 MiB read bound as unverified, not as a coverage gap.
+
+### Collector retries keep the first submission
+
+The collector treats a second submission with the same run id in the same project and environment as a duplicate and keeps the first, whatever the second holds.
+
 ### Protocol coverage is narrow on purpose
 
 MCP is spoken in `2026-07-28` and `2025-11-25`; a server answering in an older revision is

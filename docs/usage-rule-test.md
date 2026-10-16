@@ -21,7 +21,7 @@ That is the output for [`examples/custom_rule`](../examples/custom_rule/README.m
 the distribution `acme-guardana-rules`. Every command starts with only Guardana's own
 distributions, so an installed pack is admitted by name.
 
-Scripted fixtures send nothing over the network. They test classification, but cannot show whether prompts or tool results carry an attack.
+Scripted fixtures send their replies to a judge configured by the profile for grading; nothing else is contacted. They test classification, but cannot show whether prompts or tool results carry an attack.
 
 ## Declaring fixtures in a YAML rule
 
@@ -58,7 +58,7 @@ fixtures:
 | `note` | optional: why this sample is the shape it is |
 
 Each sample runs on its own. A sample comes out `inconclusive` when the rule yields an
-inconclusive verdict or reports a coverage shortfall, whatever else it yielded; otherwise
+inconclusive verdict or reports a coverage shortfall, when recorded cases are all ungraded, or when a suite declines to conclude, whatever else it yields; otherwise
 `finding` when it yields anything, and `clean` when it yields nothing.
 
 `reply` builds an endpoint over a scripted transport. That is enough because a YAML

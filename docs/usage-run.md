@@ -197,8 +197,7 @@ where it cannot create the temporary file, or an `--output` that is the input's 
 
 **A migration that cannot carry a field refuses, and writes nothing.** The default
 destination is the file itself, so a half-done migration would overwrite the only copy
-of the evidence. A test validates the written *artifact*, not only the objects the
-migration loads, parametrised over every field a version-1 run could be missing.
+of the evidence. `run migrate` reads the migrated document back before writing; if it would not load, the command exits `3` and writes nothing.
 
 ## The document
 

@@ -121,6 +121,7 @@ guardana trace inspect run.jsonl --format json
   "producer": "checkout-agent",
   "spans": 3,
   "truncated": null,
+  "unreadable_records": 0,
   "trace_rules_loaded": 11,
   "messages_without_text": 0,
   "dimensions": [

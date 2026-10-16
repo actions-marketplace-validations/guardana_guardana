@@ -181,7 +181,7 @@ is its input; writing over the input itself is migrating in place. It also exits
 when `--output` is the input's own sidecar or the destination cannot be written; the
 destination is then left as it was. `scan --write-baseline` and
 `probe --mcp … --write-mcp-pin` exit `3` beside `--output` or when their file cannot be
-written; `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
+written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. `probe` exits `3` for an MCP-only flag without `--mcp`; `recipe run` exits `3`
 for a recipe that names a file inside its own `output.directory`.
 `probe --keep-exchanges` exits `3` before sending anything when its sidecar path holds
 exchanges the other saved run of the pair (`<stem>` or `<stem>.json`) records, or a file
@@ -193,7 +193,7 @@ AI system than the one under test. `baseline create`, `baseline update` and
 to a snapshot — any open question the gate refuses, with a check that did not run
 counted whatever `fail_on_error` says — because a snapshot taken over a rule that
 never ran is missing whatever it would have found. A run that stopped exits `6` or
-`7` there, as it does on `scan`. `calibrate` exits `1` when the measured error is over
+`7` there, as it does on `scan`. `calibrate` exits `3` when `--max-ece` is not finite or is outside [0, 1], `1` when the measured error is over
 `--max-ece`, `2` when the measurement is not reliable, `4` when its judge cannot be
 reached, and `6` when the profile's `budgets:` stop its judge — then nothing is
 measured or recorded.

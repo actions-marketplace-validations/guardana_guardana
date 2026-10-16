@@ -520,6 +520,11 @@ have; one that appeared is a check nobody reviewed running against production.</
 <td><code>2</code></td>
 </tr>
 <tr>
+<td>two installed packs declare the same name; no lock is written or compared</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
 <td>a pack declares an id nothing registers under that group; no lock is written or compared</td>
 <td><strong>indeterminate</strong></td>
 <td><code>2</code></td>
@@ -535,7 +540,7 @@ have; one that appeared is a check nobody reviewed running against production.</
 <td><code>1</code></td>
 </tr>
 <tr>
-<td>the lock could not be read, or was taken against another <code>extension_api</code></td>
+<td>the lock cannot be read, names one pack twice, or has a different <code>extension_api</code></td>
 <td>refused</td>
 <td><code>3</code></td>
 </tr>

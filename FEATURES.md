@@ -210,7 +210,7 @@ without guessing from a short id.
   recipe locks, recipe artifacts, fixtures files, pack manifests, pack locks, profiles and the collector envelope, served at the URL each
   `$id` names under `https://guardana.dev/schemas/`. The profile schema is [`schemas/profile-v1.schema.json`](schemas/profile-v1.schema.json); the envelope schema is [`schemas/collector-envelope-v8.schema.json`](schemas/collector-envelope-v8.schema.json).
 - [`docs/generated/api-surface.json`](docs/generated/api-surface.json) records the supported Python, CLI, output, locator, Action and `GUARDANA_*` surface. The docs check rejects drift, and the file is identical on Python 3.11, 3.12 and 3.13. [`docs/generated/compatibility-matrix.md`](docs/generated/compatibility-matrix.md) records what each published minor release carried. [`docs/compatibility.md`](docs/compatibility.md) states the 1.0 compatibility and deprecation policy; `scripts/release.py` rejects a release candidate with an unrecorded surface change.
-- Stored documents from published releases 0.2.0 through 0.41.0 are read by current tests. They include runs, collector envelopes, profiles, pack manifests and locks, and datasets; `run migrate`, `load_verification` and `diff` read the runs. [`scripts/capture_historical_documents.py`](scripts/capture_historical_documents.py) produces them, and [`historical/releases.json`](packages/guardana-core/tests/historical/releases.json) records their versions.
+- Stored documents from published releases 0.2.0 through 0.41.0 are read by current tests. They include runs, collector envelopes, profiles, pack manifests and locks, and datasets; `run migrate` and `diff` read the runs; `load_verification` reads every run except those of schema 1, which records no gate. [`scripts/capture_historical_documents.py`](scripts/capture_historical_documents.py) produces them, and [`historical/releases.json`](packages/guardana-core/tests/historical/releases.json) records their versions.
 
 ## Extension surface
 
@@ -219,9 +219,10 @@ through Python entry points. Every command starts with Guardana's own distributi
 only: an installed pack is refused before it is imported, the refusal leaves a run
 `indeterminate`, and the pack is admitted by name (`--plugins allowlist
 --allow-plugin`, or `plugins:` in a profile). `guardana doctor` lists what an installed
-pack would execute without importing it. YAML rules cover `prompt`, `scenario`, and `agent`
+pack would execute; it imports a pack only when the pack is admitted, so a pack it does not admit is listed without being imported. YAML rules cover `prompt`, `scenario`, and `agent`
 endpoint shapes, and every shape can declare the finding, clean, and inconclusive
-samples that `guardana rule test` runs without a network. A rule declares whether a finding
+samples that `guardana rule test` runs with scripted fixture replies. A judge configured
+in the profile grades those replies; nothing else is contacted. A rule declares whether a finding
 is a checked fact or a lead (`detection:`), and the generated
 [detection limits](docs/generated/detection-limits.md) page lists every built-in by family
 beside the framework entries it is only mapped to. `guardana new-pack` writes a complete pack —

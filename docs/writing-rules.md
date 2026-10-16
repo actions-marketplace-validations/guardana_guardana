@@ -340,17 +340,14 @@ Three ways, all real:
    fails it. If a `rules.include` pattern then matches no rule because the rule it named did
    not load, the command is refused before anything runs
    ([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
-2. **Bundle it in your package and expose it via `provide_rules()`** — this
-   is how `guardana-rules` itself ships its catalog:
-   [`packages/guardana-rules/src/guardana/rules/__init__.py`](../packages/guardana-rules/src/guardana/rules/__init__.py)
-   walks its own `catalog/` directory with `importlib.resources` and calls
-   `load_yaml_rules(path)` per file. `examples/custom_rule/` follows
-   the identical pattern for its own YAML rule.
+2. **Bundle it in your package and expose it via `provide_rules()`** — load
+   its YAML rule files with `Registry.load_yaml_rule_dirs(paths)`.
 3. **Load it yourself in embedding code** with
    `Registry.load_yaml_rule_dirs(paths)` — the same loader that backs
-   `--rules` — or per file with
-   `guardana.core.rule.yaml_rule.load_yaml_rules(path)`,
-   then hand the resulting rules to a `Registry`.
+   `--rules`; it records a file that does not load instead of raising.
+
+`load_yaml_rules` is outside [the supported surface](compatibility.md#the-supported-surface);
+a pack importing an internal name pins `guardana-core`.
 
 ## Path 2: Python plugin (when YAML can't express the logic)
 
@@ -495,7 +492,7 @@ by the scanning interpreter surfaces in the run's `errors`, so it fails the gate
 rather than disappearing. Bytes are decoded the way the interpreter runs them, so
 a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call `read_source()`
 instead of `python_source()` if your rule wants the reason in its own hands — it
-returns `PythonSource | UnreadSource`.
+returns `PythonSource | UnreadSource`. `read_source()` is outside [the supported surface](compatibility.md#the-supported-surface); a pack that imports it pins `guardana-core`.
 
 **Worth copying as a pattern:** the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,

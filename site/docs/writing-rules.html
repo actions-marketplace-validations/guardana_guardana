@@ -623,18 +623,14 @@ stage <code>load</code>. Under the default <code>fail_on_error</code>, the run i
 fails it. If a <code>rules.include</code> pattern then matches no rule because the rule it named did
 not load, the command is refused before anything runs
 (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).</li>
-<li><strong>Bundle it in your package and expose it via <code>provide_rules()</code></strong> — this
-is how <code>guardana-rules</code> itself ships its catalog:
-<a href="https://github.com/guardana/guardana/blob/main/packages/guardana-rules/src/guardana/rules/__init__.py"><code>packages/guardana-rules/src/guardana/rules/__init__.py</code></a>
-walks its own <code>catalog/</code> directory with <code>importlib.resources</code> and calls
-<code>load_yaml_rules(path)</code> per file. <code>examples/custom_rule/</code> follows
-the identical pattern for its own YAML rule.</li>
+<li><strong>Bundle it in your package and expose it via <code>provide_rules()</code></strong> — load
+its YAML rule files with <code>Registry.load_yaml_rule_dirs(paths)</code>.</li>
 <li><strong>Load it yourself in embedding code</strong> with
 <code>Registry.load_yaml_rule_dirs(paths)</code> — the same loader that backs
-<code>--rules</code> — or per file with
-<code>guardana.core.rule.yaml_rule.load_yaml_rules(path)</code>,
-then hand the resulting rules to a <code>Registry</code>.</li>
+<code>--rules</code>; it records a file that does not load instead of raising.</li>
 </ol>
+<p><code>load_yaml_rules</code> is outside <a href="compatibility.html#the-supported-surface">the supported surface</a>;
+a pack importing an internal name pins <code>guardana-core</code>.</p>
 <h2 id="path-2-python-plugin-when-yaml-cant-express-the-logic">Path 2: Python plugin (when YAML can't express the logic)</h2>
 <p>Use this for custom parsers, stateful probes, or any check against an <strong>artifact</strong> target.
 Of the 58 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
@@ -760,7 +756,7 @@ by the scanning interpreter surfaces in the run's <code>errors</code>, so it fai
 rather than disappearing. Bytes are decoded the way the interpreter runs them, so
 a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call <code>read_source()</code>
 instead of <code>python_source()</code> if your rule wants the reason in its own hands — it
-returns <code>PythonSource | UnreadSource</code>.</p>
+returns <code>PythonSource | UnreadSource</code>. <code>read_source()</code> is outside <a href="compatibility.html#the-supported-surface">the supported surface</a>; a pack that imports it pins <code>guardana-core</code>.</p>
 <p><strong>Worth copying as a pattern:</strong> the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,
 yields <code>(line, why)</code> tuples from a small module-level <code>_sinks</code> helper, and

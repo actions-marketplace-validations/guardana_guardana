@@ -239,7 +239,7 @@ you ever see is about your own change.</p>
 <tbody>
 <tr>
 <td><code>pyproject.toml</code></td>
-<td>the four entry-point groups Guardana discovers, and <code>guardana-core</code> as the only dependency</td>
+<td>the four entry-point groups Guardana discovers, and <code>guardana-core</code> as the only dependency, pinned from the version that wrote the pack up to, but excluding, the next minor because the generated target uses <code>read_source</code> outside the supported surface</td>
 </tr>
 <tr>
 <td><code>src/acme_rules/guardana-pack.yaml</code></td>
@@ -255,11 +255,11 @@ you ever see is about your own change.</p>
 </tr>
 <tr>
 <td><code>src/acme_rules/__init__.py</code></td>
-<td><code>provide_rules</code>, <code>provide_evaluators</code>, <code>provide_targets</code>, <code>provide_taxonomies</code></td>
+<td><code>provide_rules</code>, <code>provide_evaluators</code>, <code>provide_targets</code>, <code>provide_taxonomies</code>; package code imports only supported names</td>
 </tr>
 <tr>
 <td><code>tests/</code></td>
-<td>the manifest is true, every rule proves all three outcomes, the target conforms</td>
+<td>the manifest is true, every rule proves all three outcomes, the target conforms; the pack's own taxonomies are registered before loading its rules, as discovery does</td>
 </tr>
 </tbody>
 </table></div>

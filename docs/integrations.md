@@ -61,9 +61,9 @@ Inputs (all optional):
 | `version` | the CLI this Action tag was released with | The `guardana-cli` version to run; `latest` takes the newest release |
 | `sarif-file` | `guardana.sarif` | Where the SARIF is written |
 | `upload-sarif` | `true` | Upload to GitHub code scanning |
-| `fail-on-findings` | `true` | Fail the job when the gate trips (exit `1`) |
+| `fail-on-findings` | `true` | Fail the job when the gate trips (exit `1`); accepts only `true` or `false`, otherwise the step fails |
 
-The SARIF is uploaded even when the gate fails, so alerts always land; set
+A separate install step fails the job if the CLI cannot be installed. The scan writes SARIF through `--output` and refuses a destination it reads or cannot create; exit `0` or `1` counts only with a SARIF file this scan writes, so `--help`, a snapshot mode or an unwritable SARIF path does not pass. The SARIF is uploaded even when the gate fails, so alerts always land; set
 `fail-on-findings: false` to make findings advisory. That input waives exit `1`
 and nothing else: a scan that did not finish — any other non-zero
 [exit code](exit-codes.md), such as `3` for a path that does not exist or `4` for

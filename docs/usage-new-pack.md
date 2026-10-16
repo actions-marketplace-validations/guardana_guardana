@@ -47,12 +47,12 @@ you ever see is about your own change.
 
 | path | what it is |
 |---|---|
-| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency |
+| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency, pinned from the version that wrote the pack up to, but excluding, the next minor because the generated target uses `read_source` outside the supported surface |
 | `src/acme_rules/guardana-pack.yaml` | the manifest: what the pack promises, checked against what it registers |
 | `src/acme_rules/catalog/` | one YAML file per rule, each with its finding, clean and inconclusive samples |
 | `src/acme_rules/target.py` | a target, reachable as `--target acme-rules://some/directory` |
-| `src/acme_rules/__init__.py` | `provide_rules`, `provide_evaluators`, `provide_targets`, `provide_taxonomies` |
-| `tests/` | the manifest is true, every rule proves all three outcomes, the target conforms |
+| `src/acme_rules/__init__.py` | `provide_rules`, `provide_evaluators`, `provide_targets`, `provide_taxonomies`; package code imports only supported names |
+| `tests/` | the manifest is true, every rule proves all three outcomes, the target conforms; the pack's own taxonomies are registered before loading its rules, as discovery does |
 
 No licence file is written. Picking one for you is not this command's decision —
 add a `LICENSE` and set `license` in `pyproject.toml`.

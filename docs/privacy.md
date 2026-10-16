@@ -123,7 +123,7 @@ A finding whose evidence was changed says so, in the text a reader sees:
 
 Truncation announces itself the same way. A report that quietly dropped the half
 of the evidence that mattered would look complete and would not be — the same
-dishonesty the `unverified` channel exists to prevent.
+dishonesty the `unverified` channel exists to prevent. A truncated evidence summary ends `… [truncated: evidence exceeded N bytes; <12 hex digest of the whole redacted text>]`, so findings differing only past the bound keep distinct fingerprints.
 
 ## Why placeholders are hashed
 
@@ -134,7 +134,9 @@ computed from its evidence summary, and a baseline waiver matches on that
 fingerprint. A placeholder that changed between runs would silently expire every
 waiver you had.
 
-**A digest can confirm a guess.** Placeholder digests and `case_id` are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. `hash_identifiers: false` writes a bare label instead of a digest.
+**A digest can confirm a guess.** Placeholder digests and `case_id` are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. `hash_identifiers: false` writes a bare label instead of a digest. With this setting,
+a finding whose location holds a bare placeholder gets a collector identity tied to
+its run, so it never merges across runs and a waiver on it covers only that run.
 
 The **label** is the other half, and it is what tells you which key to rotate:
 

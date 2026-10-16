@@ -311,17 +311,18 @@ findings a baseline waived. A run whose agent did not say prints <code>unknown</
 blank and never <code>pass</code>.</p>
 <p><code>finding list</code> groups every sighting by the identity the engine computes — the rule
 and where it was found, never the evaluator's rationale, which moves on every
-re-run — and shows how many runs saw it, first and last. That is the &quot;has this been
+re-run — and shows how many runs saw it, first and last. <code>--environment E</code> lists only
+findings seen in E, filters before the limit, and counts runs within E. That is the &quot;has this been
 there since Tuesday, or is it new&quot; question.</p>
 <p><strong>Runs, not sightings.</strong> One run's rule can report the same identity several times
 — <code>malicious_dependency</code> names three bad packages in a single <code>requirements.txt</code>,
 and the identity is the rule plus the path — so counting rows would answer &quot;how
 often was this printed&quot; while the column claims to answer the other question. A
 finding a single scan reported three times reads <code>1 runs</code>.</p>
-<p><strong>A retried job is stored once.</strong> The same run id in the same project is accepted
-with <code>200</code> and <code>&quot;duplicate&quot;: true</code> instead of being stored again: a retry is not a
-failure and must not turn a pipeline red, and counting it twice would make a
-regression answer from a duplicate. An agent older than 0.9 sends no run id,
+<p><strong>A retried job is stored once.</strong> The same run id in the same project and environment is accepted
+with <code>200</code> and <code>&quot;duplicate&quot;: true</code>, keeping the first submission whatever the retry
+holds: a retry is not a failure and must not turn a pipeline red, and counting it twice
+would make a regression answer from a duplicate. An agent older than 0.9 sends no run id,
 identifies nothing, and is stored every time — which is honest, not clever.</p>
 <h2 id="triage-what-somebody-decided-about-a-finding">Triage: what somebody decided about a finding</h2>
 <p>A finding is an entity, not just a pile of sightings. It carries a status, an
@@ -332,7 +333,9 @@ guardana-collector finding status 1854bc20 --project acme/web --status acknowled
 guardana-collector finding waive  1854bc20 --project acme/web \
   --approver alice --reason &quot;vendor fix due in September&quot; --expires 2026-09-30
 </code></pre>
-<p>Identities are <code>sha256:…</code>, so every command takes a <strong>unique prefix</strong>, like git.
+<p>Identities are <code>sha256:…</code>, so every command takes a <strong>unique, non-empty hexadecimal
+prefix</strong>, optionally beginning with <code>sha256:</code>, and matches it literally. A prefix of any
+other form is refused with exit <code>3</code>.
 An ambiguous one is refused with the candidates listed and nothing is changed:
 acting on the wrong finding is worse than being asked to type four more
 characters.</p>
@@ -539,7 +542,7 @@ undifferentiated pile, so the down migration counts the tenants across the
 submissions <em>and</em> the keys first and raises rather than doing it.</p>
 <h2 id="what-the-collector-refuses-and-redacts-on-ingest">What the collector refuses and redacts on ingest</h2>
 <p><code>POST /findings</code> redacts recognisable secrets with engine patterns and <code>[redacted:&lt;label&gt;:&lt;12 hex digits&gt;]</code>; a value reaching past a recognised key becomes one placeholder with it; placeholders the engine writes remain unchanged. Redacted fields: <code>source</code>; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).</p>
-<p>Post-redaction overflow (4,096 characters: <code>source</code>/error sources; 65,536: other text fields) returns <code>422</code>; nothing is stored.</p>
+<p>Post-redaction overflow (4,096 characters: <code>source</code>/error sources; 65,536: other text fields) returns <code>422</code>; nothing is stored. A v8 envelope without <code>findings</code>, <code>unverified</code>, <code>errors</code> or <code>summary</code> also returns <code>422</code>, naming the missing field.</p>
 <p>Across accepted envelope versions, published-schema violations return <code>422</code>, one error entry (<code>loc</code>, <code>msg</code>, <code>input</code>) per value: severity outside exact-case <code>INFO</code>/<code>LOW</code>/<code>MEDIUM</code>/<code>HIGH</code>/<code>CRITICAL</code>; verdict outcome outside <code>pass</code>/<code>fail</code>/<code>inconclusive</code>; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside <code>pass</code>/<code>fail</code>/<code>indeterminate</code>; evidence mode outside <code>metadata_only</code>/<code>redacted</code>/<code>full</code>; a skip reason outside <code>missing_capability</code>/<code>unsafe_mode</code>/<code>not_applicable</code>/<code>not_recorded</code>/<code>not_offered</code>; an identity that is present but not <code>sha256:</code> followed by 64 lower-case hex digits. Permitted <code>null</code> remains accepted.</p>
 <p>Data stored earlier reads back unchanged, including any secret it holds; redaction applies to new submissions. The dashboard never ranks an unknown severity as the worst.</p>
 <h2 id="limits-how-much-one-caller-may-send-and-how-often">Limits: how much one caller may send, and how often</h2>
@@ -609,7 +612,9 @@ guardana-collector key revoke &lt;prefix&gt;
 <p><strong><code>--project</code> is required, and this command does not guess</strong> even when exactly one
 project exists. Issuing a credential against a tenant nobody named has the same
 shape as a default credential, and <code>bootstrap</code> already covers the case where there
-is only one.</p>
+is only one. <code>--expires-in-days</code> must be at least <code>1</code>; a smaller value exits <code>3</code> and
+stores nothing. <code>key list</code> shows each key as <code>active</code>, <code>expired</code> or <code>revoked</code>, with
+its expiry.</p>
 <pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
 guardana scan . --reporter server://https://collector.example.com
 curl -H &quot;Authorization: Bearer gdn_…&quot; https://collector.example.com/findings
@@ -806,7 +811,10 @@ curl -s -X POST https://collector.example.com/findings \
   -d '{&quot;schema_version&quot;: 8, &quot;source&quot;: &quot;ci/acme-web&quot;,
        &quot;findings&quot;: [{&quot;rule_id&quot;: &quot;acme.synthetic_check&quot;, &quot;severity&quot;: &quot;HIGH&quot;,
                      &quot;title&quot;: &quot;Synthetic finding&quot;, &quot;target_ref&quot;: &quot;app/settings.py:3&quot;,
-                     &quot;evidence&quot;: {&quot;summary&quot;: &quot;a synthetic example&quot;}}]}'
+                     &quot;evidence&quot;: {&quot;summary&quot;: &quot;a synthetic example&quot;}}],
+       &quot;unverified&quot;: [], &quot;errors&quot;: [],
+       &quot;summary&quot;: {&quot;rules_run&quot;: 1, &quot;rules_executed&quot;: [&quot;acme.synthetic_check&quot;],
+                   &quot;rules_skipped&quot;: [], &quot;max_severity&quot;: &quot;HIGH&quot;, &quot;unverified&quot;: 0, &quot;errors&quot;: 0}}'
 curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; &quot;https://collector.example.com/findings?limit=1&quot;
 curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/trend   # {&quot;HIGH&quot;: 1} on a fresh project
 </code></pre>

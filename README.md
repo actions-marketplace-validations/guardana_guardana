@@ -118,7 +118,7 @@ Guardana verifies artifacts, deployed systems, and recorded evidence:
 | **Compare evidence** | [`guardana diff a.json b.json`](docs/usage-diff.md) | Reports whether the later saved run is worse, or refuses an invalid comparison. |
 | **Import external observations** | [`guardana import-observations results.json`](docs/usage-import-observations.md) | Imports garak, promptfoo, or custom results as `unverified`, with provenance. It never exits `0` because Guardana verified nothing. |
 
-`scan`, `probe`, `monitor`, and `analyze-trace` can send findings to an optional collector with `--reporter server://<url>`. Other commands cover planning, capability inspection, configuration, baselines, run inspection, rule testing, and extension packs. See [`docs/index.md`](docs/index.md). Exit codes have eight documented meanings, tested against [`docs/exit-codes.md`](docs/exit-codes.md); CI does not need to parse console text.
+`scan`, `probe`, `monitor`, and `analyze-trace` can send findings to an optional collector with `--reporter server://<url>`. Other commands cover planning, capability inspection, configuration, baselines, run inspection, rule testing, and extension packs. See [`docs/index.md`](docs/index.md). Exit codes have nine documented meanings (`0`–`8`), tested against [`docs/exit-codes.md`](docs/exit-codes.md); CI does not need to parse console text.
 
 ### GitHub Actions
 
