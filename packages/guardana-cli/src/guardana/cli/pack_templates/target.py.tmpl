@@ -4,8 +4,8 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Self
 
+from guardana.core import Capability, LocatorError, Target, TargetKind
 from guardana.core.source import PythonSource, UnreadSource, read_source
-from guardana.core.target import Capability, LocatorError, Target, TargetKind
 
 
 class __CLASS__Target(Target):

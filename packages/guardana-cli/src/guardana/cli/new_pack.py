@@ -10,6 +10,7 @@ from typing import Annotated
 import typer
 import yaml
 from guardana.cli.exit_codes import ExitCode
+from guardana.core import __version__ as core_version
 from guardana.core.pack import EXTENSION_API_VERSION, MANIFEST_NAME
 from guardana.core.registry import RESERVED_NAMESPACE, RESERVED_TARGET_SCHEMES
 
@@ -56,6 +57,7 @@ class _Names:
     def render(self, template: str) -> str:
         """Substitute the template tokens, longest first so prefixes do not collide."""
         api_range = f">={EXTENSION_API_VERSION},<{EXTENSION_API_VERSION + 1}"
+        floor, ceiling = _core_range(core_version)
         for token, value in (
             ("__MARKER__", self.marker),
             ("__MODULE__", self.module),
@@ -65,9 +67,23 @@ class _Names:
             ("__DIST__", self.distribution),
             ("__API_RANGE__", api_range),
             ("__SCHEMA__", str(_SCAFFOLD_SCHEMA)),
+            ("__CORE_FLOOR__", floor),
+            ("__CORE_CEILING__", ceiling),
         ):
             template = template.replace(token, value)
         return template
+
+
+def _core_range(version: str) -> tuple[str, str]:
+    """Return the `guardana-core` this pack is made with and the next minor it stops before.
+
+    The local label is dropped: a requirement may not name one.
+    """
+    public = version.partition("+")[0]
+    release = re.match(r"(\d+)\.(\d+)", public)
+    if release is None:
+        raise ValueError(f"guardana-core reports a version that is not PEP 440: {version!r}")
+    return public, f"{release[1]}.{int(release[2]) + 1}"
 
 
 def _refuse(message: str) -> typer.Exit:

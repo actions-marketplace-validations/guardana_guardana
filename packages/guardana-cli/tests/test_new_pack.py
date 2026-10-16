@@ -8,13 +8,14 @@ would still be a test that passes.
 
 import importlib
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
-from guardana.core import taxonomy
+from guardana.core import __version__, taxonomy
 from guardana.core.pack import EXTENSION_API_VERSION, load_manifest
 from typer.testing import CliRunner
 
@@ -189,10 +190,10 @@ def test_the_usage_page_states_the_counts_a_real_run_produces(tmp_path: Path) ->
     assert f"{generated_tests} passed" in page
 
 
-def test_a_rule_citing_the_packs_own_taxonomy_loads_outside_discovery(
+def test_a_rule_citing_the_packs_own_taxonomy_loads_once_its_taxonomies_are_registered(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The generated tests call `provide_rules()` directly, before any discovery ran."""
+    """Discovery registers taxonomies before rules; the generated tests do the same by hand."""
     runner.invoke(app, ["new-pack", "zeta-rules", "--dir", str(tmp_path)])
     package = tmp_path / "src" / "zeta_rules"
     init = package / "__init__.py"
@@ -207,9 +208,20 @@ def test_a_rule_citing_the_packs_own_taxonomy_loads_outside_discovery(
         monkeypatch.delitem(sys.modules, name)
 
     try:
-        rules = importlib.import_module("zeta_rules").provide_rules()
+        pack = importlib.import_module("zeta_rules")
+        taxonomy.register_all(pack.provide_taxonomies())
+        rules = pack.provide_rules()
         cited = {ref.reference for r in rules for ref in r.meta.taxonomy}
     finally:
         taxonomy.unregister("ZH-02")
 
     assert "ZH-02" in cited
+
+
+def test_the_pack_pins_the_core_minor_it_was_made_with(tmp_path: Path) -> None:
+    """The target reads sources through a name outside the surface, so a minor may move it."""
+    runner.invoke(app, ["new-pack", "acme-rules", "--dir", str(tmp_path)])
+    project = tomllib.loads((tmp_path / "pyproject.toml").read_text())["project"]
+    major, minor = (int(part) for part in __version__.split(".")[:2])
+
+    assert project["dependencies"] == [f"guardana-core>={__version__},<{major}.{minor + 1}"]

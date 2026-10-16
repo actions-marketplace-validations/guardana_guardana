@@ -17,6 +17,7 @@ from guardana.core.pack import (
 )
 from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
+from guardana.core.taxonomy import register_all
 
 _THIS_PACK = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"__DIST__"}))
 
@@ -32,6 +33,9 @@ def _registered(*, without: str | None = None) -> Registered:
 
     def kept(ids: list[str]) -> dict[str, str | None]:
         return {i: None for i in ids if i != without}
+
+    # Discovery registers the pack's taxonomies before its rules; called directly, so is this.
+    register_all(__MODULE__.provide_taxonomies())
 
     return Registered(
         rules=kept([rule.meta.id for rule in __MODULE__.provide_rules()]),
