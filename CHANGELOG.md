@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0rc4] - 2026-10-16
+
 ### Added
 
 - **Run maintainer proofs against published PyPI packages with the manually dispatched `.github/workflows/proofs.yml` workflow.** Supply a version and optionally a reference-pack version; the checkout supplies only proof scripts. Twelve clean-install runs cover Linux, macOS and Windows, Python 3.11 and 3.13, and pip and uv. They follow the install guide, verify the network cut with a canary, check every generated starter README command against its stated exit code and output, apply its edit, and check both saved runs. Customization proofs cover reference-pack admission, validation, locking, scanning, package tests and supported-surface conformance; a conformance-kit row shown by the pack’s rule declarations to cover nothing it ships is not applicable and does not block the proof, and any other row that cannot run is not exercised, leaving the record incomplete, never passed. JSON artifacts capture commands, exit codes and output excerpts; installer reports show Guardana files’ files.pythonhosted.org origins and SHA-256 hashes. The summary passes only when every expected record exists and passed.

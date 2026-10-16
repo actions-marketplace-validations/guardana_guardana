@@ -11,7 +11,7 @@ with a usable CLI and optional collection, outside the production request path.
 Ideas without a reproducible problem or acceptance test start in
 [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
 
-## What ships today (1.0.0rc3)
+## What ships today (1.0.0rc4)
 
 1.0.0rc3 is the third and last required candidate, from the second stabilization round; it changes the supported surface only to correct three defects.
 It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.
