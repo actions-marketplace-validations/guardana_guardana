@@ -23,12 +23,13 @@ def _enforce() -> dict[str, object]:
     return step
 
 
-def _exit(tmp_path: Path, scan_exit: str, fail_on_findings: str) -> int:
+def _exit(tmp_path: Path, scan_exit: str, fail_on_findings: str, reported: str = "true") -> int:
     script = tmp_path / "enforce.sh"
     script.write_text(str(_enforce()["run"]), encoding="utf-8")
     environment = {
         "PATH": os.environ["PATH"],
         "GUARDANA_EXIT": scan_exit,
+        "GUARDANA_REPORTED": reported,
         "GUARDANA_FAIL_ON_FINDINGS": fail_on_findings,
     }
     done = subprocess.run(  # noqa: S603 — bash running the Action's own step
@@ -69,3 +70,20 @@ def test_a_scan_that_did_not_finish_fails_the_step_regardless(
     tmp_path: Path, scan_exit: str, fail_on_findings: str
 ) -> None:
     assert _exit(tmp_path, scan_exit, fail_on_findings) != 0
+
+
+@pytest.mark.parametrize("fail_on_findings", ["treu", "True", "yes", "1", ""])
+def test_a_fail_on_findings_that_is_neither_true_nor_false_fails_the_step(
+    tmp_path: Path, fail_on_findings: str
+) -> None:
+    assert _exit(tmp_path, "1", fail_on_findings) != 0
+    assert _exit(tmp_path, "0", fail_on_findings) != 0
+
+
+@pytest.mark.parametrize("scan_exit", ["0", "1"])
+@pytest.mark.parametrize("fail_on_findings", ["true", "false"])
+def test_a_verdict_without_the_report_this_scan_wrote_fails_the_step(
+    tmp_path: Path, scan_exit: str, fail_on_findings: str
+) -> None:
+    """`--help` exits 0 and a failed install exits 1, and neither wrote a report."""
+    assert _exit(tmp_path, scan_exit, fail_on_findings, reported="false") != 0
