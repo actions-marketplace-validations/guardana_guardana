@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The reference pack is now version `0.1.3`.** Its README changed after `1.0.0rc3` attached reference pack `0.1.2` to its GitHub Release. Each changed pack gets a new version so different archives never share a version.
 - **The Python facade validates `FailOn` and `Budgets` at construction.** Previously accepted invalid values now fail construction: `FailOn` requires `min_confidence` within [0, 1], excluding NaN and infinities, and `min_graded_share` within (0, 1]; `Budgets` refuses non-finite or negative durations. Validate these values before constructing either object. May now fail: Python construction of `FailOn` or `Budgets` with these invalid values.
 - **`trace inspect` exposes unreadable records in JSON and text.** JSON previously omitted `unreadable_records`; it now includes that field, and text output notes records that could not be read. May now fail: nothing.
 - **`guardana new-pack` generates supported package imports and a bounded core dependency.** Earlier scaffolds used unsupported imports and loaded rules before registering their taxonomies; generated package code now uses supported `guardana.core` names, including `Registry.load_yaml_rule_dirs` and `TaxonomyRef`, and tests register the pack's taxonomies first. `pyproject.toml` pins `guardana-core>=<the version that wrote it>,<next minor>` because the target still uses `read_source`, which is outside the supported surface. May now fail: nothing.
