@@ -83,18 +83,21 @@ def test_the_builtin_list_is_matched_by_distribution_name() -> None:
     assert all("-" in name for name in BUILTIN_DISTRIBUTIONS)
 
 
-def test_a_refused_plugin_is_never_imported() -> None:
+def test_a_refused_plugin_is_never_imported(monkeypatch: pytest.MonkeyPatch) -> None:
     """The property `--no-plugins` exists for, and the one a refusal must not cost.
 
     Recording what it refused means walking the entry-point table, and walking it
     must not become loading it: `SECURITY.md` promises that this mode imports no
     third-party code at all. `importlib.metadata.entry_points()` reads installed
     metadata; only `EntryPoint.load()` imports, and the refusal happens first.
+
+    The modules come back afterwards, so a later test that patched one of them at
+    collection patches the module discovery builds its rules from.
     """
     import sys  # noqa: PLC0415
 
     for module in [name for name in sys.modules if name.startswith("guardana.rules")]:
-        del sys.modules[module]
+        monkeypatch.delitem(sys.modules, module)
     before = set(sys.modules)
 
     registry = Registry.discover(PluginTrust(mode=PluginMode.DISABLED))
