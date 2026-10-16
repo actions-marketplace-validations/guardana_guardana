@@ -26,8 +26,10 @@ from guardana.cli._plugins import (
     warn_about_load_errors,
 )
 from guardana.cli._profile import resolve_profile
+from guardana.cli._profile_files import profile_file_inputs, rule_flag_inputs
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._run_meta import calibrations_or_exit
+from guardana.cli._sidecar import refuse_writing_over_an_input, refuse_writing_over_named_inputs
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import BudgetExhausted
 from guardana.core.calibration.corpus import dump_corpus
@@ -79,7 +81,10 @@ def run_fixtures(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; t
     could not be loaded · `3` the selector matched nothing, or a suite holding
     regression pairs has an evaluator that cannot regrade them without sending.
     """
+    refuse_writing_over_an_input(write_corpus, [profile, *rules])
+    refuse_writing_over_named_inputs(write_corpus, rule_flag_inputs(rules))
     prof = resolve_profile(profile, None)
+    refuse_writing_over_named_inputs(write_corpus, profile_file_inputs(prof))
     resolved = resolve_trust(plugins, allow_plugin, prof)
     registry = Registry.discover(resolved.trust)
     load_custom_rules(registry, prof, rules)
@@ -329,7 +334,7 @@ def _first_request(
     """
     try:
         list(rule.run(fixture.target, ctx))
-    except Exception:  # classified as declared a moment ago; a replay that raises gets no row
+    except (Exception, SystemExit):  # classified as declared; a replay that raises gets no row
         return None
     seen = getattr(getattr(fixture.target, "transport", None), "seen", None)
     if not isinstance(seen, list) or not seen:

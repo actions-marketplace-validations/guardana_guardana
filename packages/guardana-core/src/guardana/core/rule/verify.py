@@ -13,10 +13,12 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 
+from guardana.core.manifest.records import SuiteOutcome
 from guardana.core.regression import Breach, Regraded, UnprovableError, regrade
 from guardana.core.rule.base import NOT_OFFERED_AFTER_REPORTING, NotOffered, Rule, RuleContext
 from guardana.core.rule.fixture import DEMANDED_OUTCOMES, FixtureOutcome, RuleFixture
 from guardana.core.rule.suite_rule import SuiteRule
+from guardana.core.runner import ungraded_cases
 from guardana.core.source import UnreadSource
 from guardana.core.target.protocols import FileReader
 
@@ -116,8 +118,9 @@ def verify_rule(rule: Rule, ctx: RuleContext | None = None) -> RuleVerification:
 
     Each fixture runs in a fresh copy of the context, so what one sample recorded or
     reported never counts in another. A fixture is classified as a run reads it: a
-    finding is `finding`, a coverage shortfall, a file the target could not read or an
-    inconclusive verdict without one is `inconclusive`, and `NotOffered` raised before
+    finding is `finding`; a coverage shortfall, recorded cases none of which were graded,
+    a suite that declined to conclude, a file the target could not read or an
+    inconclusive verdict without one is `inconclusive`; and `NotOffered` raised before
     anything was reported is `not_offered`. No rule is asked to declare a `not_offered` sample.
 
     A suite's regression pairs are regraded with the context's evaluators, sending
@@ -175,7 +178,7 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
                 NOT_OFFERED_AFTER_REPORTING,
             )
         return _judged(rule, fixture, FixtureOutcome.NOT_OFFERED)
-    except Exception as exc:  # a rule with an ordinary bug, or a target that would not answer
+    except (Exception, SystemExit) as exc:  # a rule's bug, its `sys.exit()`, a silent target
         return FixtureResult(
             rule.meta.id,
             fixture.name,
@@ -184,9 +187,15 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
             FixtureVerdict.ERRORED,
             f"{type(exc).__name__}: {exc}",
         )
-    gaps = ctx.shortfalls()
+    gaps = (*ctx.shortfalls(), *ungraded_cases({rule.meta.id: ctx.recorded()}, None))
     unread = _unread(fixture.target)
-    observed = _observed(findings, declined=bool(gaps) or bool(unread))
+    summary = ctx.concluded()
+    declined = (
+        bool(gaps)
+        or bool(unread)
+        or (summary is not None and summary.outcome is SuiteOutcome.INCONCLUSIVE)
+    )
+    observed = _observed(findings, declined=declined)
     shortfall = f" (shortfall: {'; '.join(g.name for g in gaps)})" if gaps else ""
     if unread:
         shortfall += f" (unread: {'; '.join(f'{u.path.name}: {u.reason}' for u in unread)})"

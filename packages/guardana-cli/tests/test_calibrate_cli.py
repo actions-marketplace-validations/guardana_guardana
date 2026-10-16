@@ -572,3 +572,23 @@ def test_a_calibration_the_budget_stops_exits_6_and_records_nothing(
     else:
         assert result.exit_code != ExitCode.BUDGET_EXHAUSTED, result.output
         assert len(judge.seen) > 2, "the judge was asked past the ceiling that stops the other case"
+
+
+@pytest.mark.parametrize("bar", ["nan", "inf", "-0.1", "1.5"])
+def test_a_max_ece_outside_zero_to_one_is_refused_before_anything_is_graded(
+    bar: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    graded: list[object] = []
+    monkeypatch.setattr(calibrate_module, "calibrate", lambda *a: graded.append(a))
+
+    result = runner.invoke(app, ["calibrate", "--evaluator", "keyword", "--max-ece", bar])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert graded == []
+
+
+@pytest.mark.parametrize("bar", ["0", "1"])
+def test_the_bounds_of_max_ece_are_accepted(bar: str) -> None:
+    result = runner.invoke(app, ["calibrate", "--evaluator", "keyword", "--max-ece", bar])
+
+    assert result.exit_code != ExitCode.INVALID_USAGE, result.output

@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
 from guardana.cli._contracts import (
     ReadContracts,
     contract_files,
@@ -16,6 +17,7 @@ from guardana.cli._contracts import (
     read_contracts,
 )
 from guardana.cli._rules_loading import rule_path_problems
+from guardana.core.dataset import DatasetError, resolve_dataset_path
 from guardana.core.manifest.build import ProfileCalibrations, read_profile_calibrations
 from guardana.core.profile import Profile, ProfileError
 from guardana.core.registry import Registry, yaml_rule_files
@@ -103,7 +105,11 @@ def profile_file_inputs(profile: Profile) -> tuple[NamedFile, ...]:
     """
     named: list[NamedFile] = []
     for entry in profile.rule_paths:
-        named.extend(("the profile's rules.paths", file) for file in yaml_rule_files(Path(entry)))
+        for file in yaml_rule_files(Path(entry)):
+            named.append(("the profile's rules.paths", file))
+            named.extend(
+                ("a dataset a rule in rules.paths reads", data) for data in _datasets(file)
+            )
     for entry in profile.contract_paths:
         named.extend(("the profile's contracts", file) for file in contract_files(Path(entry)))
     named.extend(("the profile's calibrations", Path(entry)) for entry in profile.calibration_paths)
@@ -118,9 +124,44 @@ def profile_file_inputs(profile: Profile) -> tuple[NamedFile, ...]:
 
 
 def rule_flag_inputs(rules: Iterable[Path]) -> tuple[NamedFile, ...]:
-    """Name every rule file the `--rules` flags make a run read, a directory's included."""
-    return tuple(
-        ("--rules" if not path.is_dir() else f"--rules {path}", file)
-        for path in rules
-        for file in yaml_rule_files(path)
-    )
+    """Name every rule file the `--rules` flags make a run read, and the datasets they read."""
+    named: list[NamedFile] = []
+    for path in rules:
+        flag = "--rules" if not path.is_dir() else f"--rules {path}"
+        for file in yaml_rule_files(path):
+            named.append((flag, file))
+            named.extend((f"a dataset a rule under {flag} reads", data) for data in _datasets(file))
+    return tuple(named)
+
+
+def _datasets(rule_file: Path) -> tuple[Path, ...]:
+    """Return the dataset files a YAML rule file names, its fixtures' included.
+
+    Resolved as the loader resolves them; a value the loader would refuse names no file
+    here, because the load refuses it before anything is read or written.
+    """
+    try:
+        raw = yaml.safe_load(rule_file.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return ()
+    declared = raw if isinstance(raw, list) else [raw]
+    values: list[object] = []
+    for rule in declared:
+        if not isinstance(rule, dict):
+            continue
+        fixtures = rule.get("fixtures")
+        values.append(rule.get("dataset"))
+        values.extend(
+            fixture.get("dataset")
+            for fixture in (fixtures if isinstance(fixtures, list) else [])
+            if isinstance(fixture, dict)
+        )
+    found: list[Path] = []
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        try:
+            found.append(resolve_dataset_path(value, rule_file))
+        except DatasetError:
+            continue
+    return tuple(found)

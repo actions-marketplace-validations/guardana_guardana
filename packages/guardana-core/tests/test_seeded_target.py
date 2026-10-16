@@ -260,6 +260,34 @@ def test_a_broken_applicability_hook_runs_the_rule_and_records_an_error_in_run_a
     assert plan.errors == result.errors
 
 
+class _Exits(_Asks):
+    """Raises `exiting` from its applicability hook."""
+
+    def __init__(self, exiting: BaseException) -> None:
+        super().__init__()
+        self._exiting = exiting
+
+    def not_applicable_to(self, target: Target) -> str | None:
+        raise self._exiting
+
+
+def test_an_applicability_hook_calling_sys_exit_runs_the_rule_and_records_an_error() -> None:
+    registry = _registry(_Exits(SystemExit(0)))
+
+    result = Runner(registry, default_profile()).run(_seeded())
+    plan = build_plan(registry, default_profile(), _seeded())
+
+    assert result.rules_run == ("acme.seeded.asks",)
+    assert [(e.source, e.stage) for e in result.errors] == [("acme.seeded.asks", "applicability")]
+    assert "SystemExit" in result.errors[0].reason
+    assert plan.errors == result.errors
+
+
+def test_a_keyboard_interrupt_in_an_applicability_hook_still_stops_the_run() -> None:
+    with pytest.raises(KeyboardInterrupt):
+        Runner(_registry(_Exits(KeyboardInterrupt())), default_profile()).run(_seeded())
+
+
 @pytest.mark.parametrize("hook", ["raises", "answers nonsense"])
 def test_a_rule_the_profile_leaves_out_is_never_asked_whether_it_applies(hook: str) -> None:
     rule = _Asks(broken_hook=True) if hook == "raises" else _Answers(False)

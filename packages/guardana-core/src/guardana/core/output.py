@@ -666,7 +666,7 @@ def render(selected: SelectedRenderer, verification: Verification) -> str:
 
     Raises `BoundaryError` when the boundary fails, before the format is called, and
     `OutputError` when the format raises anything but `KeyboardInterrupt` or returns
-    something that is not text or no text at all.
+    something that is not text, or no text but whitespace.
     """
     try:
         seen = outbound(verification, leaves_machine=False)
@@ -686,6 +686,8 @@ def render(selected: SelectedRenderer, verification: Verification) -> str:
         )
     if not rendered:
         raise OutputError(selected.name, selected.origin, "it returned no text")
+    if not rendered.strip():
+        raise OutputError(selected.name, selected.origin, "it returned only whitespace")
     return rendered
 
 

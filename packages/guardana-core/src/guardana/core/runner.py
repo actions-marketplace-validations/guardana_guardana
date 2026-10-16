@@ -880,7 +880,7 @@ def applicability_refusal(rule: Rule, target: Target) -> SkippedRule | None:
     """
     try:
         reason = rule.not_applicable_to(target)
-    except Exception:
+    except (Exception, SystemExit):
         return None
     if not _is_reason(reason):
         return None
@@ -910,7 +910,7 @@ def _unreadable_applicability(selected: Sequence[Rule], target: Target) -> tuple
     for rule in selected:
         try:
             answer: object = rule.not_applicable_to(target)
-        except Exception as exc:
+        except (Exception, SystemExit) as exc:
             errors.append(CheckError.from_exception(rule.meta.id, "applicability", exc))
             continue
         if answer is None or _is_reason(answer):

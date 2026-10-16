@@ -466,7 +466,9 @@ class Registry:
             references = {ref.reference for ref in known_refs()}
             try:
                 _absorb(_provided_by(entry_point), expected, register, origin)
-            except Exception as exc:
+            except (Exception, SystemExit) as exc:
+                # `sys.exit()` while importing or providing is that pack's failure: letting
+                # it end the command would exit 0 with nothing examined.
                 reg._restore(snapshot)
                 for ref in known_refs():
                     if ref.reference not in references:

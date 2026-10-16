@@ -800,6 +800,7 @@ def test_a_verbatim_unmarked_reply_without_a_placeholder_is_not_altered() -> Non
         "[evidence withheld: metadata_only:0123456789ab]",
         "[reason withheld: metadata_only]",
         "start… [truncated: evidence exceeded 16384 bytes]",
+        "start… [truncated: evidence exceeded 16384 bytes; 0123456789ab]",
     ],
 )
 def test_a_placeholder_the_redactor_writes_is_recognised(text: str) -> None:

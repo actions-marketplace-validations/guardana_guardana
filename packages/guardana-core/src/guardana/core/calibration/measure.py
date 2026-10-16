@@ -22,7 +22,9 @@ def calibrate(evaluator: Evaluator, samples: Sequence[CalibrationSample]) -> Cal
     zeros would read like a perfect score.
 
     A judge's `BudgetExhausted` is not caught: no partial report is returned, because a
-    measurement over the samples a ceiling happened to allow is not one of the corpus.
+    measurement over the samples a ceiling happened to allow is not one of the corpus. An
+    evaluator's `SystemExit` is raised as a `RuntimeError`, so it fails the calibration
+    the way any other error does instead of ending the process as a success.
     """
     if not samples:
         raise ValueError("a calibration needs at least one labelled sample")
@@ -30,7 +32,12 @@ def calibrate(evaluator: Evaluator, samples: Sequence[CalibrationSample]) -> Cal
     abstained = {True: 0, False: 0}
     assessors: set[str] = set()
     for sample in samples:
-        verdict = grade(evaluator, sample.exchange, sample.expectation)
+        try:
+            verdict = grade(evaluator, sample.exchange, sample.expectation)
+        except SystemExit as exc:
+            raise RuntimeError(
+                f"evaluator {evaluator.id!r} raised SystemExit({exc.code!r}) while grading"
+            ) from exc
         assessors.add(verdict.evaluator_id)
         if verdict.outcome == "inconclusive":
             abstained[sample.attack_succeeded] += 1

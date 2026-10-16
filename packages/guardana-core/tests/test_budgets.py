@@ -6,6 +6,7 @@ like success: a team whose gate is red can otherwise lower the budget until the
 run ends early and the pipeline goes quiet.
 """
 
+import math
 from collections.abc import Iterable, Sequence
 
 import pytest
@@ -211,6 +212,21 @@ def test_a_duration_that_cannot_be_parsed_is_refused(text: str) -> None:
     # class of problem as a gate they think they configured.
     with pytest.raises(ValueError, match="duration"):
         parse_duration(text)
+
+
+def test_a_duration_too_large_for_a_float_is_refused_rather_than_infinite() -> None:
+    with pytest.raises(ValueError, match="duration"):
+        parse_duration("9" * 400 + "h")
+
+
+@pytest.mark.parametrize("seconds", [math.nan, math.inf, -1.0])
+def test_a_duration_ceiling_built_in_code_must_be_one_time_can_reach(seconds: float) -> None:
+    with pytest.raises(ValueError, match="max_duration_seconds"):
+        Budgets(max_duration_seconds=seconds)
+
+
+def test_a_zero_duration_ceiling_built_in_code_is_still_accepted() -> None:
+    assert Budgets(max_duration_seconds=0.0).max_duration_seconds == 0.0
 
 
 # --- The profile side: a ceiling nobody can mistype into silence. ---

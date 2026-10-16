@@ -40,6 +40,27 @@ class FailOn:
     otherwise hide behind one graded everywhere. A rule below it is a coverage shortfall.
     """
 
+    def __post_init__(self) -> None:
+        """Refuse a bar `guardana.yaml` would refuse, so code cannot build a gate that never fails.
+
+        NaN or an out-of-range number passes every comparison it is used in the wrong way:
+        no confidence is `>=` NaN, so every graded failure would fall under the bar.
+        """
+        if not isinstance(self.severity, Severity):
+            raise TypeError(f"fail_on.severity must be a Severity, got {self.severity!r}")
+        confidence = self.min_confidence
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, int | float)
+            or not 0.0 <= confidence <= 1.0
+        ):
+            raise ValueError(f"fail_on.min_confidence must be in [0.0, 1.0], got {confidence!r}")
+        share = self.min_graded_share
+        if share is not None and (
+            isinstance(share, bool) or not isinstance(share, int | float) or not 0.0 < share <= 1.0
+        ):
+            raise ValueError(f"fail_on.min_graded_share must be in (0, 1], got {share!r}")
+
 
 @dataclass(frozen=True, slots=True)
 class Policy:

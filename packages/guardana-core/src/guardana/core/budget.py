@@ -7,7 +7,9 @@ out is reported as exactly that: not a pass, not a policy failure, but a run tha
 did not finish, with its own exit code and its own field in the result.
 """
 
+import math
 import re
+import reprlib
 from dataclasses import dataclass, field
 
 from guardana.core.redaction import OMITTED_WHEN_DEFAULT
@@ -30,7 +32,8 @@ def parse_duration(text: str) -> float:
 
     Refused rather than defaulted, for the same reason a typo in a profile raises:
     a ceiling somebody believes they set and did not is worse than no ceiling,
-    because they stop watching.
+    because they stop watching. A number too large for a float is refused too, since
+    an infinite ceiling bounds nothing and is not a value JSON can record.
     """
     match = _DURATION.match(text.strip())
     if match is None:
@@ -38,7 +41,13 @@ def parse_duration(text: str) -> float:
             f"{text!r} is not a duration: use a number of seconds, or a number with "
             f"s / m / h (for example 45s, 15m, 2h)"
         )
-    return float(match.group(1)) * _UNITS[match.group(2) or "s"]
+    seconds = float(match.group(1)) * _UNITS[match.group(2) or "s"]
+    if not math.isfinite(seconds):
+        raise ValueError(
+            f"{reprlib.repr(text.strip())} is not a duration: it exceeds every finite "
+            f"number of seconds, so it would bound nothing"
+        )
+    return seconds
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +68,14 @@ class Budgets:
     max_duration_seconds: float | None = None
     max_requests_per_minute: int | None = field(default=None, metadata={OMITTED_WHEN_DEFAULT: True})
     """The pace requests may be sent at, so a rate-limited target is not run into its limit."""
+
+    def __post_init__(self) -> None:
+        """Refuse a duration ceiling no elapsed time can exceed: NaN, infinite or negative."""
+        seconds = self.max_duration_seconds
+        if seconds is not None and not (math.isfinite(seconds) and seconds >= 0):
+            raise ValueError(
+                f"max_duration_seconds must be a finite number of seconds, got {seconds}"
+            )
 
     @property
     def bounds_tokens(self) -> bool:

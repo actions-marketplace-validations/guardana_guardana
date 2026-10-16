@@ -1,3 +1,4 @@
+import math
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,7 +66,14 @@ def calibrate_command(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI fl
     A judge built from `evaluators:` is held to the profile's `budgets:`. A calibration
     the budget stops exits `6` and records nothing: a measurement over the samples a
     ceiling happened to allow is not a measurement of the corpus.
+
+    `--max-ece` is refused with exit `3` unless it is a finite number in `[0, 1]`: no
+    measured error exceeds NaN, so such a bar would pass every calibration.
     """
+    if max_ece is not None and not (math.isfinite(max_ece) and 0.0 <= max_ece <= 1.0):
+        raise typer.BadParameter(
+            f"must be a number from 0 to 1, got {max_ece}", param_hint="'--max-ece'"
+        )
     prof = resolve_profile(profile, None)
     resolved = resolve_trust(plugins, allow_plugin, prof)
     registry = Registry.discover(resolved.trust)

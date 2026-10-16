@@ -135,3 +135,26 @@ def test_the_report_names_the_evaluator_and_the_assessor_its_verdicts_carried() 
     report = calibrate(_FixedJudge("acme_judge", "fail", 0.8), _mixed(40))
     assert report.evaluator_id == "acme_judge"
     assert report.assessor == "acme_judge"
+
+
+class _ExitingJudge(Evaluator):
+    """A judge that raises `exiting` instead of grading."""
+
+    id = "exiting"
+
+    def __init__(self, exiting: BaseException) -> None:
+        self._exiting = exiting
+
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -> Verdict:
+        """Raise instead of answering."""
+        raise self._exiting
+
+
+def test_an_evaluator_calling_sys_exit_fails_the_calibration_as_an_error() -> None:
+    with pytest.raises(RuntimeError, match="SystemExit"):
+        calibrate(_ExitingJudge(SystemExit(0)), _mixed(4))
+
+
+def test_a_keyboard_interrupt_while_calibrating_still_stops_it() -> None:
+    with pytest.raises(KeyboardInterrupt):
+        calibrate(_ExitingJudge(KeyboardInterrupt()), _mixed(4))

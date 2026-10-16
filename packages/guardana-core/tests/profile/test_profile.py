@@ -1,7 +1,8 @@
+import math
 from pathlib import Path
 
 import pytest
-from guardana.core.profile import Policy, ProfileError, default_profile, load_profile
+from guardana.core.profile import FailOn, Policy, ProfileError, default_profile, load_profile
 from guardana.core.severity import Severity
 
 EXPECTED_CONFIDENCE = 0.7
@@ -198,3 +199,25 @@ def test_a_non_boolean_fail_on_error_is_refused(tmp_path: Path) -> None:
     path.write_text("name: t\nfail_on:\n  fail_on_error: maybe\n", encoding="utf-8")
     with pytest.raises(ProfileError, match="fail_on_error"):
         load_profile(path)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -0.1, 1.1])
+def test_a_confidence_bar_built_in_code_is_held_to_the_profiles_bounds(bad: float) -> None:
+    with pytest.raises(ValueError, match="min_confidence"):
+        FailOn(min_confidence=bad)
+
+
+@pytest.mark.parametrize("bad", [math.nan, 0.0, 1.5])
+def test_a_graded_share_built_in_code_is_held_to_the_profiles_bounds(bad: float) -> None:
+    with pytest.raises(ValueError, match="min_graded_share"):
+        FailOn(min_graded_share=bad)
+
+
+def test_a_severity_bar_built_in_code_must_be_a_severity() -> None:
+    with pytest.raises(TypeError, match="severity"):
+        FailOn(severity="high")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("edge", [0.0, 1.0, 1])
+def test_the_bounds_of_a_confidence_bar_built_in_code_are_accepted(edge: float) -> None:
+    assert FailOn(min_confidence=edge, min_graded_share=1.0).min_confidence == edge

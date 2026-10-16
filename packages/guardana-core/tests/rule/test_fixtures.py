@@ -398,3 +398,26 @@ def test_a_rule_need_not_declare_a_not_offered_sample() -> None:
 
     assert verification.gaps == ()
     assert verification.is_proven
+
+
+@pytest.mark.parametrize("code", [0, 2])
+def test_a_fixture_whose_rule_calls_sys_exit_errors_the_sample(code: int) -> None:
+    class _Exiting(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            raise SystemExit(code)
+
+    (result,) = verify_rule(
+        _Exiting([], [RuleFixture("exits", _endpoint("a"), FixtureOutcome.CLEAN)])
+    ).results
+
+    assert result.verdict is FixtureVerdict.ERRORED
+    assert "SystemExit" in result.detail
+
+
+def test_a_keyboard_interrupt_in_a_fixture_still_stops_the_verification() -> None:
+    class _Interrupted(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        verify_rule(_Interrupted([], [RuleFixture("stops", _endpoint("a"), FixtureOutcome.CLEAN)]))

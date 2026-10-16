@@ -44,7 +44,7 @@ class _FakeEntryPoint:
         self,
         name: str,
         *,
-        load_raises: Exception | None = None,
+        load_raises: BaseException | None = None,
         provides: object = None,
     ) -> None:
         self.name = name
@@ -102,6 +102,43 @@ def test_a_provider_that_raises_when_called_is_isolated_too(
 
     assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
     assert [e.source for e in reg.load_errors] == ["angry"]
+
+
+@pytest.mark.parametrize("where", ["import", "provider"])
+def test_a_pack_calling_sys_exit_is_a_load_error_not_the_end_of_discovery(
+    monkeypatch: pytest.MonkeyPatch, where: str
+) -> None:
+    class _ExitingProvider(_FakeEntryPoint):
+        def load(self) -> Callable[[], object]:
+            def _provide() -> object:
+                raise SystemExit(0)
+
+            return _provide
+
+    exiting = (
+        _FakeEntryPoint("exiting", load_raises=SystemExit(0))
+        if where == "import"
+        else _ExitingProvider("exiting")
+    )
+    _patch_entry_points(
+        monkeypatch, rules=[exiting, _FakeEntryPoint("healthy", provides=[_HealthyRule()])]
+    )
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
+
+    assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
+    assert [e.source for e in reg.load_errors] == ["exiting"]
+    assert "SystemExit" in reg.load_errors[0].reason
+
+
+def test_a_keyboard_interrupt_during_discovery_still_stops_the_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_entry_points(
+        monkeypatch, rules=[_FakeEntryPoint("interrupted", load_raises=KeyboardInterrupt())]
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
 
 def test_a_broken_rules_entry_point_does_not_stop_evaluator_discovery(
