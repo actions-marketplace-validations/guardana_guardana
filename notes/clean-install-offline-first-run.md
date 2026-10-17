@@ -1,9 +1,9 @@
 ---
 title: "Clean-install offline first run (#138)"
-date: 2026-10-15
-summary: "The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 12 of 14 steps."
+date: 2026-10-17
+summary: "The offline first-run proof passed all Linux and macOS cells, while all four Windows cells reached 13 of 14 steps."
 ---
-The maintainer ran this proof with Guardana 1.0.0rc3 from PyPI, using proof scripts at commit `a1801e0a`. The [workflow run](https://github.com/guardana/guardana/actions/runs/38747291852) records the results.
+The maintainer ran this proof with Guardana 1.0.0rc4 from PyPI, using proof scripts at commit `2ea87bb5`. The [workflow run](https://github.com/guardana/guardana/actions/runs/39038349905) records the results.
 
 ## Installation and platforms
 
@@ -19,14 +19,14 @@ The installation followed `docs/install.md` for a candidate release. With pip:
 
 ```console
 $ python -m venv .venv
-$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc3
+$ .venv/bin/python -m pip install --pre guardana-cli==1.0.0rc4
 ```
 
 With uv:
 
 ```console
 $ uv init --bare
-$ uv add --prerelease allow guardana-cli==1.0.0rc3
+$ uv add --prerelease allow guardana-cli==1.0.0rc4
 ```
 
 Both installers named pypi.org. Each installer's own report showed that every file came from files.pythonhosted.org, with a sha256.
@@ -89,10 +89,10 @@ It exited with code 0 and reported:
 ```text
 Linux:   4 of 4 cells passed; 14 of 14 steps each
 macOS:   4 of 4 cells passed; 14 of 14 steps each
-Windows: 0 of 4 cells passed; 12 of 14 steps each
+Windows: 0 of 4 cells passed; 13 of 14 steps each
 ```
 
-On Windows, with output going to a pipe in the ANSI code page, cp1252, `guardana diff` and `guardana doctor` ended with exit 5, an internal error caused by `UnicodeEncodeError`. The other steps passed with the network cut. This was recorded in #145 on 2026-10-15. The fix for 1.0.1 is prepared in #166. The workflow reports the Windows cells without requiring them to pass.
+On Windows, with output going to a pipe in the ANSI code page, cp1252, `guardana diff` and `guardana doctor` no longer end with exit 5. Since 1.0.0rc4 Guardana writes UTF-8 when the output stream cannot carry a character. Every Windows step now exits with the code the starter README states. The comparison does not hold: `guardana diff before.json after.json` exits `1` as the README states, but names the file `model\weights.pkl` where the README shows `weights.pkl`. The other steps passed with the network cut. The workflow reports the Windows cells without requiring them to pass.
 
 Runs written on Windows record `model\weights.pkl`, where Linux and macOS record `model/weights.pkl`. A finding's fingerprint follows that path, so baselines do not carry between Windows and the other platforms. This known limitation is tracked in #167.
 
