@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0rc5] - 2026-10-20
+
 ### Changed
 
 - **Require the four Windows first-run cells in `.github/workflows/proofs.yml`, alongside Linux and macOS.** Windows Server 2025 cells cover Python 3.11 and 3.13 with pip and uv; the Windows job no longer continues on error, and the summary requires these cells to pass. One starter README line remains a recorded known difference: `guardana diff` displays `model\weights.pkl` where the README shows `weights.pkl`, because runs written on Windows keep backslash paths (#167). The proof accepts this line only when everything before the file name matches exactly and the Windows path ends in the same file name; a different verdict, severity, rule or file still fails the step. The difference is retained in the cell’s `known_differences` record and listed in the run summary. No package changes. May now fail: a proofs run whose Windows cells do not pass every other step.

@@ -11,7 +11,7 @@ with a usable CLI and optional collection, outside the production request path.
 Ideas without a reproducible problem or acceptance test start in
 [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
 
-## What ships today (1.0.0rc4)
+## What ships today (1.0.0rc5)
 
 1.0.0rc4 is the fourth required candidate; it corrects defects in the supported surface, each announced in the changelog.
 It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.
