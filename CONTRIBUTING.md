@@ -26,7 +26,7 @@ uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre
 
 Documentation fixes, tests for existing behaviour, examples, and maintainer scripts are open now. Browse issues labelled [`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) for a concrete task.
 
-New declarative rules are welcome after 1.0. A rule needs a framework mapping and positive and negative fixtures. When rules open, `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
+New declarative rules are welcome. A built-in rule needs a public framework mapping in edition form and positive and negative fixtures. `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
 
 ## Tooling gates
 
@@ -244,12 +244,11 @@ checklist, and its milestone closes after the promised artifacts are verified.
 A merged pull request runs CI but does not publish a package. The maintainer
 chooses a release from the completed work using
 [the versioning policy](docs/compatibility.md#versioning), then uses the
-tag-gated release process. Until stable 1.0, release candidates carry fixes
-only; proposed features wait outside the candidate milestone.
+tag-gated release process.
 
-### Release cadence after 1.0
+### Release cadence
 
-After stable 1.0, fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
+Fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
 
 Every Monday, the maintainer reviews changes merged since the last release. If any affect a published package, a release ships that day from `main` as it stands. Pull requests merged during preparation enter the next release. Weeks with only documentation, tests or maintainer tooling produce no package release; the site updates on every merge.
 
