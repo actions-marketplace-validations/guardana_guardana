@@ -5,7 +5,9 @@ ended as an unreachable endpoint; an undeclared error reply is raised as the `HT
 it is, its body still readable; the metadata a reply carries arrives in `ChatReply.meta`.
 """
 
+import io
 from collections.abc import Iterator, Sequence
+from email.message import Message
 from urllib.error import HTTPError
 
 import pytest
@@ -24,7 +26,12 @@ from guardana.core.target import (
     MetadataReportingTransport,
     RequestDeclined,
 )
-from guardana.core.target.adapter import DEFAULT_RETRY_STATUSES, AdapterConfig, HttpAdapterTransport
+from guardana.core.target.adapter import (
+    DEFAULT_RETRY_STATUSES,
+    AdapterConfig,
+    HttpAdapterTransport,
+    _post,
+)
 from guardana.core.target.endpoint import UsageReportingTransport
 from guardana.core.testing import ScriptedTransport
 from guardana.core.testing._fake_provider import (
@@ -415,3 +422,42 @@ def test_a_subclass_that_reshapes_chat_is_answered_through_it() -> None:
     target = _Reshaping("http://x", "m", transport=ScriptedTransport("reply"))
 
     assert target.chat_reply(_HELLO).text == "PACK reply"
+
+
+class _UnclosableBody(io.BytesIO):
+    """A reply body whose first `close()` fails, as a connection torn down underneath it can.
+
+    Later calls close it, so the finaliser that closes the error again at collection is quiet.
+    """
+
+    failed = False
+
+    def close(self) -> None:
+        if not self.failed:
+            self.failed = True
+            raise OSError("the connection is already gone")
+        super().close()
+
+
+def _post_meeting(error: HTTPError, monkeypatch: pytest.MonkeyPatch) -> tuple[int, bytes]:
+    def refused(*args: object, **kwargs: object) -> bytes:
+        raise error
+
+    monkeypatch.setattr("guardana.core.target.adapter.read_with_retry", refused)
+    reply = _post("http://guarded.example/chat", b"{}", {}, timeout=1, retry_statuses=frozenset())
+    return reply.status, reply.body
+
+
+def test_an_error_reply_is_closed_once_its_body_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = HTTPError("http://x", 400, "Bad Request", Message(), io.BytesIO(b"blocked"))
+
+    assert _post_meeting(error, monkeypatch) == (400, b"blocked")
+    assert error.fp.closed
+
+
+def test_an_error_reply_that_fails_to_close_is_read_all_the_same(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = HTTPError("http://x", 400, "Bad Request", Message(), _UnclosableBody(b"blocked"))
+
+    assert _post_meeting(error, monkeypatch) == (400, b"blocked")
