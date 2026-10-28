@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Keep `CITATION.cff` aligned with the released version.** `scripts/bump_version.py` now rewrites its `version`, sets `date-released` to the day of the bump, and lists the file in `--dry-run`. Previously, no release step wrote it, so it stayed at `0.26.0` and `2026-09-20` through `1.0.0rc5` (#214).
+- **Invalid UTF-8 in a profile now names the file and refuses the command.** The profile loader raises `ProfileError` instead of leaking `UnicodeDecodeError`; `scan --profile`, `recipe lock` and `recipe run` exit `3` before a run starts. Previously `recipe run` could report an internal error (exit `5`), while scan and lock printed a codec error without the profile path. May now fail: these commands still refuse the invalid input, but `recipe run` returns `3` instead of `5`.
 
 ### Documentation
 
