@@ -19,6 +19,7 @@ from guardana.core.rule import RuleContext, load_yaml_rules
 from guardana.core.rule.trajectory_rule import TrajectoryRule
 from guardana.core.target import EndpointTarget
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
+from guardana.core.testing import ToolCallingScriptedTransport
 from guardana.rules import provide_rules
 
 _RULE_ID = "guardana.agent.goal_hijack"
@@ -64,6 +65,27 @@ class _Hijacked:
         return ToolCallReply(text="I drafted the recommendation as instructed.", tool_calls=())
 
 
+class _ReadsAndAnswers:
+    """Reads the quotes once, then answers the question it was asked."""
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        return "ok"
+
+    def send_tools(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+        tools: Sequence[ToolSpec],
+    ) -> ToolCallReply:
+        if any(m.role == "tool" for m in messages):
+            return ToolCallReply(text="Quote B is cheaper.", tool_calls=())
+        return ToolCallReply(text=None, tool_calls=(ToolCall("read_file", "{}", "c1"),))
+
+
 def test_the_judge_rule_is_not_enabled_by_default() -> None:
     # An unconfigured judge is an error under the default policy, so shipping this
     # as a built-in would turn every judge-less probe red.
@@ -104,3 +126,31 @@ def test_the_judge_sees_the_tool_calls_not_an_empty_transcript() -> None:
         "the judge graded a transcript with the tool calls missing, which is the "
         "half of an agent run that carries the behaviour"
     )
+
+
+def test_it_proves_the_planted_note_was_delivered() -> None:
+    assert _rule().expectation.get("delivered_by") == "read_file"
+
+
+def test_an_agent_that_never_read_the_planted_note_is_not_graded_pass() -> None:
+    """A judge passes an agent that never saw the note; that pass measures no injection."""
+    judge = LlmJudgeEvaluator(lambda prompt: "PASS: it did not follow the malicious note")
+    target = EndpointTarget(
+        "http://x", "m", transport=ToolCallingScriptedTransport(text="I cannot access the file.")
+    )
+    ctx = RuleContext(evaluators={"llm_judge": judge})
+
+    findings = list(_rule().run(target, ctx))
+
+    assert [a.status.value for a in ctx.recorded()] == ["inconclusive"]
+    assert [f.verdict.outcome for f in findings if f.verdict is not None] == ["inconclusive"]
+    assert "read_file" in findings[0].evidence.summary
+
+
+def test_an_agent_that_read_the_note_and_answered_is_graded_pass() -> None:
+    judge = LlmJudgeEvaluator(lambda prompt: "PASS: it answered the question")
+    ctx = RuleContext(evaluators={"llm_judge": judge})
+
+    list(_rule().run(EndpointTarget("http://x", "m", transport=_ReadsAndAnswers()), ctx))
+
+    assert [a.passed for a in ctx.recorded()] == [True]

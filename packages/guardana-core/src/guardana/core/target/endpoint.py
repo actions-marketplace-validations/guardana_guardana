@@ -1,16 +1,26 @@
+import contextlib
+import copy
 import json
 import math
-from collections.abc import Sequence
-from dataclasses import dataclass
+import re
+from collections.abc import Callable, Iterable, Mapping, Sequence
+from contextvars import ContextVar
+from dataclasses import dataclass, field, replace
+from http.client import HTTPException, HTTPMessage, HTTPResponse
 from time import sleep as _sleep
-from typing import Literal, Protocol, runtime_checkable
-from urllib.error import HTTPError
+from typing import IO, TYPE_CHECKING, Literal, Protocol, Self, TypeVar, runtime_checkable
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from guardana.core.budget import BudgetExhausted, Budgets
-from guardana.core.target.base import Capability, Target, TargetKind
+from guardana.core.target._url import display_url
+from guardana.core.target.base import Capability, Target, TargetKind, WireProtocol
+from guardana.core.target.decline import RequestDeclined
 from guardana.core.usage import TargetUsage, TokenUsage, UsageMeter
+
+if TYPE_CHECKING:  # the keeper builds on the recording format, which builds on this module
+    from guardana.core.keeping import ExchangeKeeper
 
 REQUEST_TIMEOUT_SECONDS = 30
 """How long one request to a target may take.
@@ -29,6 +39,8 @@ _ALLOWED_SCHEMES = frozenset({"http", "https"})
 # more now that rules can run concurrently.
 _RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
 _MAX_ATTEMPTS = 3
+RETRIES_PER_REQUEST = _MAX_ATTEMPTS - 1
+"""How many times one request is sent again at most; each retry counts as a request."""
 _BACKOFF_BASE_SECONDS = 0.5
 # A server answering `Retry-After: 86400` must not be able to park a scan for a
 # day, so its request to wait is honoured only up to this bound.
@@ -52,7 +64,100 @@ def _retry_delay(attempt: int, retry_after: str | None) -> float:
 
 
 class EndpointError(Exception):
-    """Raised when an endpoint is unusable: bad URL, or a reply guardana can't parse."""
+    """Raised when an endpoint is unusable: bad URL, a redirect, or a reply guardana can't parse."""
+
+
+class EndpointUnreachable(EndpointError):  # noqa: N818 — named for what the run meets
+    """The endpoint did not answer: a timeout, a reset, or a connection that broke mid-reply.
+
+    Its message names the endpoint and never quotes a reply, since none arrived.
+    """
+
+
+class UnreadableReply(EndpointError):  # noqa: N818 — named for what the run meets
+    """A reply arrived that is not one the protocol allows: not JSON-RPC, over-long, malformed.
+
+    Its message names the target and the reply's size, never its content.
+    """
+
+
+class TargetChanged(EndpointError):  # noqa: N818 — named for what the run meets
+    """The target still answers but stopped accepting what the run agreed with it.
+
+    Its message names the target, the agreement it dropped and what it offers instead.
+    """
+
+
+_T = TypeVar("_T")
+
+_BEFORE_RETRY: ContextVar[Callable[[], None] | None] = ContextVar("_BEFORE_RETRY", default=None)
+"""What the target sending this request does before a retry goes out.
+
+A retry is another request to the model, so it has to pass the run's request
+ceiling and appear in its usage. Only the target owns the meter, and the transport
+protocol it calls through has no room to carry one.
+"""
+
+
+class _RefuseRedirects(HTTPRedirectHandler):
+    """Hands a redirect back as the `HTTPError` it is, instead of following it.
+
+    urllib re-sends a redirected POST as a GET carrying every header, the
+    credential included, to whatever origin `Location` names, and returns that
+    host's reply as if the configured address had sent it.
+    """
+
+    def redirect_request(  # noqa: PLR0913, PLR0917 — the signature urllib calls
+        self,
+        req: Request,
+        fp: IO[bytes],
+        code: int,
+        msg: str,
+        headers: HTTPMessage,
+        newurl: str,
+    ) -> Request | None:
+        """Decline every hop, so urllib raises the redirect as an error."""
+        return None
+
+
+_UNREDIRECTED = build_opener(_RefuseRedirects)
+
+
+def open_unredirected(request: Request, *, timeout: float) -> HTTPResponse:
+    """Send `request` and return the reply of the address it names, never of another.
+
+    A `3xx` raises `HTTPError` carrying the redirect's status. Shared by every
+    client that sends a credential to a configured address: the model endpoint, an
+    adapted product endpoint and the collector.
+    """
+    response: HTTPResponse = _UNREDIRECTED.open(request, timeout=timeout)
+    return response
+
+
+def close_http_error(exc: BaseException) -> None:
+    """Close the reply `exc` carries when it is an `HTTPError`; any other error holds none.
+
+    Never raises an `Exception`: a reply that fails to close, however it fails, must not
+    replace the outcome its caller is reporting.
+    """
+    if isinstance(exc, HTTPError):
+        with contextlib.suppress(Exception):
+            exc.close()
+
+
+def redirect_refusal(exc: HTTPError, ref: str) -> EndpointError | None:
+    """Return the error a redirect from a target becomes, or None for any other status.
+
+    An endpoint that answers only somewhere else is unavailable at the address under
+    test; following it would grade another host's reply as this model's.
+    """
+    if not 300 <= exc.code < 400:  # noqa: PLR2004 — the redirect status class
+        return None
+    close_http_error(exc)
+    return EndpointError(
+        f"{ref} answered with a redirect (HTTP {exc.code}); redirects are not followed, "
+        f"so configure the address that answers directly"
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +192,43 @@ class ChatTransport(Protocol):
     ) -> str:
         """Send `messages` to the model and return its reply text."""
         raise NotImplementedError
+
+
+@runtime_checkable
+class SendsSecrets(Protocol):
+    """A target or transport that names the values it sends to authenticate.
+
+    The runner withholds them from every failure it records, so an endpoint that echoes
+    a key in an error body cannot put it in a saved run, whoever built the target.
+    """
+
+    def sent_secrets(self) -> tuple[str, ...]:
+        """Return every value this sends that a recorded message must never quote."""
+        raise NotImplementedError
+
+
+def secrets_sent_by(sender: object) -> tuple[str, ...]:
+    """Return the text `sender` declares it sends to authenticate; nothing when it declares none.
+
+    The declaration may come from a plugin, so bytes are read as UTF-8 text, any other item
+    that is not text is left out, and a single value returned whole is one value. A
+    declaration that is no collection raises `TypeError`, and whatever the call itself
+    raises propagates.
+    """
+    if not isinstance(sender, SendsSecrets):
+        return ()
+    declared: object = sender.sent_secrets()
+    if isinstance(declared, str | bytes | bytearray):
+        declared = (declared,)
+    if not isinstance(declared, Iterable):
+        raise TypeError(f"sent_secrets() returned {type(declared).__name__}, not a tuple")
+    values: list[str] = []
+    for value in declared:
+        if isinstance(value, bytes | bytearray):
+            values.append(bytes(value).decode("utf-8", errors="replace"))
+        elif isinstance(value, str):
+            values.append(value)
+    return tuple(values)
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,10 +283,16 @@ class ToolCallReply:
     `text` is `None` when the model replied with tool calls and no prose — that is
     normal here (unlike the text-only path, where no content is a fail-closed
     error), because the tool calls are the signal an agency check grades.
+    `usage` is what the provider said the turn cost, or None when it said nothing.
+    `unreadable` says why a call in the reply could not be read, or is None when every
+    one was: `tool_calls` then holds only the readable ones, and what the model asked
+    for in full is unknown, so a reply carrying it is never graded as a pass.
     """
 
     text: str | None
     tool_calls: tuple[ToolCall, ...]
+    usage: TokenUsage | None = None
+    unreadable: str | None = None
 
     @property
     def is_silent(self) -> bool:
@@ -194,6 +342,64 @@ class ChatReply:
 
     text: str
     usage: TokenUsage | None = None
+    meta: Mapping[str, str] = field(default_factory=dict)
+    """What the reply said beside its text, by the names an adapter's `metadata_paths:` give.
+
+    A name the reply did not carry is absent, never an empty string: an evaluator reads a
+    missing name as missing evidence.
+    """
+
+
+MAX_METADATA_NAMES = 16
+"""How many names a reply's metadata may carry, and an adapter's `metadata_paths:` declare."""
+
+MAX_METADATA_CHARS = 1024
+"""The longest value kept as metadata; a longer one is left out, not cut."""
+
+METADATA_NAME = re.compile(r"[a-z][a-z0-9_]*")
+"""What a metadata name must be, wherever metadata is declared, kept or read back."""
+
+
+def valid_metadata(meta: Mapping[str, object]) -> dict[str, str]:
+    """Return the part of a reply's metadata every reader accepts, leaving out the rest.
+
+    A name that is not `METADATA_NAME`, a value that is not text or is over
+    `MAX_METADATA_CHARS`, and every name past the first `MAX_METADATA_NAMES` are left
+    out: a missing name is missing evidence, while one no reader accepts would make the
+    whole kept run unreadable.
+    """
+    kept: dict[str, str] = {}
+    for name, value in meta.items():
+        if len(kept) == MAX_METADATA_NAMES:
+            break
+        if (
+            isinstance(name, str)
+            and METADATA_NAME.fullmatch(name)
+            and isinstance(value, str)
+            and len(value) <= MAX_METADATA_CHARS
+        ):
+            kept[name] = value
+    return kept
+
+
+@runtime_checkable
+class MetadataReportingTransport(Protocol):
+    """A transport that reads metadata from each reply beside its text.
+
+    Optional, as `UsageReportingTransport` is, and separate from it: a transport may read
+    metadata and report no token counts, and claiming usage it cannot report would let a
+    token ceiling through unenforced.
+    """
+
+    def send_with_metadata(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+    ) -> ChatReply:
+        """Send `messages` and return the reply with its metadata, and its usage if known."""
+        raise NotImplementedError
 
 
 @runtime_checkable
@@ -217,29 +423,89 @@ class UsageReportingTransport(Protocol):
         raise NotImplementedError
 
 
-def _read_with_retry(request: Request, ref: str) -> bytes:
-    """Send `request`, retrying only the statuses that mean "ask again".
+def read_with_retry(
+    request: Request,
+    ref: str,
+    *,
+    timeout: float = REQUEST_TIMEOUT_SECONDS,
+    retry_statuses: frozenset[int] = _RETRY_STATUSES,
+    on_status: Callable[[int], None] | None = None,
+) -> bytes:
+    """Send `request`, retrying only `retry_statuses`, the ones that mean "ask again".
+
+    `on_status`, when given, is told the status of the reply returned, for a caller that
+    reads more than "it succeeded" into a `2xx`.
 
     A failure that survives the retries is raised, never swallowed: a rule handed
-    silence here would grade a model it never actually reached. One byte past the
+    silence here would grade a model it never actually reached. An error status is
+    raised with its reply open and unread, for the caller to read and close; every
+    other reply this function caught is closed here. One byte past the
     cap is read so an over-limit reply is reported as truncated rather than
-    mis-diagnosed as non-JSON once `json.loads` chokes on the tail.
+    mis-diagnosed as non-JSON once `json.loads` chokes on the tail. Every retry
+    passes the sending target's meter first, so it counts against the run's
+    request ceiling and in its usage.
+
+    A connect or read timeout, a reset or a reply that is not HTTP raises
+    `EndpointUnreachable` and is not retried; a refused connection or a failed name
+    lookup stays the `URLError` it is.
     """
     for attempt in range(_MAX_ATTEMPTS):
         try:
-            with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:  # noqa: S310
+            with open_unredirected(request, timeout=timeout) as response:
                 raw: bytes = response.read(_MAX_RESPONSE_BYTES + 1)
+                if on_status is not None:
+                    on_status(response.status)
         except HTTPError as exc:
+            refusal = redirect_refusal(exc, ref)
+            if refusal is not None:
+                raise refusal from exc
             last_attempt = attempt == _MAX_ATTEMPTS - 1
-            if exc.code not in _RETRY_STATUSES or last_attempt:
+            if exc.code not in retry_statuses or last_attempt:
                 raise
+            close_http_error(exc)
+            before_retry = _BEFORE_RETRY.get()
+            if before_retry is not None:
+                before_retry()
             _sleep(_retry_delay(attempt, exc.headers.get("Retry-After")))
+        except (OSError, HTTPException) as exc:
+            unreachable = _unreachable(exc, ref, timeout)
+            if unreachable is None:
+                raise
+            raise unreachable from exc
         else:
             return raw
     raise EndpointError(f"exhausted retries for {ref}")  # unreachable: the loop returns or raises
 
 
-def post_json(url: str, payload: dict[str, object], api_key: str | None, ref: str) -> object:
+def _unreachable(
+    exc: OSError | HTTPException, ref: str, timeout: float
+) -> EndpointUnreachable | None:
+    """Return what a send that broke without a status becomes, or None to raise it as it is.
+
+    A refused connection or a failed name lookup is already the `URLError` callers read.
+    """
+    if isinstance(exc, TimeoutError) or (
+        isinstance(exc, URLError) and isinstance(exc.reason, TimeoutError)
+    ):
+        return EndpointUnreachable(f"{ref} did not answer within {timeout:g} seconds")
+    if isinstance(exc, URLError):
+        return None
+    return EndpointUnreachable(f"connection to {ref} failed: {exc}")
+
+
+def endpoint_ref(base_url: str, model: str) -> str:
+    """Name a model at an endpoint the way findings and messages show it."""
+    return f"{display_url(base_url)}#{model}"
+
+
+def post_json(
+    url: str,
+    payload: dict[str, object],
+    api_key: str | None,
+    ref: str,
+    *,
+    timeout: float = REQUEST_TIMEOUT_SECONDS,
+) -> object:
     """POST a JSON payload and return the parsed JSON reply — bounded and fail-closed.
 
     Shared by every built-in transport so the response cap, the truncation guard,
@@ -251,7 +517,7 @@ def post_json(url: str, payload: dict[str, object], api_key: str | None, ref: st
         headers["Authorization"] = f"Bearer {api_key}"
     # S310 x2: the scheme is validated to be http/https in EndpointTarget.__init__.
     request = Request(url, data=body, headers=headers, method="POST")  # noqa: S310
-    raw = _read_with_retry(request, ref)
+    raw = read_with_retry(request, ref, timeout=timeout)
     if len(raw) > _MAX_RESPONSE_BYTES:
         raise EndpointError(f"response from {ref} exceeds {_MAX_RESPONSE_BYTES} bytes; refusing it")
     try:
@@ -263,6 +529,9 @@ def post_json(url: str, payload: dict[str, object], api_key: str | None, ref: st
 class UrllibTransport:
     """Default `ChatTransport` — POSTs to an OpenAI-compatible chat endpoint via stdlib urllib."""
 
+    def __init__(self, *, timeout: float = REQUEST_TIMEOUT_SECONDS) -> None:
+        self._timeout = timeout
+
     def send(
         self,
         base_url: str,
@@ -271,7 +540,7 @@ class UrllibTransport:
         api_key: str | None,
     ) -> str:
         """POST an OpenAI-compatible chat completion and return the reply text."""
-        ref = f"{base_url}#{model}"
+        ref = endpoint_ref(base_url, model)
         payload = post_json(
             f"{base_url}/v1/chat/completions",
             {
@@ -280,6 +549,7 @@ class UrllibTransport:
             },
             api_key,
             ref,
+            timeout=self._timeout,
         )
         return _extract_content(payload, ref=ref)
 
@@ -291,12 +561,13 @@ class UrllibTransport:
         api_key: str | None,
     ) -> ChatReply:
         """POST a chat completion and return the reply with the token counts the server sent."""
-        ref = f"{base_url}#{model}"
+        ref = endpoint_ref(base_url, model)
         payload = post_json(
             f"{base_url}/v1/chat/completions",
             {"model": model, "messages": [wire_message(m) for m in messages]},
             api_key,
             ref,
+            timeout=self._timeout,
         )
         return ChatReply(
             text=_extract_content(payload, ref=ref), usage=extract_token_usage(payload)
@@ -311,7 +582,7 @@ class UrllibTransport:
         tools: Sequence[ToolSpec],
     ) -> ToolCallReply:
         """POST an OpenAI-compatible chat completion offering `tools`; report the tool calls."""
-        ref = f"{base_url}#{model}"
+        ref = endpoint_ref(base_url, model)
         payload = post_json(
             f"{base_url}/v1/chat/completions",
             {
@@ -321,8 +592,9 @@ class UrllibTransport:
             },
             api_key,
             ref,
+            timeout=self._timeout,
         )
-        return _extract_tool_reply(payload, ref=ref)
+        return replace(_extract_tool_reply(payload, ref=ref), usage=extract_token_usage(payload))
 
 
 def extract_token_usage(payload: object) -> TokenUsage | None:
@@ -363,28 +635,50 @@ def _extract_tool_reply(payload: object, *, ref: str) -> ToolCallReply:
         raise EndpointError(f"unexpected response from {ref}: {payload!r}")
     content = message.get("content")
     raw_calls = message.get("tool_calls")
-    calls = tuple(_parse_tool_call(c) for c in raw_calls) if isinstance(raw_calls, list) else ()
+    if raw_calls is None:
+        raw_calls = []
+    if not isinstance(raw_calls, list):
+        raise UnreadableReply(f"the reply from {ref} carries tool_calls that are not a list")
+    calls: list[ToolCall] = []
+    problems: list[str] = []
+    for position, raw in enumerate(raw_calls, start=1):
+        parsed = _parse_tool_call(raw)
+        if isinstance(parsed, ToolCall):
+            calls.append(parsed)
+        else:
+            problems.append(f"tool call {position} {parsed}")
     return ToolCallReply(
         text=content if isinstance(content, str) else None,
-        tool_calls=tuple(c for c in calls if c is not None),
+        tool_calls=tuple(calls),
+        unreadable=f"the reply from {ref} carries {problems[0]}" if problems else None,
     )
 
 
-def _parse_tool_call(raw: object) -> ToolCall | None:
-    """Parse one OpenAI tool-call object, or None if its shape is unusable."""
-    if not isinstance(raw, dict):
-        return None
-    function = raw.get("function")
-    if not isinstance(function, dict):
-        return None
-    name = function.get("name")
-    if not isinstance(name, str):
-        return None
+def _parse_tool_call(raw: object) -> ToolCall | str:
+    """Parse one OpenAI tool-call object, or say why it cannot be read whole.
+
+    Arguments sent as a JSON object instead of the string the format defines are kept as
+    their canonical JSON text, which is what is graded and what is sent back: a call
+    dropped or emptied here would be graded as a call that carried nothing.
+    """
+    function = raw.get("function") if isinstance(raw, dict) else None
+    name = function.get("name") if isinstance(function, dict) else None
+    if not isinstance(raw, dict) or not isinstance(function, dict) or not isinstance(name, str):
+        return "with no readable function name"
     arguments = function.get("arguments")
+    if isinstance(arguments, dict):
+        arguments = json.dumps(arguments, sort_keys=True, ensure_ascii=False)
+    elif arguments is None:
+        arguments = ""
+    elif not isinstance(arguments, str):
+        return (
+            f"whose arguments are a {type(arguments).__name__}, neither the JSON text nor "
+            f"the object a call carries"
+        )
     call_id = raw.get("id")
     return ToolCall(
         name=name,
-        arguments=arguments if isinstance(arguments, str) else "",
+        arguments=arguments,
         id=call_id if isinstance(call_id, str) else "",
     )
 
@@ -428,7 +722,11 @@ def _extract_content(payload: object, *, ref: str) -> str:
 
 
 class EndpointTarget(Target):
-    """A live model reachable over an OpenAI-compatible chat API."""
+    """A live model reachable over an OpenAI-compatible chat API.
+
+    With a keeper attached (`keep_exchanges`), each rule's view (`for_rule`) keeps the chat
+    exchanges it completes; the endpoint itself, planted views and tool offers keep nothing.
+    """
 
     kind = TargetKind.ENDPOINT
 
@@ -446,9 +744,8 @@ class EndpointTarget(Target):
     ) -> None:
         scheme = urlsplit(base_url).scheme
         if scheme not in _ALLOWED_SCHEMES:
-            raise EndpointError(
-                f"unsupported URL scheme {scheme!r} in {base_url!r}: expected http or https"
-            )
+            # Never repeated: in `user:pw@host:8000` the "scheme" is the user name.
+            raise EndpointError("the endpoint URL needs an http or https scheme")
         # `send` re-appends `/v1/chat/completions`, so strip a trailing `/v1` the
         # user included (the conventional OpenAI base) to avoid `/v1/v1/...`. Other
         # base paths (e.g. `/api`) are left intact.
@@ -457,6 +754,7 @@ class EndpointTarget(Target):
         self._model = model
         self._api_key = api_key
         self._system_prompt = system_prompt
+        self._provider = provider if transport is None else None
         if transport is None:
             # Lazy import breaks the endpoint<->providers cycle and keeps any heavy
             # backend a provider might need out of the registry-walk path.
@@ -477,6 +775,8 @@ class EndpointTarget(Target):
             # shared meter was handed, leaving the run bounded only for as long as
             # nobody reorders the runner's call to restore them.
             self.apply_budgets(budgets)
+        self._keeper: ExchangeKeeper | None = None
+        self._kept_rule: str | None = None
 
     def capabilities(self) -> set[Capability]:
         """Declare CHAT, plus PLANT_SYSTEM_PROMPT and CALL_TOOLS when supported."""
@@ -486,6 +786,10 @@ class EndpointTarget(Target):
         if isinstance(self._transport, ToolCallingTransport):
             caps.add(Capability.CALL_TOOLS)
         return caps
+
+    def speaks(self) -> frozenset[WireProtocol]:
+        """Speak chat, whatever transport carries it."""
+        return frozenset({WireProtocol.CHAT})
 
     @property
     def transport(self) -> ChatTransport:
@@ -503,11 +807,31 @@ class EndpointTarget(Target):
         return self._model
 
     @property
+    def provider(self) -> str | None:
+        """The built-in wire protocol this endpoint speaks; None when a transport was supplied."""
+        return self._provider
+
+    @property
+    def meter(self) -> UsageMeter:
+        """The meter every request of this endpoint is billed to, shared with its views."""
+        return self._meter
+
+    @property
+    def system_prompt(self) -> str | None:
+        """The system prompt this endpoint sends, canaries planted on this view included."""
+        return self._system_prompt
+
+    @property
     def ref(self) -> str:
         """The endpoint and model under test, as it appears in findings."""
-        return f"{self._base_url}#{self._model}"
+        return endpoint_ref(self._base_url, self._model)
 
-    def planting(self, system_prompt: str) -> "EndpointTarget":
+    def sent_secrets(self) -> tuple[str, ...]:
+        """Return the API key this endpoint sends and whatever its transport declares sending."""
+        key = () if self._api_key is None else (self._api_key,)
+        return (*key, *secrets_sent_by(self._transport))
+
+    def planting(self, system_prompt: str) -> Self:
         """Return this endpoint with an additional prompt and the same run meter.
 
         A probe builds one view per random canary. Sharing the transport is
@@ -519,14 +843,46 @@ class EndpointTarget(Target):
             if self._system_prompt is None
             else f"{self._system_prompt}\n{system_prompt}"
         )
-        return EndpointTarget(
-            self._base_url,
-            self._model,
-            api_key=self._api_key,
-            system_prompt=planted,
-            transport=self._transport,
-            meter=self._meter,
-        )
+        return self._sibling(planted)
+
+    def keep_exchanges(self, keeper: "ExchangeKeeper") -> None:
+        """Keep, in `keeper`, every chat exchange a rule's view of this endpoint completes.
+
+        Attached once: a second keeper would split one run's exchanges between two places.
+        """
+        if self._keeper is not None:
+            raise ValueError(f"{self.ref} already keeps its exchanges in a keeper")
+        self._keeper = keeper
+
+    def stop_keeping(self) -> None:
+        """Detach the keeper, so a run refused before sending leaves the target as it was."""
+        self._keeper = None
+
+    def for_rule(self, rule_id: str) -> Self:
+        """Return the view `rule_id` sends through: this endpoint, keeping what the rule asks.
+
+        Without a keeper this is the endpoint itself. With one, the view shares the meter,
+        the ceilings, the transport and the system prompt, so usage and budgets stay those
+        of the whole run.
+        """
+        if self._keeper is None:
+            return self
+        view = self._sibling(self._system_prompt)
+        view._keeper = self._keeper  # noqa: SLF001 — a view of the same class
+        view._kept_rule = rule_id  # noqa: SLF001
+        return view
+
+    def _sibling(self, system_prompt: str | None) -> Self:
+        """Build another view of this endpoint, on the same meter and transport, keeping nothing.
+
+        Copied rather than constructed, so a subclass's view keeps the subclass, its
+        overrides and its own state; only what makes it a view is reset.
+        """
+        view = copy.copy(self)
+        view._system_prompt = system_prompt  # noqa: SLF001 — a view of the same class
+        view._keeper = None  # noqa: SLF001
+        view._kept_rule = None  # noqa: SLF001
+        return view
 
     def apply_budgets(self, budgets: Budgets) -> None:
         """Adopt these ceilings, refusing a token ceiling this transport cannot enforce.
@@ -553,21 +909,69 @@ class EndpointTarget(Target):
         return self._meter.snapshot()
 
     def chat(self, messages: Sequence[ChatMessage]) -> str:
-        """Send `messages`, prepending the planted system prompt when one is set."""
+        """Send `messages`, prepending the planted system prompt when one is set.
+
+        A rule's view with a keeper keeps the messages as passed here, without the system
+        prompt, and the reply, once the reply has arrived.
+        """
+        return self._reply(messages).text
+
+    def chat_reply(self, messages: Sequence[ChatMessage]) -> ChatReply:
+        """Send `messages` as `chat` does, and return the reply with its metadata.
+
+        Kept exactly as `chat` keeps it, the metadata included. A subclass that overrides
+        `chat` is answered through its `chat`, with no metadata, so a reply it reshapes is
+        never bypassed.
+        """
+        if type(self).chat is not EndpointTarget.chat:
+            return ChatReply(text=self.chat(messages))
+        return self._reply(messages)
+
+    def _reply(self, messages: Sequence[ChatMessage]) -> ChatReply:
+        """Send and keep one exchange; a declined request is kept before it is raised."""
+        try:
+            reply = self._send_chat(messages)
+        except RequestDeclined as declined:
+            declined.meta = valid_metadata(declined.meta)
+            if self._keeper is not None and self._kept_rule is not None:
+                self._keeper.keep(
+                    self._kept_rule,
+                    messages,
+                    None,
+                    declined=declined.decline,
+                    meta=declined.meta,
+                )
+            raise
+        if self._keeper is not None and self._kept_rule is not None:
+            self._keeper.keep(self._kept_rule, messages, reply.text, meta=reply.meta)
+        return reply
+
+    def _send_chat(self, messages: Sequence[ChatMessage]) -> ChatReply:
         history = self._with_system_prompt(messages)
-        self._meter.reserve()
-        if isinstance(self._transport, UsageReportingTransport):
-            reply = self._transport.send_reporting_usage(
-                self._base_url, self._model, history, self._api_key
+        transport = self._transport
+        if isinstance(transport, MetadataReportingTransport):
+            reply = self._spend(
+                lambda: transport.send_with_metadata(
+                    self._base_url, self._model, history, self._api_key
+                )
             )
-            self._meter.record(reply.usage)
-            return reply.text
-        text = self._transport.send(self._base_url, self._model, history, self._api_key)
-        # Recorded with no token counts rather than not recorded: the request was
-        # sent and cost something, and the run should say it does not know how
-        # much instead of implying it was free.
-        self._meter.record(None)
-        return text
+        elif isinstance(transport, UsageReportingTransport):
+            reply = self._spend(
+                lambda: transport.send_reporting_usage(
+                    self._base_url, self._model, history, self._api_key
+                )
+            )
+        else:
+            reply = ChatReply(
+                text=self._spend(
+                    lambda: transport.send(self._base_url, self._model, history, self._api_key)
+                )
+            )
+        # A reply without counts is recorded with none rather than not recorded: the
+        # request was sent and cost something, and the run should say it does not know
+        # how much instead of implying it was free.
+        self._meter.record_reply(reply.usage)
+        return replace(reply, meta=valid_metadata(reply.meta))
 
     def offer_tools(
         self, messages: Sequence[ChatMessage], tools: Sequence[ToolSpec]
@@ -577,17 +981,41 @@ class EndpointTarget(Target):
         Requires a tool-calling transport (the `CALL_TOOLS` capability); the runner
         only runs a tool-using rule against a target that has it.
         """
-        if not isinstance(self._transport, ToolCallingTransport):
+        transport = self._transport
+        if not isinstance(transport, ToolCallingTransport):
             raise EndpointError(f"transport for {self.ref} does not support tool calling")
-        self._meter.reserve()
-        reply = self._transport.send_tools(
-            self._base_url, self._model, self._with_system_prompt(messages), self._api_key, tools
+        history = self._with_system_prompt(messages)
+        reply = self._spend(
+            lambda: transport.send_tools(self._base_url, self._model, history, self._api_key, tools)
         )
         # An agent probe spends most of its budget here, not in `chat`. Counting
         # only one of the two paths would under-report the most expensive thing
         # Guardana does.
-        self._meter.record(None)
+        self._meter.record_reply(reply.usage)
         return reply
+
+    def _spend(self, send: Callable[[], _T]) -> _T:
+        """Send one request through the meter, counting every attempt it takes.
+
+        An attempt that fails is counted too: it reached the endpoint, and a run it
+        aborted must not report having spent less than it did. A declined request is
+        counted the same way, once.
+        """
+        self._meter.reserve()
+        token = _BEFORE_RETRY.set(self._before_retry)
+        try:
+            return send()
+        except BudgetExhausted:
+            raise
+        except Exception:
+            self._meter.record(None)
+            raise
+        finally:
+            _BEFORE_RETRY.reset(token)
+
+    def _before_retry(self) -> None:
+        self._meter.record(None)
+        self._meter.reserve()
 
     def _with_system_prompt(self, messages: Sequence[ChatMessage]) -> list[ChatMessage]:
         if self._system_prompt is None:

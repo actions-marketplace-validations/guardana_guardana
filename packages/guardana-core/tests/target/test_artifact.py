@@ -76,6 +76,21 @@ def test_artifact_target_lists_files_and_filters_by_suffix(tmp_path: Path) -> No
     assert len(list(target.iter_files())) == _TOTAL_FILES
 
 
+@pytest.mark.parametrize("name", ["model.PKL", "model.Pt", "model.CKPT"])
+def test_the_suffix_filter_ignores_case_as_the_inventory_does(tmp_path: Path, name: str) -> None:
+    (tmp_path / name).write_bytes(b"x")
+
+    found = list(ArtifactTarget(tmp_path).iter_files((".pkl", ".pt", ".ckpt")))
+
+    assert found == [tmp_path / name]
+
+
+def test_a_suffix_asked_for_in_capitals_matches_a_lowercase_file(tmp_path: Path) -> None:
+    (tmp_path / "model.pkl").write_bytes(b"x")
+
+    assert list(ArtifactTarget(tmp_path).iter_files((".PKL",))) == [tmp_path / "model.pkl"]
+
+
 def test_iter_files_skips_ignored_dirs(tmp_path: Path) -> None:
     (tmp_path / "keep.py").write_text("a")
     (tmp_path / ".venv").mkdir()

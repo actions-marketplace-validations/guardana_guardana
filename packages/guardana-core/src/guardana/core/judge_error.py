@@ -1,0 +1,394 @@
+"""Correct a judge-graded rate for the judge's measured error, or say why it cannot be.
+
+A rate graded by a model inherits the model's mistakes: a judge that misses attacks makes
+the system look safer than it is, and every number computed from its verdicts is still
+arithmetically right. The correction uses the judge's sensitivity and specificity from
+`guardana calibrate`, applies to rates and never to one case's verdict, and refuses — naming
+the missing condition — whenever the calibration cannot be trusted to describe this run.
+"""
+
+import math
+from collections.abc import Collection, Mapping, Sequence
+from dataclasses import dataclass
+
+from guardana.core.calibration.report import class_caveat
+from guardana.core.evaluator.base import Evaluator
+from guardana.core.manifest.records import (
+    MIN_YOUDEN,
+    CalibrationRecord,
+    CorrectionStatus,
+    JudgeCorrection,
+    SuiteCorrection,
+    TrialSummary,
+)
+from guardana.core.trials import wilson_interval
+
+_NOT_MEASURED = "judge error not measured: "
+"""Opens every reason about the calibration, so the line reads as the label it prints under."""
+
+
+@dataclass(frozen=True, slots=True)
+class Grading:
+    """Who graded one rule's recorded trials, and which of them are judges."""
+
+    assessors: tuple[str, ...]
+    judges: tuple[str, ...]
+    """The assessors whose verdict is an opinion rather than a computation."""
+
+
+@dataclass(frozen=True, slots=True)
+class _Measured:
+    """The part of a usable calibration the correction computes with."""
+
+    dataset_digest: str
+    positives: int
+    negatives: int
+    sensitivity: float
+    specificity: float
+
+
+def grading_of(
+    rule_id: str,
+    rule_deterministic: bool,
+    assessors: Collection[str],
+    evaluators: Mapping[str, Evaluator],
+) -> Grading:
+    """Classify the assessors a rule actually recorded, failing closed.
+
+    Read from the recorded assessments rather than the evaluators a rule declares: a rule
+    can declare `canary` and still grade some cases with a judge. An assessor is
+    deterministic only when it is a registered evaluator declaring `deterministic = True`,
+    or the rule's own id on a rule declaring the same; anything else is a judge.
+    """
+    ordered = tuple(sorted(set(assessors)))
+    judges = tuple(
+        assessor
+        for assessor in ordered
+        if not _is_deterministic(assessor, rule_id, rule_deterministic, evaluators)
+    )
+    return Grading(assessors=ordered, judges=judges)
+
+
+def correct(
+    summary: TrialSummary,
+    grading: Grading,
+    evaluators: Mapping[str, Evaluator],
+    calibrations: Mapping[str, CalibrationRecord],
+    starter_digest: str | None = None,
+) -> JudgeCorrection:
+    """Correct what `summary` states for the judge's measured error, or record why not.
+
+    `calibrations` is keyed by the id an evaluator is registered under, as the calibration
+    store is. `starter_digest` is the digest of the bundled starter corpus, compared as a
+    backstop to the flag a calibration carries.
+    """
+    if not grading.judges:
+        return JudgeCorrection(status=CorrectionStatus.DETERMINISTIC)
+    if len(grading.assessors) > 1:
+        return _uncorrected(
+            None, f"multiple assessors graded this rule: {', '.join(grading.assessors)}"
+        )
+    assessor = grading.judges[0]
+    usable = _usable(assessor, evaluators, calibrations, starter_digest)
+    if isinstance(usable, str):
+        return _uncorrected(assessor, _NOT_MEASURED + usable)
+    observed = _observed(summary)
+    if observed is None:
+        return _uncorrected(assessor, _no_rate(summary))
+    return _apply(observed, assessor, usable)
+
+
+def correct_pass_rate(  # noqa: PLR0913 — the four observed rates and what grades them
+    grading: Grading,
+    evaluators: Mapping[str, Evaluator],
+    calibrations: Mapping[str, CalibrationRecord],
+    *,
+    worst: float,
+    best: float,
+    low: float,
+    high: float,
+    starter_digest: str | None = None,
+) -> SuiteCorrection:
+    """Correct a suite's pass rates for the judge's measured error, or record why not.
+
+    `worst` and `best` are the pass rates with every ungraded trial counted failed and
+    passed; `low` and `high` the 95% limits around them. The correction runs on the failure
+    share, which is what sensitivity and specificity describe, and returns pass rates. It
+    refuses everything `correct` refuses and, because a gate reads the result, also a
+    calibration whose 95% box reaches a judge that cannot tell a pass from a fail.
+    """
+    if not grading.judges:
+        return SuiteCorrection(status=CorrectionStatus.DETERMINISTIC)
+    if len(grading.assessors) > 1:
+        return _suite_uncorrected(
+            None, f"multiple assessors graded this suite: {', '.join(grading.assessors)}"
+        )
+    assessor = grading.judges[0]
+    usable = _usable(assessor, evaluators, calibrations, starter_digest)
+    if isinstance(usable, str):
+        return _suite_uncorrected(assessor, _NOT_MEASURED + usable)
+    failed_high = 1.0 - low
+    floor = _floor_refusal(failed_high, usable.specificity)
+    if floor is not None:
+        return _suite_uncorrected(assessor, floor)
+    corners = _corners(usable)
+    weakest = min(se + sp - 1.0 for se, sp in corners)
+    if weakest <= 0.0:
+        sensitivity = min(se for se, _sp in corners)
+        specificity = min(sp for _se, sp in corners)
+        return _suite_uncorrected(
+            assessor,
+            _NOT_MEASURED + f"at the edge of its 95% calibration intervals (sensitivity "
+            f"{sensitivity:.2f}, specificity {specificity:.2f}), the judge cannot distinguish "
+            f"pass from fail",
+        )
+    se, sp = usable.sensitivity, usable.specificity
+    return SuiteCorrection(
+        status=CorrectionStatus.CORRECTED,
+        assessor=assessor,
+        worst=1.0 - _clip(rogan_gladen(1.0 - worst, se, sp)),
+        best=1.0 - _clip(rogan_gladen(1.0 - best, se, sp)),
+        low=1.0 - _clip(_extreme(failed_high, corners, upper=True)),
+        high=1.0 - _clip(_extreme(1.0 - high, corners, upper=False)),
+        sensitivity=se,
+        specificity=sp,
+        dataset_digest=usable.dataset_digest,
+        positives=usable.positives,
+        negatives=usable.negatives,
+    )
+
+
+def rogan_gladen(rate: float, sensitivity: float, specificity: float) -> float:
+    """Return the Rogan-Gladen estimate of the true rate behind an observed one, unclipped."""
+    return (rate + specificity - 1.0) / (sensitivity + specificity - 1.0)
+
+
+def _is_deterministic(
+    assessor: str, rule_id: str, rule_deterministic: bool, evaluators: Mapping[str, Evaluator]
+) -> bool:
+    _key, evaluator = _resolve(assessor, evaluators)
+    if evaluator is not None:
+        return getattr(evaluator, "deterministic", False) is True
+    return assessor == rule_id and rule_deterministic is True
+
+
+def _resolve(
+    assessor: str, evaluators: Mapping[str, Evaluator]
+) -> tuple[str | None, Evaluator | None]:
+    """Find the registered evaluator an assessor id names: exactly, or before its `@version`."""
+    if assessor in evaluators:
+        return assessor, evaluators[assessor]
+    base, versioned, _version = assessor.partition("@")
+    if versioned and base in evaluators:
+        return base, evaluators[base]
+    return None, None
+
+
+def _usable(
+    assessor: str,
+    evaluators: Mapping[str, Evaluator],
+    calibrations: Mapping[str, CalibrationRecord],
+    starter_digest: str | None,
+) -> "_Measured | str":
+    """Return the calibration's per-class error for `assessor`, or why none can be used."""
+    key, evaluator = _resolve(assessor, evaluators)
+    calibration = calibrations.get(key) if key is not None else None
+    if key is None or calibration is None:
+        return f"no calibration recorded for {assessor}"
+    lacking = f"{key} calibration lacks per-class counts"
+    if (
+        calibration.assessor is None
+        or calibration.dataset_digest is None
+        or calibration.positives is None
+        or calibration.negatives is None
+        or calibration.positives_inconclusive is None
+        or calibration.negatives_inconclusive is None
+    ):
+        return _without_counts(key, calibration) or lacking
+    refusal = (
+        _refusal(assessor, evaluator, calibration, starter_digest)
+        or class_caveat(
+            "positives", "sensitivity", calibration.positives, calibration.positives_inconclusive
+        )
+        or class_caveat(
+            "negatives", "specificity", calibration.negatives, calibration.negatives_inconclusive
+        )
+    )
+    if refusal:
+        return refusal
+    sensitivity, specificity = calibration.sensitivity, calibration.specificity
+    if sensitivity is None or specificity is None:
+        return lacking
+    return _youden_refusal(sensitivity + specificity - 1.0) or _Measured(
+        dataset_digest=calibration.dataset_digest,
+        positives=calibration.positives,
+        negatives=calibration.negatives,
+        sensitivity=sensitivity,
+        specificity=specificity,
+    )
+
+
+def _without_counts(key: str, calibration: CalibrationRecord) -> str | None:
+    """Say why a calibration has no per-class counts, promising a rerun only where it helps.
+
+    `starter_corpus` has been recorded since the counts were, so an entry without it
+    predates them. An entry with it and no assessor was measured over verdicts carrying
+    several assessor ids, which `calibrate --record` never counts per class.
+    """
+    if calibration.starter_corpus is None:
+        return (
+            f"{key} calibration predates per-class counts; rerun guardana calibrate --record, "
+            f"which records them when every verdict carries one assessor id"
+        )
+    if calibration.assessor is None:
+        return (
+            f"{key} calibration has no per-class counts: its verdicts carried several assessor "
+            f"ids, and one sensitivity and specificity cannot describe them together"
+        )
+    return None
+
+
+def _refusal(
+    assessor: str,
+    evaluator: Evaluator | None,
+    calibration: CalibrationRecord,
+    starter_digest: str | None,
+) -> str | None:
+    """Name the first condition that keeps `calibration` from describing this run, or None."""
+    if calibration.assessor != assessor:
+        return f"calibration is for {calibration.assessor}; run was graded by {assessor}"
+    if calibration.starter_corpus is True or (
+        starter_digest is not None and calibration.dataset_digest == starter_digest
+    ):
+        return (
+            "bundled starter corpus is a demonstration corpus with no real deployment; "
+            "it cannot correct this run"
+        )
+    judge = getattr(evaluator, "judge_identity", None) if evaluator is not None else None
+    if (calibration.judge_identity is not None or judge is not None) and (
+        calibration.judge_identity != judge
+    ):
+        return (
+            f"judge identity changed: calibrated as {calibration.judge_identity or 'not stated'}"
+            f", run as {judge or 'not stated'}"
+        )
+    return None
+
+
+def _youden_refusal(youden: float) -> str | None:
+    if youden < MIN_YOUDEN:
+        return f"Youden's J is {youden:.2f}, below the {MIN_YOUDEN} correction threshold"
+    return None
+
+
+def _observed(summary: TrialSummary) -> tuple[float, float, float] | None:
+    """Return (rate, low, high) of the rate `summary` states, or None when it states none.
+
+    Only a failed case or a stated bound is a rate here. Correcting the raw counts of any
+    other summary would state a bound the summary deliberately withheld.
+    """
+    decided = summary.cases - summary.cases_incomplete
+    if summary.cases_failed:
+        low, high = wilson_interval(summary.cases_failed, decided)
+        return summary.cases_failed / decided, low, high
+    if summary.bound is not None:
+        return 0.0, 0.0, summary.bound
+    return None
+
+
+def _no_rate(summary: TrialSummary) -> str:
+    if summary.cases_incomplete:
+        return (
+            f"not clean: {summary.cases_incomplete} of {summary.cases} cases incomplete, "
+            f"a trial could not be graded"
+        )
+    return "reported finding is not shown by the recorded cases"
+
+
+def _apply(
+    observed: tuple[float, float, float], assessor: str, measured: _Measured
+) -> JudgeCorrection:
+    """Correct the observed interval, or refuse when the run contradicts the calibration.
+
+    Each end of the interval the uncorrected line prints is corrected at the least
+    favourable corner of the sensitivity and specificity 95% Wilson intervals, so the
+    calibration's own sampling error widens the result: a symmetric spread understates a
+    ratio whose denominator was measured on a few dozen samples. The upper limit is never
+    below the Rogan-Gladen image of the raw one, and near a judge's false-alarm floor that
+    image can still sit far below the raw bound.
+    """
+    rate, low_seen, high_seen = observed
+    sensitivity, specificity = measured.sensitivity, measured.specificity
+    floor = _floor_refusal(high_seen, specificity)
+    if floor is not None:
+        return _uncorrected(assessor, floor)
+    corners = _corners(measured)
+    return JudgeCorrection(
+        status=CorrectionStatus.CORRECTED,
+        assessor=assessor,
+        rate=_clip(rogan_gladen(rate, sensitivity, specificity)),
+        low=_clip(_extreme(low_seen, corners, upper=False)) if rate > 0.0 else 0.0,
+        high=_clip(_extreme(high_seen, corners, upper=True)),
+        sensitivity=sensitivity,
+        specificity=specificity,
+        dataset_digest=measured.dataset_digest,
+        positives=measured.positives,
+        negatives=measured.negatives,
+    )
+
+
+def _floor_refusal(high_seen: float, specificity: float) -> str | None:
+    """Refuse a correction the run's failures give nothing to rest on.
+
+    At or below the false-alarm floor the correction would rest on the calibration alone,
+    which says nothing about this run's cases.
+    """
+    if high_seen > 1.0 - specificity:
+        return None
+    return (
+        _NOT_MEASURED + f"observed fail share ≤ {_percent_up(high_seen)}% is at or below "
+        f"calibrated false-alarm rate {_percent_up(1.0 - specificity)}%"
+    )
+
+
+def _corners(measured: _Measured) -> list[tuple[float, float]]:
+    """Return the corners of the sensitivity and specificity 95% Wilson intervals."""
+    sensitivities = wilson_interval(
+        round(measured.sensitivity * measured.positives), measured.positives
+    )
+    specificities = wilson_interval(
+        round(measured.specificity * measured.negatives), measured.negatives
+    )
+    return [(se, sp) for se in sensitivities for sp in specificities]
+
+
+def _extreme(rate: float, corners: Sequence[tuple[float, float]], *, upper: bool) -> float:
+    """Correct `rate` at every corner and keep the least favourable result.
+
+    Rogan-Gladen is linear-fractional in sensitivity and specificity, so over a box its
+    extremes sit at the corners. A corner where sensitivity + specificity - 1 is not
+    positive cannot tell a success from a false alarm, and then nothing is bounded.
+    """
+    corrected = []
+    for sensitivity, specificity in corners:
+        if sensitivity + specificity - 1.0 <= 0.0:
+            return 1.0 if upper else 0.0
+        corrected.append(rogan_gladen(rate, sensitivity, specificity))
+    return max(corrected) if upper else min(corrected)
+
+
+def _uncorrected(assessor: str | None, reason: str) -> JudgeCorrection:
+    return JudgeCorrection(status=CorrectionStatus.UNCORRECTED, assessor=assessor, reason=reason)
+
+
+def _suite_uncorrected(assessor: str | None, reason: str) -> SuiteCorrection:
+    return SuiteCorrection(status=CorrectionStatus.UNCORRECTED, assessor=assessor, reason=reason)
+
+
+def _clip(value: float) -> float:
+    return min(1.0, max(0.0, value))
+
+
+def _percent_up(value: float) -> str:
+    """Render a share as a percentage rounded up at one decimal."""
+    return f"{math.ceil(value * 1000 - 1e-9) / 10:.1f}".removesuffix(".0")

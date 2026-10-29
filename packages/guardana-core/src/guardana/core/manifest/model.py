@@ -3,11 +3,19 @@ from datetime import datetime
 
 from guardana.core.manifest.coverage import CoverageRecord
 from guardana.core.manifest.identity import DeploymentRef, RunSource, TargetIdentity, ToolInfo
-from guardana.core.manifest.records import EvaluatorRecord, ResultSummary, RuleRecord
+from guardana.core.manifest.records import (
+    EvaluatorRecord,
+    ExchangesRecord,
+    FixturesRecord,
+    RecipeRecord,
+    RecordingRecord,
+    ResultSummary,
+    RuleRecord,
+)
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
 from guardana.core.manifest.usage import RunUsage
 
-MANIFEST_SCHEMA_VERSION = 7
+MANIFEST_SCHEMA_VERSION = 18
 """Version of the run document, moved independently of the CLI.
 
 A run written by 0.7.3 and one written by 0.9.0 are the same document if the
@@ -30,6 +38,49 @@ widened in place.
 Version 7 records repeated trials: `execution.trials`, `rules[].trial_summary` and
 `assessments[].trial`, and renames `rules[].trials` to `declared_requests` so the
 count of declared model calls no longer shares a name with the trials per case.
+
+Version 8 records whether each repeating rule's rate was corrected for its judge's
+error (`rules[].trial_summary.correction`) and the per-class calibration that
+correction reads (`evaluators[].calibration`).
+
+Version 9 records what a suite measured over its dataset and what its gate concluded
+(`rules[].suite`), with the pass rate corrected for its judge's error or why not.
+
+Version 10 records what the judges configured under `evaluators:` spent (`usage.judge`),
+apart from the target's counts, and whether a judge's own ceiling stopped the run.
+
+Version 11 records the digest of the document a run read, and what it covers
+(`target.document`).
+
+Version 12 records what a file run listed and excluded (`scope`), the plugin trust in
+force (`configuration.plugins`) and the `unexamined_component` shortfall kind.
+
+Version 13 records which execution a run graded apart from how it graded it: the
+exchanges a probe kept (`exchanges`), the recording a graded run answered from
+(`recording`), the judge identity each evaluator stated (`evaluators[].judge`), why a
+trial went unmeasured (`assessments[].reason`) and the `not_recorded` skip reason.
+
+Version 14 records the recipe a run was started from and what it declared answered
+(`recipe`), the provider wire the run spoke (`configuration.provider`) and the
+`incomplete_recording` and `demanded_check` shortfall kinds.
+
+Version 15 records the fixtures file a run was given (`fixtures`), the
+`seed_not_reached` shortfall kind and whether each evaluator is deterministic
+(`evaluators[].deterministic`).
+
+Version 16 records a run its target stopped (`stopped_by: target_unavailable`), the
+`empty_target` and `ungraded_cases` shortfall kinds, a case the application declined
+(`assessments[].reason: target_declined`), a recipe that named an installed target
+(`recipe.source: target`) and the pace requests were held to
+(`execution.max_requests_per_minute`).
+
+Version 17 records a rule the target does not offer (`rules_skipped[].reason:
+not_offered`) and a run whose target changed under it (`stopped_by: target_changed`).
+
+Version 18 records the file each exclude pattern was read from (`scope.excludes[].file`),
+the model files the scanned target's ignore file matched and the scan read anyway
+(`scope.kept_models`) and the model files named inside the directories every scan skips
+(`scope.skipped_models`).
 """
 
 
@@ -69,6 +120,18 @@ class RunManifest:
     deployment: DeploymentRef = field(default_factory=DeploymentRef)
     privacy: PrivacyRecord = field(default_factory=PrivacyRecord)
     coverage: CoverageRecord = field(default_factory=CoverageRecord)
+    exchanges: ExchangesRecord | None = None
+    """The exchanges this probe kept in its sidecar; None when it kept none."""
+
+    recording: RecordingRecord | None = None
+    """The recording this run graded instead of calling a target; None for a live run."""
+
+    recipe: RecipeRecord | None = None
+    """The recipe this run was started from; None for a run started without one."""
+
+    fixtures: FixturesRecord | None = None
+    """The fixtures file this run was given; None for a run given none."""
+
     schema_version: int = MANIFEST_SCHEMA_VERSION
     migrated_from: int | None = None
     """Which older schema this document was migrated from, if any.

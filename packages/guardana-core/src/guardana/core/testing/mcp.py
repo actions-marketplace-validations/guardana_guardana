@@ -18,7 +18,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 from urllib.parse import urlsplit
 
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import DiscoveryScope, RawReply
 from guardana.core.target._mcp_wire import (
     LEGACY_VERSION,
     UNSUPPORTED_PROTOCOL_VERSION,
@@ -32,20 +32,25 @@ _AUTHORIZATION_METADATA_PATHS = (
     "/.well-known/openid-configuration",
 )
 _METHOD_NOT_FOUND = -32601
+_INVALID_PARAMS = -32602
 
 
 class ScriptedMcpServer:
     """An MCP server double reached the way the real one is: through a sender.
 
-    Pass an instance as `McpServerTarget(..., sender=server)` and every request the
-    target would have put on the network arrives here instead.
+    Pass an instance as both senders, `McpServerTarget(..., sender=server,
+    discovery_sender=server)`, and every request the target would have put on the
+    network arrives here instead — the server's own requests and the discovery
+    documents alike.
 
     ```python
     open_server = ScriptedMcpServer(url, tools=[{"name": "read", "description": "…"}])
-    assert list(rule.run(McpServerTarget(url, sender=open_server), RuleContext()))
+    target = McpServerTarget(url, sender=open_server, discovery_sender=open_server)
+    assert list(rule.run(target, RuleContext()))
 
     guarded = ScriptedMcpServer(url, credential="s3cret", tools=[…])
-    assert not list(rule.run(McpServerTarget(url, sender=guarded), RuleContext()))
+    target = McpServerTarget(url, sender=guarded, discovery_sender=guarded)
+    assert not list(rule.run(target, RuleContext()))
     ```
 
     `protocol_versions` chooses the era. Left unset, this is a **legacy** server: it
@@ -54,6 +59,30 @@ class ScriptedMcpServer:
     advertises exactly those revisions through `server/discover` — one modern entry
     for a modern-only server, both for a dual-era one, and a revision this client
     does not speak to exercise the case where there is no conversation to have.
+
+    `discovers` is what `server/discover` lists when it differs from what the server
+    answers: a server listing only modern revisions while still answering `initialize`
+    is dual-era, and only the legacy handshake tells.
+
+    `tasks` are the task ids `tasks/list` answers with; left unset, the method is unknown.
+    `tasks_owner_bound` shows them only to a caller presenting `credential`, and
+    `tasks_unguarded` answers the listing without asking who is calling.
+    `task_declaration` is what the server declares: `"listing"` (`tasks.list` in its
+    handshake capabilities), `"unlisted"` (`tasks` without `list`) or `"extension"` (the
+    modern tasks extension in `server/discover`). `server_info` is the identity reported
+    in both eras.
+
+    `tool_pages` splits the listing into pages joined by `nextCursor`, in place of `tools`;
+    a cursor it never handed out is answered as invalid params. `tasks_next_cursor` is the
+    `nextCursor` every `tasks/list` result names, for a listing with more pages than one.
+    `expire_session_on_page` answers the listing page at that index with `404` once, to a
+    request carrying a session id, the way a server whose session expired mid-listing does.
+
+    `resource_metadata_body` is served as given in place of `resource_metadata`, for a
+    document that came back but is not JSON, or not a JSON object.
+    `resource_metadata_status` and `authorization_metadata_status` answer that document's
+    addresses with the status and an empty body instead, for a server that is unavailable,
+    rate-limited or refusing there.
     """
 
     def __init__(  # noqa: PLR0913 — one keyword per behaviour a real server varies in
@@ -67,10 +96,22 @@ class ScriptedMcpServer:
         session_ids: Sequence[str] = (),
         challenge: str | None = None,
         resource_metadata: Mapping[str, Any] | None = None,
+        resource_metadata_body: bytes | None = None,
         authorization_metadata: Mapping[str, Any] | None = None,
+        resource_metadata_status: int | None = None,
+        authorization_metadata_status: int | None = None,
         protocol_versions: Sequence[str] | None = None,
         cache_scope: str | None = None,
         ttl_ms: int | None = None,
+        discovers: Sequence[str] | None = None,
+        tasks: Sequence[str] | None = None,
+        tasks_owner_bound: bool = False,
+        tasks_unguarded: bool = False,
+        task_declaration: str | None = None,
+        server_info: Mapping[str, Any] | None = None,
+        tool_pages: Sequence[Sequence[Mapping[str, Any]]] | None = None,
+        tasks_next_cursor: str | None = None,
+        expire_session_on_page: int | None = None,
     ) -> None:
         self.url = url
         self.tools = list(tools)
@@ -80,10 +121,23 @@ class ScriptedMcpServer:
         self.session_ids = list(session_ids)
         self.challenge = challenge
         self.resource_metadata = resource_metadata
+        self.resource_metadata_body = resource_metadata_body
         self.authorization_metadata = authorization_metadata
+        self.resource_metadata_status = resource_metadata_status
+        self.authorization_metadata_status = authorization_metadata_status
         self.protocol_versions = list(protocol_versions) if protocol_versions is not None else None
         self.cache_scope = cache_scope
         self.ttl_ms = ttl_ms
+        self.discovers = list(discovers) if discovers is not None else None
+        self.tasks = list(tasks) if tasks is not None else None
+        self.tasks_owner_bound = tasks_owner_bound
+        self.tasks_unguarded = tasks_unguarded
+        self.task_declaration = task_declaration
+        self.server_info = dict(server_info or {"name": "scripted", "version": "0"})
+        self.tool_pages = [list(page) for page in tool_pages] if tool_pages is not None else None
+        self.tasks_next_cursor = tasks_next_cursor
+        self.expire_session_on_page = expire_session_on_page
+        self._expired = False
         self.requests: list[tuple[str, str, dict[str, str]]] = []
         self.bodies: list[Mapping[str, Any]] = []
         """Every JSON-RPC request this server was sent, parsed.
@@ -95,7 +149,7 @@ class ScriptedMcpServer:
         """
         self._handed_out = 0
 
-    def __call__(
+    def __call__(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
         self,
         url: str,
         *,
@@ -103,13 +157,15 @@ class ScriptedMcpServer:
         body: bytes | None = None,
         headers: Mapping[str, str] | None = None,
         alongside: str | None = None,
+        discovery: DiscoveryScope | None = None,
     ) -> RawReply:
         """Answer one request the way the configured server would.
 
-        `alongside` is accepted and ignored: it exists so the real sender can guard
-        each redirect hop, and this double never redirects. Taking it keeps the
-        signature the one the `Sender` protocol publishes, so a double cannot drift
-        out of the contract it stands in for.
+        `alongside` and `discovery` are accepted and ignored: they exist so the real
+        sender can guard each redirect hop and pin each discovery connection, and
+        this double neither redirects nor connects. Taking them keeps the signature
+        the one the `DiscoverySender` protocol publishes, so one double serves as both
+        senders and cannot drift out of the contract it stands in for.
         """
         sent = dict(headers or {})
         self.requests.append((method, url, sent))
@@ -122,9 +178,14 @@ class ScriptedMcpServer:
         rejected = self._version_refusal(sent)
         if rejected is not None:
             return rejected
-        if not self._authorized(sent):
+        method_name = str(request.get("method"))
+        unguarded = self.tasks_unguarded and method_name == "tasks/list"
+        if not unguarded and not self._authorized(sent):
             return _reply(401, {}, headers=self._challenge_headers())
-        return self._json_rpc(str(request.get("method")), _era_of_request(request))
+        if "id" not in request:
+            # A notification: accepted, and nothing answers it.
+            return RawReply(status=202, headers={}, body=b"")
+        return self._json_rpc(method_name, _era_of_request(request), sent, request)
 
     @property
     def offers_legacy(self) -> bool:
@@ -157,7 +218,11 @@ class ScriptedMcpServer:
             return True
         return self.session_authenticates and "Mcp-Session-Id" in headers
 
-    def _json_rpc(self, method: str, era: Era) -> RawReply:
+    def _json_rpc(  # noqa: PLR0911 — one answer per method the double serves
+        self, method: str, era: Era, headers: Mapping[str, str], request: Mapping[str, Any]
+    ) -> RawReply:
+        if method == "tasks/list":
+            return self._task_listing(headers, era)
         if method == "server/discover":
             if self.protocol_versions is None:
                 return _error(200, _METHOD_NOT_FOUND, "Method not found", None)
@@ -167,18 +232,67 @@ class ScriptedMcpServer:
                 return _error(200, _METHOD_NOT_FOUND, "Method not found", None)
             return _reply(
                 200,
-                {"protocolVersion": self._legacy_version(), "capabilities": {}},
+                {
+                    "protocolVersion": self._legacy_version(),
+                    "capabilities": self._legacy_capabilities(),
+                    "serverInfo": self.server_info,
+                },
                 headers=self._session_headers(),
             )
         if method == "tools/list":
-            return _reply(200, {"tools": self.tools, **self._caching()}, era=era)
+            return self._tool_listing(request, era, headers)
         return _reply(200, {}, era=era)
 
+    def _tool_listing(
+        self, request: Mapping[str, Any], era: Era, headers: Mapping[str, str]
+    ) -> RawReply:
+        if self.tool_pages is None:
+            return _reply(200, {"tools": self.tools, **self._caching()}, era=era)
+        params = request.get("params")
+        cursor = params.get("cursor") if isinstance(params, Mapping) else None
+        handed_out = [f"page-{index}" for index in range(1, len(self.tool_pages))]
+        if cursor is None:
+            index = 0
+        elif cursor in handed_out:
+            index = handed_out.index(cursor) + 1
+        else:
+            return _error(200, _INVALID_PARAMS, "Invalid cursor", None)
+        expiring = index == self.expire_session_on_page and "Mcp-Session-Id" in headers
+        if expiring and not self._expired:
+            self._expired = True
+            return _reply(404, {})
+        listed: dict[str, Any] = {"tools": self.tool_pages[index], **self._caching()}
+        if index + 1 < len(self.tool_pages):
+            listed["nextCursor"] = handed_out[index]
+        return _reply(200, listed, era=era)
+
+    def _task_listing(self, headers: Mapping[str, str], era: Era) -> RawReply:
+        if self.tasks is None:
+            return _error(200, _METHOD_NOT_FOUND, "Method not found", None)
+        owner = headers.get("Authorization") == f"Bearer {self.credential}"
+        shown = [] if self.tasks_owner_bound and not owner else self.tasks
+        listed = [{"taskId": task_id, "status": "completed"} for task_id in shown]
+        result: dict[str, Any] = {"tasks": listed}
+        if self.tasks_next_cursor is not None:
+            result["nextCursor"] = self.tasks_next_cursor
+        return _reply(200, result, era=era)
+
+    def _legacy_capabilities(self) -> dict[str, Any]:
+        if self.task_declaration == "listing":
+            return {"tasks": {"list": {}}}
+        if self.task_declaration == "unlisted":
+            return {"tasks": {}}
+        return {}
+
     def _discovery(self) -> dict[str, Any]:
+        listed = self.discovers if self.discovers is not None else self.protocol_versions
+        capabilities: dict[str, Any] = {"tools": {}}
+        if self.task_declaration == "extension":
+            capabilities["extensions"] = {"io.modelcontextprotocol/tasks": {}}
         return {
-            "supportedVersions": list(self.protocol_versions or ()),
-            "capabilities": {"tools": {}},
-            "_meta": {"io.modelcontextprotocol/serverInfo": {"name": "scripted", "version": "0"}},
+            "supportedVersions": list(listed or ()),
+            "capabilities": capabilities,
+            "_meta": {"io.modelcontextprotocol/serverInfo": self.server_info},
             **self._caching(),
         }
 
@@ -196,12 +310,21 @@ class ScriptedMcpServer:
 
     def _metadata(self, url: str) -> RawReply:
         path = urlsplit(url).path
-        if path.startswith(_RESOURCE_METADATA_PATH) and self.resource_metadata is not None:
+        resource = path.startswith(_RESOURCE_METADATA_PATH)
+        authorization = any(path.startswith(prefix) for prefix in _AUTHORIZATION_METADATA_PATHS)
+        if resource and self.resource_metadata_status is not None:
+            return RawReply(status=self.resource_metadata_status, headers={}, body=b"")
+        if authorization and self.authorization_metadata_status is not None:
+            return RawReply(status=self.authorization_metadata_status, headers={}, body=b"")
+        if resource and self.resource_metadata_body is not None:
+            return RawReply(
+                status=200,
+                headers={"Content-Type": "application/json"},
+                body=self.resource_metadata_body,
+            )
+        if resource and self.resource_metadata is not None:
             return _document(self.resource_metadata)
-        if (
-            any(path.startswith(prefix) for prefix in _AUTHORIZATION_METADATA_PATHS)
-            and self.authorization_metadata is not None
-        ):
+        if authorization and self.authorization_metadata is not None:
             return _document(self.authorization_metadata)
         return _reply(404, {})
 

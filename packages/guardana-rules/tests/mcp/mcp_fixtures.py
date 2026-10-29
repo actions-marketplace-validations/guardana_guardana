@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from guardana.core.report import Finding
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.target import McpError, McpServerTarget
-from guardana.core.target._mcp_http import RawReply
+from guardana.core.target._mcp_http import DiscoveryScope, RawReply
 from guardana.core.testing import ScriptedMcpServer
 
 ROUTABLE = "https://93.184.215.14/mcp"
@@ -65,7 +65,9 @@ def findings(
     rule: Rule, server: ScriptedMcpServer, *, credential: str | None = None
 ) -> list[Finding]:
     """Run one rule against a scripted server and return everything it reported."""
-    target = McpServerTarget(server.url, credential=credential, sender=server)
+    target = McpServerTarget(
+        server.url, credential=credential, sender=server, discovery_sender=server
+    )
     return list(rule.run(target, RuleContext()))
 
 
@@ -79,13 +81,49 @@ def outcomes(reported: list[Finding]) -> list[str | None]:
     return [finding.verdict.outcome if finding.verdict else None for finding in reported]
 
 
-def unreachable(
+def unreachable(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
     url: str,
     *,
     method: str = "POST",
     body: bytes | None = None,
     headers: Mapping[str, str] | None = None,
     alongside: str | None = None,
+    discovery: DiscoveryScope | None = None,
 ) -> RawReply:
     """A sender for the server that is not there."""
     raise McpError(f"could not reach {url}: connection refused")
+
+
+class ServingAt:
+    """A scripted server that answers one discovery address with `body`, whatever it serves."""
+
+    def __init__(self, server: ScriptedMcpServer, address: str, body: bytes) -> None:
+        self.server = server
+        self.url = server.url
+        self.address = address
+        self.body = body
+
+    def __call__(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
+        self,
+        url: str,
+        *,
+        method: str = "POST",
+        body: bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
+        discovery: DiscoveryScope | None = None,
+    ) -> RawReply:
+        """Answer `address` with the configured body and pass every other request on."""
+        if method == "GET" and url == self.address:
+            return RawReply(status=200, headers={}, body=self.body)
+        return self.server(url, method=method, body=body, headers=headers)
+
+
+def findings_through(
+    rule: Rule, sender: ServingAt, *, credential: str | None = None
+) -> list[Finding]:
+    """Run one rule against a server reached through `sender`."""
+    target = McpServerTarget(
+        sender.url, credential=credential, sender=sender, discovery_sender=sender
+    )
+    return list(rule.run(target, RuleContext()))

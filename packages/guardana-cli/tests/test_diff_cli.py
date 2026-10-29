@@ -13,7 +13,7 @@ from guardana.cli.main import app
 from guardana.core.diff.model import DIFF_SCHEMA_VERSION
 from guardana.core.evaluator.base import Verdict
 from guardana.core.manifest.records import RuleRecord
-from guardana.core.report import Evidence, Finding, ScanResult
+from guardana.core.report import CheckError, Evidence, Finding, ScanResult
 from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from guardana.core.testing import manifest_for
@@ -52,6 +52,11 @@ def _write(
     kind: TargetKind = TargetKind.ENDPOINT,
 ) -> Path:
     result = ScanResult(findings=findings, rules_run=ran, rules_skipped=(), unverified=unverified)
+    return _save(path, result, kind=kind)
+
+
+def _save(path: Path, result: ScanResult, *, kind: TargetKind = TargetKind.ENDPOINT) -> Path:
+    ran = result.rules_run
     manifest = replace(
         manifest_for(result, target_ref=_ENDPOINT, target_kind=kind, tool_version="0.6.0"),
         rules=tuple(RuleRecord(id=rule, digest="aaaabbbbccccdddd") for rule in ran),
@@ -108,6 +113,21 @@ def test_a_rule_that_stopped_running_fails_the_gate(tmp_path: Path) -> None:
 
     assert result.exit_code == _REGRESSION
     assert _OTHER in result.stdout
+
+
+def test_a_saved_run_with_an_error_is_refused_with_two(tmp_path: Path) -> None:
+    """A refused pack never ran, so the vanished finding is not a fix the run can show."""
+    refused = CheckError(source="acme-pack", stage="discovery", reason="not admitted")
+    before = _write(tmp_path / "a.json", findings=(_finding(),))
+    errored = ScanResult(
+        findings=(), rules_run=(_RULE, _OTHER), rules_skipped=(), errors=(refused,)
+    )
+    after = _save(tmp_path / "b.json", errored)
+
+    result = runner.invoke(app, ["diff", str(before), str(after)])
+
+    assert result.exit_code == _INCOMPARABLE
+    assert "acme-pack" in result.stdout
 
 
 def test_a_run_from_an_older_guardana_is_refused_with_two(tmp_path: Path) -> None:

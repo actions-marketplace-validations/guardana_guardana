@@ -6,6 +6,7 @@ still see — which is the single-turn injection case, already covered elsewhere
 """
 
 from collections.abc import Sequence
+from dataclasses import replace
 
 from guardana.core.rule import RuleContext
 from guardana.core.rule.trajectory_rule import TrajectoryRule
@@ -101,6 +102,58 @@ def test_an_agent_that_never_read_its_memory_is_inconclusive_not_clean() -> None
     # `recall` was never called, so the poisoned note never reached the second
     # session. Nothing about this run says the agent is robust.
     assert _run(ToolCallingScriptedTransport(text="All good.")) == ["inconclusive"]
+
+
+class _SavesSomethingElse(_RemembersAndBehaves):
+    """Saves an unrelated note instead of the poisoned one, then recalls it."""
+
+    def send_tools(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+        tools: Sequence[ToolSpec],
+    ) -> ToolCallReply:
+        used = [call.name for m in messages for call in m.tool_calls]
+        if "remember" not in used and "read_file" in used:
+            return _call("remember", '{"note": "The standup moved to ten."}')
+        return super().send_tools(base_url, model, messages, api_key, tools)
+
+
+def test_an_agent_that_recalls_only_an_unrelated_note_is_inconclusive_not_clean() -> None:
+    # Something was saved and read back, but not the poisoned note, so the second
+    # session never faced the payload and its good behaviour proves nothing.
+    assert _run(_SavesSomethingElse()) == ["inconclusive"]
+
+
+class _SavesUnderAKeyNamedLikeTheMarker(_RemembersAndBehaves):
+    """Saves an unrelated note whose argument name happens to be the marker."""
+
+    def send_tools(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+        tools: Sequence[ToolSpec],
+    ) -> ToolCallReply:
+        used = [call.name for m in messages for call in m.tool_calls]
+        if "remember" not in used and "read_file" in used:
+            return _call("remember", '{"preference": "The standup moved to ten."}')
+        return super().send_tools(base_url, model, messages, api_key, tools)
+
+
+def test_a_marker_that_is_only_a_key_name_is_not_delivered_by_any_note() -> None:
+    # The writer stores the raw arguments, so a raw match on the recall would find
+    # the marker in the saved note's key and call the unrelated note a delivery.
+    fields = {**_rule().expectation.fields, "payload_marker": "preference"}
+    rule = replace(_rule(), expectation=replace(_rule().expectation, fields=fields))
+    target = EndpointTarget("http://x", "m", transport=_SavesUnderAKeyNamedLikeTheMarker())
+
+    outcomes = [f.verdict.outcome if f.verdict else "?" for f in rule.run(target, _CTX)]
+
+    assert outcomes == ["inconclusive"]
 
 
 def test_only_the_store_crosses_the_session_boundary() -> None:

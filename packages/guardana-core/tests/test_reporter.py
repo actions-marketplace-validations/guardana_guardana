@@ -6,6 +6,7 @@ import sys
 import guardana.core
 import pytest
 from guardana.core.evaluator.base import Verdict
+from guardana.core.redaction import EvidenceMode, EvidenceRedactor, RedactionPolicy
 from guardana.core.report.finding import Evidence, Finding
 from guardana.core.report.result import ScanResult
 from guardana.core.reporter import ENVELOPE_SCHEMA_VERSION, HttpReporter
@@ -101,3 +102,38 @@ def test_core_does_not_depend_on_server() -> None:
 
     server_modules = {name for name in sys.modules if name.startswith("guardana.server")}
     assert server_modules - pre_existing == set()
+
+
+def _submitted_source(source: str, redactor: EvidenceRedactor | None = None) -> str:
+    captured: list[bytes] = []
+    HttpReporter(
+        "https://c/x", transport=lambda _u, b: captured.append(b), redactor=redactor
+    ).submit(ScanResult((), (), ()), source=source)
+    submitted = json.loads(captured[0])["source"]
+    assert isinstance(submitted, str)
+    return submitted
+
+
+def test_a_credential_in_the_source_never_reaches_the_collector() -> None:
+    secret = "sk-" + "A" * 20
+
+    submitted = _submitted_source(f"/builds/{secret}/model")
+
+    assert secret not in submitted
+    assert "[redacted:openai-key" in submitted
+
+
+def test_a_source_without_a_credential_reaches_the_collector_unchanged() -> None:
+    assert _submitted_source("http://127.0.0.1:8000#llama3") == "http://127.0.0.1:8000#llama3"
+
+
+def test_metadata_only_still_names_the_source_and_still_strips_its_credential() -> None:
+    # The source is what a collector groups runs by, so blanking it would merge every
+    # target into one; it is redacted, never withheld.
+    secret = "sk-" + "B" * 20
+    redactor = EvidenceRedactor(RedactionPolicy(mode=EvidenceMode.METADATA_ONLY))
+
+    submitted = _submitted_source(f"/builds/{secret}/model", redactor)
+
+    assert secret not in submitted
+    assert submitted.startswith("/builds/")

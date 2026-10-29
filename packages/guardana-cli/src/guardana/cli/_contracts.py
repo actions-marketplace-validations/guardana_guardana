@@ -10,6 +10,7 @@ an operator states outright. That difference decides what happens when a policy
 excludes the compiled rule: the implication goes with it, the stated demand does not.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -17,12 +18,12 @@ import typer
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.contract import ContractError, SecurityContract, load_contract
 from guardana.core.profile import Profile
-from guardana.core.registry import Registry
+from guardana.core.registry import Registry, name_rule_ids
 from guardana.core.rule import Rule
 from guardana.core.runner import refused_by_this_run
 from guardana.core.target import dimensions_of
 from guardana.core.trace import Dimension
-from guardana.rules.contract import ContractCompilation, compile_contracts
+from guardana.rules.contract import ContractCompilation, compile_contract, compile_contracts
 
 _SUFFIXES = (".yaml", ".yml")
 
@@ -56,43 +57,65 @@ def contract_paths(profile: Profile, extra: list[Path]) -> list[Path]:
     return [*(Path(p) for p in profile.contract_paths), *extra]
 
 
-def load_contracts_or_exit(paths: list[Path]) -> list[SecurityContract]:
-    """Read every contract, expanding directories, or exit `3` naming the bad file."""
+@dataclass(frozen=True, slots=True)
+class ReadContracts:
+    """Every contract that loaded, and a sentence for each file or path that did not."""
+
+    contracts: tuple[SecurityContract, ...]
+    problems: tuple[str, ...]
+
+
+def read_contracts(paths: list[Path]) -> ReadContracts:
+    """Read every contract, expanding directories, and collect what could not be read.
+
+    The runs and the profile checks share this, so `config validate` cannot call a
+    profile valid whose contracts a run then refuses.
+    """
     contracts: list[SecurityContract] = []
+    problems: list[str] = []
     for path in paths:
-        for file in _files(path):
+        files, problem = _files(path)
+        if problem is not None:
+            problems.append(problem)
+        for file in files:
             try:
                 contracts.append(load_contract(file))
             except ContractError as exc:
-                typer.echo(f"error: {exc}", err=True)
-                raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
-    return contracts
+                problems.append(str(exc))
+    return ReadContracts(tuple(contracts), tuple(problems))
 
 
-def _files(path: Path) -> list[Path]:
+def load_contracts_or_exit(paths: list[Path]) -> list[SecurityContract]:
+    """Read every contract, or exit `3` naming each bad file."""
+    read = read_contracts(paths)
+    for problem in read.problems:
+        typer.echo(f"error: {problem}", err=True)
+    if read.problems:
+        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+    return list(read.contracts)
+
+
+def contract_files(path: Path) -> list[Path]:
+    """Return the contract files a run reads for one configured path; none for a missing one."""
+    return _files(path)[0]
+
+
+def _files(path: Path) -> tuple[list[Path], str | None]:
     """Expand a directory of contracts, and refuse a path that is not there at all.
 
-    A missing path raises rather than contributing nothing. `--contract
+    A missing path is a problem rather than contributing nothing. `--contract
     ./contracts/checkout.yaml` with a typo would otherwise run every built-in rule,
     grade none of the team's invariants, and exit `0` — the exact shape of gate the
     whole feature exists to make impossible.
     """
     if not path.exists():
-        typer.echo(
-            f"error: {path} does not exist, so the contract it names cannot be checked",
-            err=True,
-        )
-        raise typer.Exit(code=ExitCode.INVALID_USAGE)
+        return [], f"{path} does not exist, so the contract it names cannot be checked"
     if path.is_dir():
-        found = sorted(f for f in path.rglob("*") if f.suffix in _SUFFIXES and f.is_file())
+        found = sorted(f for f in path.rglob("*") if f.suffix.lower() in _SUFFIXES and f.is_file())
         if not found:
-            typer.echo(
-                f"error: {path} contains no .yaml or .yml contract, so nothing was loaded from it",
-                err=True,
-            )
-            raise typer.Exit(code=ExitCode.INVALID_USAGE)
-        return found
-    return [path]
+            return [], f"{path} contains no .yaml or .yml contract, so nothing was loaded from it"
+        return found, None
+    return [path], None
 
 
 def wire_contracts(
@@ -105,6 +128,7 @@ def wire_contracts(
     operator's explicit `trace.require` without either side knowing about the other.
     """
     contracts = load_contracts_or_exit(paths)
+    name_contract_rules(registry, contracts)
     try:
         compiled = compile_contracts(contracts, ai_system)
     except ContractError as exc:
@@ -116,6 +140,28 @@ def wire_contracts(
     running = [rule for rule in compiled.rules if rule.meta.id not in refused]
     excluded = tuple(rule.meta.id for rule in compiled.rules if rule.meta.id in refused)
     return profile.demanding(_dimensions_needed_by(running)), WiredContracts(compiled, excluded)
+
+
+def name_contract_rules(registry: Registry, contracts: Sequence[SecurityContract]) -> None:
+    """Name on `registry` every rule id the contracts compile to, whatever system each is about.
+
+    An include pattern naming an assertion then matches on every run of the profile, the
+    run about another AI system and a run that grades no trace included, while only the
+    run about the contract's own system registers and executes the rule. A contract that
+    does not compile names nothing; the command that reads it refuses it.
+    """
+    for contract in contracts:
+        try:
+            compiled = compile_contract(contract, contract.applies_to.ai_system)
+        except ContractError:
+            continue
+        name_rule_ids(registry, (rule.meta.id for rule in compiled.rules))
+        name_rule_ids(registry, (skip.rule_id for skip in compiled.skipped))
+
+
+def name_profile_contract_rules(registry: Registry, profile: Profile) -> None:
+    """Name on `registry` the rule ids of every contract the profile names that reads."""
+    name_contract_rules(registry, read_contracts(contract_paths(profile, [])).contracts)
 
 
 def _dimensions_needed_by(rules: list[Rule]) -> tuple[Dimension, ...]:

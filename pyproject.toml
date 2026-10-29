@@ -115,9 +115,15 @@ convention = "pep257"
 "examples/custom_rule/tests/**" = ["S101", "D", "PLR2004"]
 "examples/hermes_integrator/tests/**" = ["S101", "D", "PLR2004"]
 "examples/shell_hook_integrator/tests/**" = ["S101", "D", "PLR2004"]
+"examples/retrieval_pilot/tests/**" = ["S101", "D", "PLR2004"]
+"examples/output_pack/tests/**" = ["S101", "D", "PLR2004"]
+"examples/reference_pack/tests/**" = ["S101", "D", "PLR2004"]
 "scripts/tests/**" = ["S101", "D", "PLR2004", "SLF001"]
 # Maintainer scripts are CLIs — print() is their user interface, not stray debug output.
 "scripts/*.py" = ["T201"]
+"scripts/proofs/*.py" = ["T201"]
+# The conformance kit the customization proof runs is a pytest module, copied out to run.
+"scripts/proofs/kit/**" = ["S101", "D", "PLR2004"]
 # Same reason: `guardana-collector` is a console entry point, and stdout is what it
 # is for. The rule stays on everywhere else, which is where a stray print is a bug.
 "packages/guardana-server/src/guardana/server/cli/*.py" = ["T201"]
@@ -142,15 +148,33 @@ mypy_path = [
     "examples/custom_rule/src",
     "examples/hermes_integrator/src",
     "examples/shell_hook_integrator/src",
+    "examples/retrieval_pilot/src",
+    "examples/output_pack/src",
+    "examples/reference_pack/src",
+    # Its own directory, never the tests beside it: their `conftest.py` would clash with
+    # the collector's. Same entry in pytest's `pythonpath`.
+    "examples/output_pack/tests/doubles",
     # Same reason as pytest's `pythonpath` below: the round-trip helpers are imported
     # by gates in several suites, so the type checker has to resolve them too.
     "packages/guardana-core/tests",
+    # The fuzz targets import their shared helper as a top-level module, as Atheris runs them.
+    "fuzz",
 ]
 # Deliberately-insecure demo inputs: not project source, and not type-checked.
 exclude = ["examples/vulnerable-model"]
 
 [[tool.mypy.overrides]]
 module = "defusedxml.*"
+ignore_missing_imports = true
+
+# Installed only by the `fuzz` dependency group, which most environments cannot install.
+[[tool.mypy.overrides]]
+module = "atheris"
+ignore_missing_imports = true
+
+# The reference webhook verifier, installed only in the output example's isolated suite.
+[[tool.mypy.overrides]]
+module = "standardwebhooks.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
@@ -161,7 +185,13 @@ addopts = "-q -ra --strict-markers --strict-config"
 # in different packages. Made importable here rather than through a second
 # `conftest.py`: two files named `conftest` in one repository is a duplicate module
 # for mypy, and the helper has to sit beside the tests that import it.
-pythonpath = ["packages/guardana-core/tests", "scripts"]
+# The output example's doubles sit in their own directory for the same reason.
+pythonpath = [
+    "packages/guardana-core/tests",
+    "scripts",
+    "examples/output_pack/tests/doubles",
+    "fuzz",
+]
 # The example plugin is deliberately NOT collected here: installing it would put
 # its `acme.*` rules into every `Registry.discover()` call and make the dogfood
 # scan non-representative. CI runs its tests in a dedicated job instead, which is
@@ -188,19 +218,40 @@ filterwarnings = [
 # which is not a published distribution — no wheel declares markdown-it-py, and
 # `test_declared_dependencies.py` plus `clean_install_check.py` are what keep that
 # true rather than this comment.
-default-groups = ["dev", "docs"]
+default-groups = ["dev", "docs", "conformance"]
 
 [dependency-groups]
+# Coverage-guided fuzzing of the readers of hostile input (artifacts, traces, profiles) in
+# `fuzz/`, run by `.github/workflows/fuzz.yml`. Not a default group and never a package
+# dependency: Atheris publishes wheels for Linux x86_64 on CPython 3.12 and later only, so
+# the marker keeps every other development environment able to resolve the lock.
+fuzz = ["atheris==3.1.0; sys_platform == 'linux' and platform_machine == 'x86_64' and python_version >= '3.12'"]
+# The build backend of every package, locked so the container images build the local
+# packages without build isolation and with hashes, like their dependencies. Not a
+# default group: nothing in the development environment imports it.
+# `scripts/export_image_requirements.py` exports it to deploy/docker/.
+image-build = ["hatchling==1.32.4"]
 docs = [
     # Renders docs/**.md into site/docs/**.html. Its own dependency is `mdurl` and
     # nothing else, it is CommonMark-compliant, and it exposes the token stream —
     # which is what lets the build rewrite every internal `.md` link into `.html`
-    # by walking links rather than by running a regex over prose. The alternative
-    # considered and rejected in `docs/design/documentation-site.md` was a static
-    # site generator: MkDocs or Docusaurus would bring a framework, a theme system
-    # and (for Docusaurus) a Node toolchain to render sixty files, and the half
-    # with actual value — the rule explorer — would still be custom work.
+    # by walking links rather than by running a regex over prose. The rejected
+    # alternative was a static site generator: MkDocs or Docusaurus would bring a
+    # framework, a theme system and (for Docusaurus) a Node toolchain to render
+    # sixty files, and the half with actual value — the rule explorer — would
+    # still be custom work.
     "markdown-it-py>=3.0",
+]
+conformance = [
+    # Test-only fixtures for the MCP and A2A conformance suite. Servers written by the
+    # same hands as the client share one reading of the specification, so a misreading
+    # passes both; these are the protocol owners' reference SDKs, pinned exactly so a
+    # release of theirs never changes what the suite means. Nothing under
+    # `packages/*/src` may import `mcp` or `a2a` (the import-linter contract below),
+    # and the clean-install check and the isolated example suites never install it.
+    "mcp==2.3.0",
+    "a2a-sdk[http-server]==1.2.3",
+    "uvicorn",
 ]
 dev = [
     # Property-based tests for the parsers that read files an attacker chose.
@@ -208,7 +259,7 @@ dev = [
     # model named "no fuzzing of the binary parsers" as an open gap for four
     # releases, and an example-based test proves the case its author thought of —
     # which is never the length field that is one byte short of the file.
-    "hypothesis>=6.167.1",
+    "hypothesis>=6.170.9",
     "import-linter>=2.14",
     # Test-only, and deliberately not a runtime dependency of any distribution:
     # `schemas/run-v2.schema.json` is a published contract, and a schema
@@ -216,12 +267,12 @@ dev = [
     # never validates at run time — it constructs manifests from typed
     # dataclasses, so the shape is enforced by mypy on the way out.
     "jsonschema>=4.23",
-    "types-jsonschema>=4.23",
-    "mypy>=2.3.1",
-    "pre-commit>=4.6.2",
+    "types-jsonschema>=4.26.0.20261006",
+    "mypy>=2.4.0",
+    "pre-commit>=4.7.0",
     "pytest>=9.1.1",
     "pytest-cov>=6.0",
-    "ruff>=0.16.8",
+    "ruff>=0.17.2",
 ]
 
 [tool.coverage.run]
@@ -247,6 +298,9 @@ root_packages = [
     "guardana.testing",
     "guardana.adapters",
 ]
+# The contract over the conformance SDKs names packages outside the workspace, which
+# import-linter only sees when external packages are part of the graph.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 # The commercialization carve-out, enforced by tooling and not just by review:
@@ -289,3 +343,19 @@ layers = [
     "guardana.rules | guardana.report | guardana.testing | guardana.adapters",
     "guardana.core",
 ]
+
+[[tool.importlinter.contracts]]
+# The conformance SDKs are test fixtures, never runtime code: a shipped module that
+# imported one would make an installed Guardana depend on a group no wheel declares.
+name = "No shipped module imports a conformance SDK"
+type = "forbidden"
+source_modules = [
+    "guardana.core",
+    "guardana.rules",
+    "guardana.cli",
+    "guardana.report",
+    "guardana.server",
+    "guardana.testing",
+    "guardana.adapters",
+]
+forbidden_modules = ["mcp", "mcp_types", "a2a"]

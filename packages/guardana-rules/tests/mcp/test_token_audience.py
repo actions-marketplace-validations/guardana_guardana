@@ -1,11 +1,19 @@
 """The audience probe, and the two ways it must refuse to reach a verdict."""
 
 from base64 import urlsafe_b64decode as b64decode
+from collections.abc import Mapping
 
+import pytest
+from _offline import refuse_name_lookups
+from guardana.core.report import Finding
+from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
-from guardana.core.target import forged_token
+from guardana.core.target import McpServerTarget, forged_token
+from guardana.core.target._mcp_http import DiscoveryScope, RawReply
 from guardana.rules.mcp import McpTokenAudienceRule
 from mcp_fixtures import CREDENTIAL, findings, guarded, outcomes, summaries, wide_open
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 RULE = McpTokenAudienceRule()
 
@@ -39,3 +47,53 @@ def test_the_token_presented_is_unmistakably_not_a_credential() -> None:
     assert signature == "guardana-probe-not-a-valid-signature"
     assert "guardana.invalid" in b64decode(payload + "==").decode()
     assert '"alg":"none"' in b64decode(header + "==").decode()
+
+
+class _AnsweringTheForgedToken:
+    """A guarded server that answers every request bearing the forged token with one status."""
+
+    def __init__(self, status: int) -> None:
+        self.status = status
+        self.inner = guarded()
+        self.url = self.inner.url
+
+    def __call__(  # noqa: PLR0913 — the keywords the `Sender` protocol publishes
+        self,
+        url: str,
+        *,
+        method: str = "POST",
+        body: bytes | None = None,
+        headers: Mapping[str, str] | None = None,
+        alongside: str | None = None,
+        discovery: DiscoveryScope | None = None,
+    ) -> RawReply:
+        if (headers or {}).get("Authorization") == f"Bearer {forged_token()}":
+            return RawReply(status=self.status, headers={}, body=b"")
+        return self.inner(
+            url,
+            method=method,
+            body=body,
+            headers=headers,
+            alongside=alongside,
+            discovery=discovery,
+        )
+
+
+def _against(server: _AnsweringTheForgedToken) -> list[Finding]:
+    target = McpServerTarget(
+        server.url, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+    return list(RULE.run(target, RuleContext()))
+
+
+@pytest.mark.parametrize("status", [400, 404, 429, 500, 503])
+def test_a_server_error_to_the_forged_token_is_inconclusive_not_a_pass(status: int) -> None:
+    reported = _against(_AnsweringTheForgedToken(status))
+
+    assert outcomes(reported) == ["inconclusive"]
+    assert f"HTTP {status}" in summaries(reported)[0]
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_an_authorization_refusal_of_the_forged_token_reports_nothing(status: int) -> None:
+    assert _against(_AnsweringTheForgedToken(status)) == []

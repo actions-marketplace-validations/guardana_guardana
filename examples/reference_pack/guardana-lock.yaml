@@ -1,0 +1,23 @@
+schema_version: 3
+extension_api: 2
+packs:
+- name: guardana-reference-pack
+  distribution: guardana-reference-pack
+  version: 0.1.3
+  rules:
+    reference.prompt.codename_disclosure:
+      digest: b00991d5ddc71066
+    reference.supply_chain.unpinned_requirement:
+      digest: 533087d5b5815f7b
+  evaluators:
+  - reference.marker
+  targets:
+  - ReferenceRequirementsTarget
+  renderers:
+  - reference-summary
+  reporters:
+  - reference-file
+  taxonomies:
+    REFERENCE-CONTROLS:
+      digest: sha256:5a3eabd6733c45b3622b5d60efa2b50c35dd1a38f2ba7ce6af6a1608d3a0abb6
+unlocked: []

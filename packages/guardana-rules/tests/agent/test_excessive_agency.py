@@ -3,6 +3,8 @@ from guardana.core.assessment import AssessmentStatus, case_id_for
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES
+from guardana.core.rule.verify import verify_rule
 from guardana.core.target import Capability, EndpointTarget
 from guardana.core.target.endpoint import ToolCall, ToolCallReply
 from guardana.core.testing import (
@@ -193,3 +195,10 @@ def test_a_failure_seen_before_a_later_trial_raised_is_still_reported() -> None:
     assert findings[0].verdict is not None
     assert findings[0].verdict.outcome == "fail"
     assert "(3 planned)" in findings[0].evidence.summary
+
+
+def test_the_rule_proves_all_three_outcomes_on_its_own_samples() -> None:
+    verified = verify_rule(ExcessiveAgencyRule())
+
+    assert verified.is_proven, verified
+    assert {r.observed for r in verified.results} >= set(DEMANDED_OUTCOMES)

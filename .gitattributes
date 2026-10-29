@@ -1,0 +1,21 @@
+# Generated output stays out of GitHub's language statistics and collapses in diffs;
+# a reviewer reads the source it was built from.
+site/docs/** linguist-generated=true
+site/schemas/** linguist-generated=true
+site/llms.txt linguist-generated=true
+site/sitemap.xml linguist-generated=true
+site/robots.txt linguist-generated=true
+site/favicon.ico linguist-generated=true
+site/apple-touch-icon*.png linguist-generated=true
+site/.well-known/** linguist-generated=true
+docs/generated/** linguist-generated=true
+
+# The website is documentation, not the product's code.
+site/** linguist-documentation=true
+scripts/og_card.html linguist-documentation=true
+
+# Templates for the files `new-pack` and `init --starter` write, named for their output.
+*.py.tmpl linguist-language=Python
+*.toml.tmpl linguist-language=TOML
+*.yaml.tmpl linguist-language=YAML
+*.md.tmpl linguist-language=Markdown

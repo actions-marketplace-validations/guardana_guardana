@@ -19,6 +19,7 @@ must never read as a green build.
 """
 
 import os
+import re
 import shutil
 import subprocess
 import uuid
@@ -43,6 +44,10 @@ def _unusable(message: str) -> None:
     pytest.skip(message)
 
 
+_CLIENT_VERSION = re.compile(r"\(PostgreSQL\)\s+(\d+)")
+"""A packager appends its own suffix, as in "pg_dump (PostgreSQL) 16.15 (Homebrew)"."""
+
+
 def _client_major() -> int:
     """The major version of the installed `pg_dump`, e.g. 16 from "pg_dump (PostgreSQL) 16.4"."""
     # S603/S607: a literal command, resolved from PATH like every other tool here.
@@ -52,7 +57,14 @@ def _client_major() -> int:
         text=True,
         capture_output=True,
     ).stdout
-    return int(reported.strip().split()[-1].split(".")[0])
+    return _major_of(reported)
+
+
+def _major_of(reported: str) -> int:
+    match = _CLIENT_VERSION.search(reported)
+    if match is None:
+        raise ValueError(f"pg_dump --version printed no version: {reported!r}")
+    return int(match.group(1))
 
 
 def _require_tools(server_major: int | None = None) -> None:
@@ -97,7 +109,8 @@ def back_up(url: str, destination: Path) -> None:
 
 
 def restore(url: str, source: Path) -> None:
-    """Run the documented restore command."""
+    """Run the documented check that the dump reads, then the documented restore command."""
+    _run(["pg_restore", "--list", str(source)])
     _run(["pg_restore", "--clean", "--if-exists", "--dbname", url, str(source)])
 
 
@@ -220,3 +233,15 @@ def test_missing_client_tools_only_skip_where_they_were_not(
 
     with pytest.raises(pytest.skip.Exception, match="not on PATH"):
         _require_tools()
+
+
+@pytest.mark.parametrize(
+    "reported",
+    [
+        "pg_dump (PostgreSQL) 16.4\n",
+        "pg_dump (PostgreSQL) 16.15 (Homebrew)\n",
+        "pg_dump (PostgreSQL) 16.4 (Ubuntu 16.4-1.pgdg24.04+1)\n",
+    ],
+)
+def test_the_client_version_is_read_whatever_the_packager_appends(reported: str) -> None:
+    assert _major_of(reported) == 16

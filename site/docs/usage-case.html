@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana case — Guardana documentation</title>
+<meta name="description" content="guardana case add|list: promote one reviewed failure from a recording into a regression case of a suite, proven on both sides before it is written">
+<link rel="canonical" href="https://guardana.dev/docs/usage-case">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html" aria-current="page">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>guardana case</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html" aria-current="page">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana case</code> — turn a reviewed failure into a regression case<span class="status beta">beta</span></h1><p class="lede"><code>guardana case add|list</code>: promote one reviewed failure from a recording into a regression case of a suite, proven on both sides before it is written</p><p>A recipe run that failed, or stopped, keeps its exchanges when the profile and the recipe ask
+for them (<code>run.exchanges.jsonl</code> in the artifact). <code>guardana case add</code> turns one of those
+exchanges into a case of a quality suite's dataset, labelled, versioned and proven on both
+sides. Once the case is in the dataset, <code>guardana rule test</code> and every <code>guardana recipe</code>
+command regrade it, and CI runs it against your application.</p>
+<pre><code class="language-bash">guardana case list guardana-artifact/run.exchanges.jsonl
+guardana case add rules/support.yaml --from guardana-artifact/run.exchanges.jsonl \
+  --line 4 --expect '{&quot;contains_any&quot;: [&quot;reset link&quot;]}' \
+  --accepted-file accepted.txt --version 2026.10 --label &quot;no reset link&quot;
+guardana case add ... --write        # the same command, now writing the dataset
+</code></pre>
+<p>Nothing is written without <code>--write</code>. The person who runs it with <code>--write</code> promotes the
+case; Guardana never promotes one by itself.</p>
+<h2 id="case-list"><code>case list</code></h2>
+<p><code>guardana case list RECORDING</code> prints every kept exchange: its line, its rule, its key and
+whether its reply is altered (redacted, marked <code>altered</code>, or from a recording that is not
+verbatim), or <code>declined</code> for a request the application declined. The input and the reply,
+shortened and with control characters escaped, are printed only to a terminal or with
+<code>--show</code>; a declined line's reply is shown as <code>[declined: &lt;name&gt; (HTTP &lt;status&gt;)]</code>.</p>
+<h2 id="case-add"><code>case add</code></h2>
+<p><code>RULE</code> is the YAML file of one suite — a rule with <code>dataset:</code> — in your own source tree. The
+case is appended to that suite's dataset:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Part of the case</th>
+<th>Where it comes from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td>The kept exchange's input, or <code>--input-file</code> (tagged <code>input:rewritten</code>).</td>
+</tr>
+<tr>
+<td><code>observed</code></td>
+<td>The kept exchange's reply: the failure. An altered reply needs <code>--observed-file</code>, a stand-in you write that reproduces the failure without the removed data (tagged <code>observed:synthetic</code>).</td>
+</tr>
+<tr>
+<td><code>accepted</code></td>
+<td><code>--accepted-file</code>: a correct reply you write.</td>
+</tr>
+<tr>
+<td><code>expect</code></td>
+<td><code>--expect</code>: what a correct reply must satisfy, a JSON object of the suite evaluator's fields, overlaid on the suite's own <code>expect:</code> as a hand-written case's is.</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td><code>regression</code>, <code>label:&lt;text&gt;</code> with <code>--label</code>, and <code>origin:&lt;run id&gt;</code> when the recording names the run it was kept from.</td>
+</tr>
+</tbody>
+</table></div>
+<p>The dataset's header gets <code>--version</code>, which must differ from its current version. Every
+other line is kept byte for byte, and a format-1 dataset is rewritten as format 2.</p>
+<p><strong>How the file is written.</strong> With <code>--write</code>, <code>case add</code> creates a lock file beside the
+dataset (<code>.&lt;dataset&gt;.lock</code>), reads the suite and the dataset again, and refuses, writing
+nothing, when either differs from the text the case was proven against. It then writes the
+new dataset to a temporary file in the same directory and renames it over the dataset, so a
+reader sees the old file or the new one, never part of either, and removes the lock file
+whatever happened. A second <code>case add</code> that finds the lock file refuses (exit <code>3</code>) rather
+than wait, so two promotions into one dataset never both write over the same version. The
+lock excludes only other <code>case add</code> runs: an editor that saves the dataset between that
+last read and the rename is not detected. A lock file left by a process that was killed is
+not removed for you; delete it once no <code>case add</code> is running.</p>
+<p>A file you write for <code>--input-file</code>, <code>--observed-file</code> or <code>--accepted-file</code> is read as UTF-8
+text; one line ending at its end is dropped, and an empty file, or one holding a redaction
+placeholder, is refused.</p>
+<h3 id="the-proof">The proof</h3>
+<p>Before anything is written, the suite's evaluator grades <code>observed</code> and <code>accepted</code> against
+the case's effective expectation. <strong>The case holds only when <code>observed</code> grades <code>fail</code> and
+<code>accepted</code> grades <code>pass</code></strong>: an expectation that does not tell the two apart gates nothing.
+Only an evaluator that declares itself deterministic and declares that a verdict asks no
+judge can prove a case without sending anything, such as <code>contains</code>, <code>regex</code>, <code>exact_match</code>,
+<code>json_valid</code> or <code>length</code>. A judge, or an
+evaluator that declares neither, is refused, never skipped. The proof uses the built-in
+plugin trust, so an evaluator from an installed pack is not available to it.</p>
+<p>A synthetic <code>observed</code> proves the expectation against your reconstruction, not against what
+the application said; its tag says so. The proof shows that the expectation separates two
+replies. It does not show that the input reproduces the failure against the build CI runs: a
+case from another subject, or with a rewritten input, passes from its first run if it never
+reproduced. Run the recipe once against the unfixed build to see the case fail.</p>
+<h3 id="what-is-printed">What is printed</h3>
+<p>Off a terminal, the output names the suite, the dataset and its versions, the recording line
+and key, and the length and digest of the input, <code>observed</code> and <code>accepted</code>, the names of the
+<code>expect</code> fields, the tags and what each side of the proof graded. The text of the case, and
+the evaluator's reasons, which may quote a reply, are printed only to a terminal or with
+<code>--show</code>, so a dry run scripted in CI does not copy into its log what a redactor missed.</p>
+<h3 id="what-is-refused">What is refused</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>the case was written, or shown without <code>--write</code></td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>a side graded the wrong way: <code>observed</code> passed or <code>accepted</code> failed</td>
+<td><code>1</code>, nothing written</td>
+</tr>
+<tr>
+<td>no side graded the wrong way and a side declined</td>
+<td><code>2</code>, nothing written</td>
+</tr>
+<tr>
+<td>an evaluator raised on a side</td>
+<td><code>3</code>, nothing written</td>
+</tr>
+<tr>
+<td><code>--key</code> and <code>--line</code> both or neither; a key on several lines (pick one with <code>--line</code>); a line with no key, which only <code>--line</code> names; a line or key the recording does not hold</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>an input that was altered — it holds a redaction placeholder, it no longer matches the key taken before redaction, or the line has no key and the recording is not verbatim — without <code>--input-file</code></td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>an altered reply without <code>--observed-file</code></td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>a line the application declined: it holds no reply to pair with a correct one, whatever <code>--observed-file</code> says</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>a file for <code>--input-file</code>, <code>--observed-file</code> or <code>--accepted-file</code> that holds a redaction placeholder</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>with <code>--write</code>: the dataset's lock file exists, or the suite or the dataset changed while the case was being proven</td>
+<td><code>3</code>, nothing written</td>
+</tr>
+<tr>
+<td>a <code>RULE</code> that is not one YAML suite, that does not load, that lies in an installed distribution, or whose dataset or its directory is not writable</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>an evaluator that cannot prove the case without sending</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td><code>--expect</code> that is not a JSON object, or a field the evaluator does not read</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td><code>--version</code> equal to the current one; a case line over the dataset's line limit; a case the dataset already holds; a suite that would not load with the case</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>a recording that cannot be read</td>
+<td><code>3</code></td>
+</tr>
+</tbody>
+</table></div>
+<h2 id="the-suite-stays-a-regression-gate">The suite stays a regression gate</h2>
+<p>A dataset that holds any <code>observed</code>/<code>accepted</code> pair refuses, whenever the suite is loaded, a
+suite that declares <code>sample:</code> or whose <code>gate.min_pass_rate</code> is below 1: a regression case that
+may not run, or that other cases can outvote, prevents nothing. Set <code>gate.min_sample</code> to at
+most the number of cases, since its default of 30 refuses a small suite at load. The
+<code>regression</code> tag is a label: a case that carries it without a pair changes no gate. See
+<a href="usage-suites.html">quality suites</a>.</p>
+<h2 id="regrading">Regrading</h2>
+<p>A live run sends the case's input and grades the target's reply. It never sends <code>observed</code> or
+<code>accepted</code> or grades either as the target's reply. It only regrades the pair offline as the
+list below describes. Neither is part of the case's identity.</p>
+<ul>
+<li><code>guardana rule test</code> regrades every pair of every selected suite with the rule as it is now,
+sending nothing, and names each case whose pair no longer holds: exit <code>1</code> when a side graded
+the wrong way, <code>2</code> when a side declined or the evaluator raised, and <code>3</code> when the suite's
+evaluator cannot regrade without sending (<a href="usage-rule-test.html">testing rules</a>).</li>
+<li><code>guardana recipe lock</code>, <code>recipe lock --check</code> and <code>recipe run</code> regrade the pairs of every
+selected suite before they compare anything. Any of those four states is a refusal there,
+with one code: <code>lock</code> writes nothing and exits <code>1</code>, <code>lock --check</code> exits <code>1</code>, and <code>run</code>
+sends nothing and exits <code>3</code> (<a href="usage-recipe.html">recipes</a>).</li>
+<li><code>guardana probe</code>, <code>grade</code>, <code>monitor</code> and <code>plan</code>, and a <code>Verifier</code> run from Python, regrade
+the pairs of every suite they select before the first rule, sending nothing. A pair that no
+longer holds, or cannot be regraded without sending, is an error for that suite (stage
+<code>regression</code>), so the run cannot pass while <code>fail_on_error</code> is on (exit <code>2</code>).</li>
+</ul>
+<p>The suite's digest covers its dataset, so after <code>case add --write</code> the recipe's lock no
+longer holds: <code>recipe run</code> sends nothing until you run <code>guardana recipe lock</code> and commit the
+dataset and the lock together. In CI the suite then runs every case against your application
+and fails on any one.</p>
+<p>The format of a dataset is <a href="https://guardana.dev/schemas/dataset/v2.schema.json"><code>dataset-v2.schema.json</code></a>;
+format 1 (<a href="https://guardana.dev/schemas/dataset/v1.schema.json"><code>dataset-v1.schema.json</code></a>) is still read.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-case.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installed outputs — Guardana documentation</title>
+<meta name="description" content="an installed format for --format and an installed reporter for --reporter: choosing one, plugin trust, the delivery line, exit 8, exporting a saved run from Python, and writing your own">
+<link rel="canonical" href="https://guardana.dev/docs/outputs">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html" aria-current="page">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Installed outputs</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html" aria-current="page">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Installed outputs: formats and reporters a package adds</h1><p class="lede">an installed format for --format and an installed reporter for --reporter: choosing one, plugin trust, the delivery line, exit 8, exporting a saved run from Python, and writing your own</p><p>A package can add a format, selected with <code>--format</code>, and a reporter, selected with
+<code>--reporter</code>. Guardana needs no change and no new flag for either. An installed output is
+imported only when a command names it, and it receives what the saved run holds, never more.</p>
+<p><code>examples/output_pack</code> is a complete package with one of each: <code>acme-table</code>, a CSV export of
+every outcome, and <code>acme-webhook</code>, a signed webhook.</p>
+<h2 id="choose-one">Choose one</h2>
+<pre><code class="language-bash">pip install ./examples/output_pack
+guardana scan models/ --format acme-table --output run.csv \
+  --plugins allowlist --allow-plugin acme-guardana-outputs
+guardana probe --url https://api.example.com --model m \
+  --format json --output run.json \
+  --reporter acme-webhook://env:ACME_WEBHOOK_URL \
+  --plugins allowlist --allow-plugin acme-guardana-outputs
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Built in</th>
+<th>Installed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--format</code> on <code>scan</code>, <code>probe</code>, <code>grade</code>, <code>analyze-trace</code></td>
+<td><code>human</code>, <code>json</code>, <code>sarif</code>, <code>junit</code></td>
+<td>any installed format name</td>
+</tr>
+<tr>
+<td><code>--reporter</code> on <code>scan</code>, <code>probe</code>, <code>analyze-trace</code></td>
+<td><code>server://URL</code> or an <code>http(s)://</code> collector URL</td>
+<td><code>&lt;name&gt;://&lt;locator&gt;</code>; the reporter reads the locator</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>monitor</code> and <code>import-observations</code> take only the built-in forms, and refuse an installed one
+with exit <code>3</code>. So do <code>scan --write-baseline</code> and <code>probe --write-mcp-pin</code>, which produce no
+report; they refuse a collector <code>--reporter</code> or an <code>--output</code> with exit <code>3</code>.</p>
+<p>Every command starts with Guardana's own distributions only, so an installed output is
+refused until you admit its distribution: <code>--plugins allowlist --allow-plugin &lt;distribution&gt;</code>
+or <code>plugins:</code> in a profile (<a href="profiles.html#plugin-trust-plugins">plugin trust</a>). The output is
+then selected before the run sends anything. An unknown name, a name two installed
+distributions claim, a refused distribution or an output that fails to load exits <code>3</code> with the
+reason, and nothing is sent. <code>guardana doctor</code> lists each installed output, imports none of
+them, and says whether it would be refused.</p>
+<h2 id="what-an-output-receives">What an output receives</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th></th>
+<th>Format</th>
+<th>Reporter</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>findings, unverified, errors, skips, shortfalls, cases</td>
+<td>redacted under the profile, then again as the built-in formats are</td>
+<td>the same</td>
+</tr>
+<tr>
+<td>the run description and verdict</td>
+<td>as saved</td>
+<td>as saved, with every text field redacted for secrets again, the target's address (<code>target.ref</code>) also redacted at <code>redacted</code> mode as the collector's source is, and names and identifiers (rule, evaluator and assessor ids, mapping keys) kept</td>
+</tr>
+<tr>
+<td>kept exchanges</td>
+<td>redacted again</td>
+<td>never</td>
+</tr>
+</tbody>
+</table></div>
+<p>No option hands an output an unredacted result. The verdict comes from the saved run: an
+output cannot decide that a run with open questions is clean.</p>
+<h2 id="delivery-status">Delivery status</h2>
+<p>A reporter prints one line to stderr on every path, success included:</p>
+<pre><code>delivery: &lt;status&gt; — &lt;name&gt; to &lt;destination&gt;[ (HTTP &lt;code&gt;, &lt;n&gt; attempt|attempts)][: &lt;detail&gt;]
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning</th>
+<th>Exit code</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>delivered</code></td>
+<td>the receiver acknowledged it, after at least one attempt; a reporter that names an HTTP status names a 2xx one, and one that writes locally, such as to a file, names none</td>
+<td>the verdict's</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>the receiver answered and did not accept it</td>
+<td>the verdict's; <code>8</code> under <code>delivery.required</code></td>
+</tr>
+<tr>
+<td><code>unreachable</code></td>
+<td>the receiver did not answer</td>
+<td>the verdict's; <code>8</code> under <code>delivery.required</code></td>
+</tr>
+<tr>
+<td><code>not_sent</code></td>
+<td>nothing left the machine: the run ended before its report existed, or the reporter declined to send</td>
+<td>the verdict's, or the code the command ended with before delivery; <code>8</code> under <code>delivery.required</code> once the run produced its report</td>
+</tr>
+<tr>
+<td><code>unknown</code></td>
+<td>the reporter failed, ran past 30 seconds including its post-delivery <code>sent_secrets()</code> read, or said <code>delivered</code> with no attempt or a status outside 2xx; whether anything left is unknown</td>
+<td><code>8</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>The destination is shown without a path, query or credential: Guardana reduces a URL to
+<code>scheme://host[:port]</code> before printing it, whatever the reporter gave, and withholds the
+reporter's secrets from any other destination. The line's prefix and status words are stable;
+a script may read them.</p>
+<p>A profile that sets <a href="profiles.html#delivery"><code>delivery.required: true</code></a> makes every status but
+<code>delivered</code> a failed delivery: the delivery line is followed by <code>error: the profile sets delivery.required, and the delivery was &lt;status&gt;</code>, the verdict is printed, and the command
+exits <code>8</code> unless the run stopped, which keeps <code>4</code>, <code>6</code> or <code>7</code>. <code>not_sent</code> counts, because a
+reporter can return it, and a job that delivered nothing must not pass.</p>
+<h2 id="exit-code-8">Exit code 8</h2>
+<p>Exit <code>8</code> means an installed output failed: a format raised or returned no text, so nothing was
+written, or a reporter's delivery is <code>unknown</code> — or, under <code>delivery.required</code>, anything but
+<code>delivered</code>. When a format fails (exit <code>8</code>) or Guardana's redaction fails (exit <code>5</code>), a file
+already at <code>--output</code> that this process can write is removed, and stderr says so.
+One it cannot write is kept with a warning. The verdict is printed whenever <code>8</code> replaces its
+code, as <code>the run's verdict: &lt;gate&gt; (exit &lt;code&gt;)</code>, and a failed format's error names the distribution to report it to. A
+run its target or budget stopped keeps exit <code>4</code>, <code>6</code> or <code>7</code>. When Guardana's own redaction fails
+before an output is called, nothing is written or sent and the exit is <code>5</code>, a defect to report
+to Guardana; <code>GUARDANA_DEBUG=1</code> prints the traceback. See <a href="exit-codes.html">exit codes</a>.</p>
+<h2 id="export-a-saved-run-from-python">Export a saved run from Python</h2>
+<p>A paid probe saved with <code>--format json --output run.json</code> can be exported later, with no
+request to anything:</p>
+<pre><code class="language-python">from pathlib import Path
+
+from guardana.core.output import render, select_renderer
+from guardana.core.plugins import PluginMode, PluginTrust
+from guardana.core.verify import load_verification
+
+trust = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({&quot;acme-guardana-outputs&quot;}))
+table = render(select_renderer(&quot;acme-table&quot;, trust), load_verification(Path(&quot;run.json&quot;)))
+Path(&quot;run.csv&quot;).write_text(table, encoding=&quot;utf-8&quot;, newline=&quot;&quot;)
+</code></pre>
+<p><code>render</code>, <code>select_renderer</code> and <code>load_verification</code> are in the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. <code>PluginTrust</code> and <code>PluginMode</code> are
+outside it and subject to change in any release. While your code imports them, pin the exact
+<code>guardana-core</code> version you tested.</p>
+<p><code>guardana recipe run</code> saves <code>run.json</code> in its artifact directory; export it the same way.</p>
+<h2 id="the-reference-webhook">The reference webhook</h2>
+<p><code>acme-webhook</code> follows <a href="https://github.com/standard-webhooks/standard-webhooks">Standard Webhooks</a>:
+a JSON body <code>{&quot;type&quot;: &quot;run.completed&quot;, &quot;timestamp&quot;: …, &quot;data&quot;: {…}}</code>, signed with
+HMAC-SHA256 under <code>webhook-id</code>, <code>webhook-timestamp</code> and <code>webhook-signature</code>. A receiver verifies
+it with any Standard Webhooks library and the secret in <code>ACME_WEBHOOK_SECRET</code> (<code>whsec_…</code>).</p>
+<ul>
+<li><strong>Destination.</strong> <code>acme-webhook://https://host/path</code>, or <code>acme-webhook://env:VARIABLE</code> to keep
+a URL that carries a token out of shell history and CI logs. Plain <code>http</code> is accepted only for
+<code>localhost</code>, <code>127.0.0.1</code> and <code>::1</code>. You name the address, as you name a probe target; nothing
+else is contacted.</li>
+<li><strong>Content.</strong> The run id, verdict, exit code, open questions, counts per outcome, the target,
+declared deployment fields, and up to 50 findings as rule id, severity and title. No evidence,
+prompt or reply is sent. That is still an inventory of what is wrong with a named deployment:
+send it only to a receiver you would show the report to.</li>
+<li><strong>Delivery.</strong> At most three attempts within 25 seconds, retrying on no answer, <code>408</code>, <code>429</code>
+and <code>5xx</code>; redirects are not followed. <code>webhook-id</code> is the same on every attempt, so a
+receiver can drop a repeat.</li>
+<li><strong>Network.</strong> It connects straight to the destination. <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and their
+lowercase forms are ignored, so no proxy sees the signed summary or answers for the receiver.</li>
+</ul>
+<h2 id="write-your-own">Write your own</h2>
+<p>An output is one entry point; its name is the output's name.</p>
+<pre><code class="language-toml">[project.entry-points.&quot;guardana.renderers&quot;]
+acme-table = &quot;acme_outputs:provide_table&quot;
+
+[project.entry-points.&quot;guardana.reporters&quot;]
+acme-webhook = &quot;acme_outputs:provide_webhook&quot;
+</code></pre>
+<p>Name the package module, not a submodule, so <code>guardana pack validate</code> finds your manifest.
+Import heavy code inside the provider so selecting one output never imports another. A name
+matches <code>[a-z][a-z0-9-]*</code>: a lowercase letter followed by lowercase letters, digits and <code>-</code>,
+with at most 40 characters in total. A format cannot use <code>human</code>, <code>json</code>, <code>sarif</code> or <code>junit</code>;
+a reporter cannot use <code>server</code>, <code>http</code> or <code>https</code>. No output name may start with <code>guardana</code>.</p>
+<pre><code class="language-python">from guardana.core.output import Delivery, DeliveryStatus, RendererSpec, ReporterSpec
+
+def provide_table() -&gt; RendererSpec:
+    return RendererSpec(name=&quot;acme-table&quot;, summary=&quot;CSV of every outcome&quot;, render=to_csv)
+
+def provide_webhook() -&gt; ReporterSpec:
+    return ReporterSpec(name=&quot;acme-webhook&quot;, summary=&quot;signed webhook&quot;, prepare=prepare)
+</code></pre>
+<ul>
+<li><code>render(verification)</code> returns the text. Read <code>verification.gate</code>, <code>exit_code</code> and
+<code>open_questions</code> for whether the run is clean; never decide it yourself.</li>
+<li><code>prepare(ReporterRequest(locator))</code> checks the destination and credentials and sends
+nothing; raise <code>ValueError</code> with the reason to refuse. It returns an object with
+<code>destination</code> (shown in the delivery line), <code>sent_secrets()</code> (withheld from every line) and
+<code>deliver(verification) -&gt; Delivery</code>. <code>sent_secrets()</code> is read again after <code>deliver</code>, within
+the same deadline.</li>
+<li><code>deliver</code> should connect straight to the destination the operator named and ignore
+<code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and their lowercase forms, as the reference webhook does with
+<code>ProxyHandler({})</code>. A proxy the environment names sees everything sent and can answer in the
+receiver's place. Guardana cannot enforce this: the reporter's code makes the connection.</li>
+</ul>
+<p>Declare both in <code>guardana-pack.yaml</code> (schema 3) with the output API you were written against:</p>
+<pre><code class="language-yaml">schema_version: 3
+name: acme-outputs
+extension_api: &quot;&gt;=2,&lt;3&quot;
+output_api: &quot;&gt;=1,&lt;2&quot;
+provides:
+  renderers: [acme-table]
+  reporters: [acme-webhook]
+</code></pre>
+<p><code>guardana pack validate</code> checks that each declared output is delivered by your distribution and
+by no other, and <code>guardana pack lock</code> pins it (<a href="usage-pack.html"><code>usage-pack.md</code></a>). A lock that
+pins an output is schema 3, which Guardana 0.39 refuses.</p>
+<h2 id="check-it-in-your-tests">Check it in your tests</h2>
+<p><code>guardana.testing.assert_renderer_conforms</code> and <code>assert_reporter_conforms</code> run your format or
+reporter over five real runs, a stopped and an empty one among them, through the same boundary
+a run uses. The reporter check also proves <code>prepare</code> sends nothing and that each destination
+yields its own delivery status; <code>guardana.core.testing.receiver()</code> serves an accepting, a
+refusing and a closed URL for an HTTP reporter. What each check proves, and what it does not:
+<a href="conformance-kit.html#outputs">conformance kit</a>.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/outputs.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

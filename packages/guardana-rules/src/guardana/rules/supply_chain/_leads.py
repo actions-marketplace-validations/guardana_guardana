@@ -6,7 +6,10 @@ treat it as a lead — while unambiguous detections (a malicious pickle opcode)
 stay verdict-free and at effective certainty, never diluted by a made-up number.
 """
 
+from pathlib import Path
+
 from guardana.core.evaluator.base import Verdict
+from guardana.core.report import CoverageShortfall, ShortfallKind
 
 LEAD_CONFIDENCE = 0.4
 _LEAD_EVALUATOR_ID = "heuristic.lead"
@@ -29,3 +32,17 @@ def unscanned_verdict(rationale: str) -> Verdict:
     holding a hundred members it could not parse.
     """
     return Verdict("inconclusive", 0.0, rationale, _UNSCANNED_EVALUATOR_ID)
+
+
+def unread_component(rule_id: str, path: Path, reason: str) -> CoverageShortfall:
+    """Name a model or notebook a rule could not read as coverage the run did not get.
+
+    Reported beside the inconclusive finding, never instead of it: the finding is what
+    the collector envelope carries, and the shortfall is what makes the run
+    `indeterminate` under every policy rather than only under `fail_on_inconclusive`.
+    """
+    return CoverageShortfall(
+        kind=ShortfallKind.UNEXAMINED_COMPONENT,
+        name=str(path),
+        detail=f"{rule_id} could not read it: {reason}",
+    )

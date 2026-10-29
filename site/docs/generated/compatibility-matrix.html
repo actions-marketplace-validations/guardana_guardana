@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compatibility matrix — Guardana documentation</title>
+<meta name="description" content="Which document, envelope and API versions each minor release writes, from the documents those releases wrote.">
+<link rel="canonical" href="https://guardana.dev/docs/generated/compatibility-matrix">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="../../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html" aria-current="page">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Compatibility matrix</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html" aria-current="page">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Compatibility matrix</h1><p class="lede">Which document, envelope and API versions each minor release writes, from the documents those releases wrote.</p><p>What each release writes and which API versions it defines. The policy these versions follow is on the <a href="../compatibility.html">compatibility page</a>.</p>
+<p>One row per minor release, from its newest patch, as that release wrote its documents when it was captured; a pack manifest and a lock were captured for a pack without outputs. The first row is this tree, read from its own constants, and shows the newest version it writes.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Release</th>
+<th>Python</th>
+<th>Run schema</th>
+<th>Envelope</th>
+<th>Pack manifest</th>
+<th>Lock</th>
+<th>Profile</th>
+<th>Extension API</th>
+<th>Output API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>this tree</td>
+<td>3.11, 3.12, 3.13</td>
+<td>18</td>
+<td>8</td>
+<td>3</td>
+<td>3</td>
+<td>1</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>1.0.0rc5</td>
+<td>3.11, 3.12, 3.13</td>
+<td>18</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>0.41.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>17</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>0.40.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>17</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>1</td>
+</tr>
+<tr>
+<td>0.39.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>17</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.38.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>16</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.37.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>15</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.36.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>14</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.35.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>13</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.34.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>12</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.33.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>11</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.32.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>11</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.31.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>10</td>
+<td>8</td>
+<td>2</td>
+<td>2</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.30.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>10</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.29.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>9</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.28.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>8</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.27.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>7</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.26.1</td>
+<td>3.11, 3.12, 3.13</td>
+<td>6</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.25.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>6</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.24.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>6</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.23.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>6</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.22.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>6</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.21.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>5</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.20.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>5</td>
+<td>8</td>
+<td>2</td>
+<td>1</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.19.1</td>
+<td>3.11, 3.12, 3.13</td>
+<td>5</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.18.1</td>
+<td>3.11, 3.12, 3.13</td>
+<td>5</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.17.1</td>
+<td>3.11, 3.12, 3.13</td>
+<td>5</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.16.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>4</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.15.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>4</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.14.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>4</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.13.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>3</td>
+<td>8</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.12.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>7</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.11.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>7</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.10.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>7</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.9.1</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>7</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.8.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>5</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.7.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>2</td>
+<td>5</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.6.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>1</td>
+<td>4</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.5.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>—</td>
+<td>3</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.4.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>—</td>
+<td>3</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.3.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>—</td>
+<td>3</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>0.2.0</td>
+<td>3.11, 3.12, 3.13</td>
+<td>—</td>
+<td>2</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>— means the release wrote no such document when it was captured, wrote it without a version key, or defines no such API version.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/generated/compatibility-matrix.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

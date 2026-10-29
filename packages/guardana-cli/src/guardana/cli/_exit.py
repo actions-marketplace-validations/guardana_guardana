@@ -1,9 +1,13 @@
 """Turn a run into an exit status. One place, so every command says the same thing."""
 
+import os
+import sys
+import traceback
+
 import typer
 from guardana.cli.exit_codes import ExitCode, code_for
-from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import GateOutcome
+from guardana.core.profile import ProfileError
 from guardana.core.report import ScanResult
 
 
@@ -19,7 +23,7 @@ def exit_with(outcome: GateOutcome, result: ScanResult) -> None:
         raise typer.Exit(code=code)
 
 
-def refuse_unenforceable_budget(exc: BudgetExhausted) -> typer.Exit:
+def refuse_unenforceable_budget(exc: Exception) -> typer.Exit:
     """Report a budget that could never be enforced as bad configuration.
 
     Reached only from `Target.apply_budgets`, which runs before any rule — a
@@ -29,3 +33,22 @@ def refuse_unenforceable_budget(exc: BudgetExhausted) -> typer.Exit:
     """
     typer.echo(f"error: {exc}", err=True)
     return typer.Exit(code=ExitCode.INVALID_USAGE)
+
+
+def refuse_invalid_profile(exc: ProfileError) -> typer.Exit:
+    """Report a profile block that cannot be built as bad configuration, in one line.
+
+    A `3`, never the gate's code: a typo in `guardana.yaml` must not read as a
+    security verdict, nor as a crash.
+    """
+    typer.echo(f"error: {exc}", err=True)
+    return typer.Exit(code=ExitCode.INVALID_USAGE)
+
+
+def print_debug_traceback(error: BaseException) -> None:
+    """Print `error`'s traceback to stderr when `GUARDANA_DEBUG=1`, and nothing otherwise.
+
+    Only on request, because a traceback can carry a URL or a payload from the run.
+    """
+    if os.environ.get("GUARDANA_DEBUG") == "1":
+        traceback.print_exception(error, file=sys.stderr)

@@ -7,15 +7,20 @@ means editing a dispatch chain that somebody has to remember to extend.
 import argparse
 import sys
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
 
 from guardana.server.cli import audit, inventory, keys, retention, schema, serve, tenants
-from guardana.server.cli.codes import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK
+from guardana.server.cli.codes import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, EXIT_UNAVAILABLE
 from guardana.server.cli.serve import ServerNotInstalledError
-from guardana.server.db.migrations import MigrationError
+from guardana.server.db.connection import DatabaseUnreachableError, connect
 from guardana.server.db.settings import StorageNotConfiguredError, resolve_storage
 from guardana.server.lifecycle import LifecycleError
 from guardana.server.security import UnauthenticatedCollectorError
 from guardana.server.tenancy import TenancyError
+
+if TYPE_CHECKING:
+    from psycopg import Connection
+    from psycopg.rows import TupleRow
 
 _DESCRIPTION = (
     "Apply, inspect and undo the collector's schema; manage its tenants and "
@@ -83,6 +88,24 @@ def _without_connection(arguments: argparse.Namespace) -> int:
         return EXIT_INVALID_USAGE
 
 
+def _with_connection(arguments: argparse.Namespace, connection: "Connection[TupleRow]") -> int:
+    """Run a command on an open connection; anything that goes wrong now is not an outage."""
+    try:
+        with connection:
+            return int(arguments.handler(arguments, connection))
+    except (TenancyError, LifecycleError) as exc:
+        # Naming a tenant that does not exist, a slug that is not one, or an identity
+        # prefix that matches nine findings: the command was pointed at nothing, or
+        # at too much. All of them are usage errors — and reporting them through the
+        # catch-all below would tell an operator the database said no, which sends
+        # them after entirely the wrong thing.
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_INVALID_USAGE
+    except Exception as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_FAILED
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run a collector command. Returns the exit code rather than raising."""
     arguments = _parse(argv)
@@ -96,29 +119,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return EXIT_INVALID_USAGE
 
-    from psycopg import connect  # noqa: PLC0415 — imported here so --help needs no database
-
     try:
-        with connect(url) as connection:
-            return int(arguments.handler(arguments, connection))
-    except (TenancyError, LifecycleError) as exc:
-        # Naming a tenant that does not exist, a slug that is not one, or an identity
-        # prefix that matches nine findings: the command was pointed at nothing, or
-        # at too much. All of them are usage errors — and reporting them through the
-        # catch-all below would tell an operator the database is unreachable, which
-        # sends them after entirely the wrong thing.
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_INVALID_USAGE
-    except MigrationError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return EXIT_FAILED
-    except Exception as exc:  # a connection that cannot be made is not a usage error
+        connection = connect(url)
+    except DatabaseUnreachableError as exc:
         print(f"error: could not reach the database: {exc}", file=sys.stderr)
-        return EXIT_FAILED
+        return EXIT_UNAVAILABLE
+    return _with_connection(arguments, connection)
 
 
 if __name__ == "__main__":  # pragma: no cover — the console-script entry point covers this
     raise SystemExit(main())
 
 
-__all__ = ["EXIT_FAILED", "EXIT_INVALID_USAGE", "EXIT_OK", "build_parser", "main"]
+__all__ = [
+    "EXIT_FAILED",
+    "EXIT_INVALID_USAGE",
+    "EXIT_OK",
+    "EXIT_UNAVAILABLE",
+    "build_parser",
+    "main",
+]

@@ -2,21 +2,18 @@
 title: "guardana analyze-trace"
 nav_order: 80
 summary: "`guardana analyze-trace`: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect"
-status: stable
+status: beta
 ---
 
 # `guardana analyze-trace` — grade an execution that already happened
 
-`scan` reads files. `probe` talks to a live model. `analyze-trace` reads a **trace**:
-a recording of what your agent actually did, exported by whatever instrumentation you
-already run.
+`analyze-trace` reads a recorded agent execution when you need to check what happened offline. `scan` reads files; `probe` talks to a live model.
 
 ```bash
 guardana analyze-trace trace.jsonl
 ```
 
-It opens one file and no socket. Nothing is sent anywhere, no model is called, and no
-tool is invoked.
+It opens one file and calls no model and no tool; it sends nothing over the network unless you pass `--reporter`.
 
 ## What it is for
 
@@ -40,7 +37,13 @@ When no approval appears before a payment, three worlds fit the file:
 A tool that reads that absence as world 1 fires on every well-governed system. One that
 reads it as world 2 passes on the one system that really skipped it. So Guardana reads it
 as neither: **a dimension your producer does not record makes the rules that need it not
-run**, and the command says which ones and why.
+run**, and the command says which ones and why. A grant or consent recorded in the action's
+own span or an earlier-written span counts unless its own time (`decided_at`, else
+`requested_at`; a consent's `recorded_at`) is after the action span's `ended_at`. One recorded
+in a later span counts when that time is not after the action span's `started_at`, gives a
+finding when it is after `ended_at`, and is inconclusive when it falls inside the span's
+window or no time orders them. An attempted consequential effect with no approval shown
+to precede it is inconclusive.
 
 ```
 $ guardana analyze-trace otel-export.jsonl
@@ -107,16 +110,42 @@ one.
 {"guardana_trace_end": 3, "spans": 2}
 ```
 
-Six rules of the format, each with a reason:
+Seven rules of the format, each with a reason:
 
 **`instrumented` is what licenses a finding.** List the dimensions your producer really
 records. Leave one out and its rules do not run — which is the safe direction. If you
 omit the field entirely, Guardana derives it from what is present, and derivation can only
 ever *reduce* what runs.
 
-**Unknown keys are refused.** A misspelled `aprovals:` would leave the approval dimension
-declared and empty, the rule would run, and it would report a system that approved
-everything properly. A load error is better than a false accusation.
+**Unknown keys are refused, at every level.** The header, its `producer`, each span and
+every object inside a span — message, part, tool, retrieval, credential, approval, effect
+and the rest — accept only the keys `schemas/trace-v3.schema.json` defines. Anything else
+stops the read with exit `3`. A misspelled `aprovals:` would leave the approval dimension
+declared and empty; a misspelled `aprover` or a part written `{"type": "text", "text": …}`
+would read as a missing value. Either way a rule grades nothing, or accuses a system that
+did nothing wrong. The shapes are held the same way: a value where the schema has an object,
+a list or a list of strings must be one, every item of `messages`, `approvals`, `effects`
+and the other lists must be an object, and every part names its `type`. `"approvals":
+{…}` or a bare-string part stops the read naming the span, rather than reading as no
+approvals or as text nobody typed. The `otel` dialect stays tolerant, because an
+OpenTelemetry span carries attributes from other domains.
+
+**Values are refused unless they have the schema's type and, for a list of choices, are
+one of them.** Every field typed in `schemas/trace-v3.schema.json` must hold that type:
+`"reversible": "false"`, `"terminated": "true"`, `"input_tokens": "12"` or a `null` stop the
+read with exit `3`, naming the span and the field. A field with a fixed list of values —
+a span's `kind`, a tool's `status`, a memory `action`, a credential's `kind`, an effect's
+`sink` and `status`, a policy or approval `outcome`, `approver_kind`, the header's
+`truncated` — accepts exactly the values the schema lists, in lower case: `"Shell"` and
+`"bash"` are refused, never read as `other`. Missing `delegations[].actor`,
+`delegations[].boundary`, `consents[].client`, `policy_decisions[].action`,
+`approvals[].action` or `effects[].action` stops the read with exit `3`, as does a
+native trace with no spans that is not cut short. The `tenant_boundary` contract with
+`sources:` is inconclusive for a retrieval that records no source. An effect's `sink` and a policy decision's or
+an approval's `outcome` are required. Write `other` or `unknown` when that is what you
+mean. Read leniently, `"sink": "Shell"` would reach no contract forbidding a shell, and
+`"terminated": "true"` would withdraw the promise that makes a missing footer
+`unterminated`.
 
 **Credentials are named, never carried.** Write a `digest` if you have one. If you write a
 `value`, Guardana hashes it on read and keeps only the hash — the model has no field to
@@ -179,9 +208,9 @@ half.
 | `guardana.trace.secret_in_tool_argument` | a credential appears in a recorded tool argument | messages/tools |
 | `guardana.trace.credential_passthrough` | one credential crossed two trust boundaries — the confused deputy | delegation |
 | `guardana.trace.identity_disagreement` | a token's audience is not the resource it was presented to | identity |
-| `guardana.trace.session_as_identity` | a step that changed something identified itself with a session and nothing else | identity |
-| `guardana.trace.consent_scope_exceeded` | a hop exercised a scope no consent granted | consent |
-| `guardana.trace.policy_decision_ignored` | a policy said no — or could not say — and the action happened anyway | policy |
+| `guardana.trace.session_as_identity` | a step that changed something identified itself with a session and nothing else | identity, and tools or effects |
+| `guardana.trace.consent_scope_exceeded` | a hop exercised a scope no consent granted | consent + delegation |
+| `guardana.trace.policy_decision_ignored` | a policy said no — or could not say — and the action happened anyway | policy, and tools or effects |
 | `guardana.trace.unapproved_side_effect` | a consequential effect executed with its approval denied or never sought | approval + effects |
 | `guardana.trace.cross_tenant_retrieval` | a retrieval for one tenant returned a document belonging to another | retrieval |
 | `guardana.trace.handoff_authority_expansion` | an agent exercised a scope wider than the handoff carried to it | delegation + handoff |
@@ -190,6 +219,10 @@ Full mapping to OWASP and MITRE ATLAS:
 [the generated catalog](generated/rule-catalog.md).
 
 ## A truncated trace is not a shorter one
+
+The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit `3` without waiting for anything to be written to it.
 
 If the header says `truncated`, or the file exceeds a read ceiling, then a rule that
 **found** something still reports it — the evidence is real — and a rule that found
@@ -215,13 +248,13 @@ session that ends when the process does is `unterminated` by construction.
 | `--target SCHEME://LOCATOR` | Build a trusted installed trace target instead of reading the positional trace file |
 | `--target-option KEY=VALUE` | Repeatable, non-secret configuration passed to that target |
 | `--dialect guardana\|otel` | Override detection |
-| `--write-trace PATH` | Also write the trace in the native dialect |
+| `--write-trace PATH` | Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits `3`. A `PATH` that is `--output`, its `<stem>.exchanges.jsonl`, or a file the command reads — the trace, `--profile`, a `--rules` or `--contract` file or one read from such a directory, or a file the profile names under `rules.paths`, `contracts:`, `calibrations:` or a judge's `adapter` — exits `3` before any rule is loaded or run |
 | `--profile`, `--preset` | Policy, as for every other command — see [`profiles.md`](profiles.md) |
-| `--format human\|json\|sarif\|junit` | `json` is what [`guardana diff`](usage-diff.md) reads |
+| `--format human\|json\|sarif\|junit` | `json` is what [`guardana diff`](usage-diff.md) reads; an [installed format](outputs.md) is named the same way |
 | `--output PATH` | Save the run |
-| `--reporter server://URL` | Forward findings to a collector |
+| `--reporter server://URL` | Forward findings to a collector, or to an [installed reporter](outputs.md) as `<name>://<locator>` |
 | `--ai-system`, `--environment`, `--deployment-id` | What this trace came from. Never guessed |
-| `--rules`, `--plugins`, `--allow-plugin` | Rule loading, as for `scan` |
+| `--rules`, `--plugins`, `--allow-plugin` | Rule loading and plugin trust, as for `scan`: `builtins` unless the flag or the profile's `plugins:` says otherwise |
 | `--contract PATH` | A [security contract](usage-contracts.md) to check this execution against; repeatable, and a directory loads every `.yaml` in it |
 
 The trace file and `--target` are mutually exclusive, and `--dialect` applies
@@ -247,6 +280,14 @@ run, and the coverage fingerprint records which dimensions were available — so
 against a richer trace says the *reach* changed instead of reading the missing findings as
 an improvement.
 
+The run also records which bytes it read, under `run.target.document`. `digest` is SHA-256
+over the first `bytes` bytes of the trace file, and `kind` is `content` when that is the
+whole file or `content_prefix` when a read ceiling stopped the reader first. Check it with
+`head -c <bytes> trace.jsonl | sha256sum`. An edit changes the digest even when the file
+keeps its size. The digest sits beside the target fingerprint, not inside it, so a trace
+re-recorded at the same path is still the same target for `diff`. A run saved before
+schema 11 carries `document: null`: the digest was not recorded.
+
 ## Related
 
 - [`usage-trace-inspect.md`](usage-trace-inspect.md) — what this file can answer at
@@ -255,7 +296,5 @@ an improvement.
   file this command checks
 - [`usage-import-observations.md`](usage-import-observations.md) — carrying another
   tool's results in as unverified claims
-- [`design/trace-domain-model.md`](design/trace-domain-model.md) — why the model is
-  shaped this way, and what was rejected
 - [`usage-probe.md`](usage-probe.md) — verifying a live endpoint or MCP server instead
 - [`privacy.md`](privacy.md) — what evidence keeps, and what the redactor removes

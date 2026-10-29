@@ -27,6 +27,12 @@ class SinkMap:
 
     tools: Mapping[str, SinkKind]
     default: SinkKind
+    read_only: frozenset[str] = frozenset()
+    """Tools that reach no sink at all, so a call to one records no effect.
+
+    Named one by one, like a sink: a read the integrator never listed still falls through
+    to `default`, because "nobody said" is not "nothing happened".
+    """
 
     def sink_for(self, tool: str) -> SinkKind | None:
         """Give the declared sink for this tool, or `None` when nobody mapped it."""

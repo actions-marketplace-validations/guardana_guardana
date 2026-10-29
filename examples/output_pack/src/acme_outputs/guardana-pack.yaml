@@ -1,0 +1,10 @@
+# Schema 3 is the first that can declare an output, and `output_api` is required
+# exactly when `provides` names one. `guardana pack validate` compares the names
+# below with what the entry points deliver.
+schema_version: 3
+name: acme-guardana-outputs
+extension_api: ">=2,<3"
+output_api: ">=1,<2"
+provides:
+  renderers: [acme-table]
+  reporters: [acme-webhook]

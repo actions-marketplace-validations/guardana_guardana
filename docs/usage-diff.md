@@ -7,13 +7,7 @@ status: stable
 
 # `guardana diff` — is this worse than last time?
 
-`scan`, `probe` and `monitor` all answer *how is it now*. This one answers the
-question a team actually has at every change — a new model, an edited system
-prompt, one more tool wired into an agent: **is it worse than it was?**
-
-That is what turns security testing from a launch ritual into part of the change
-process. A regression stops the deploy, and a comparison that cannot honestly be
-made says so instead of going green.
+`guardana diff` compares runs when you need to see whether a change made results worse. `scan`, `probe`, and `monitor` check current results. A regression can stop a deploy; an incomparable pair is reported as such.
 
 ## Save a run, then compare two
 
@@ -28,6 +22,9 @@ guardana probe --url http://localhost:11434 --model llama4 \
 
 guardana diff monday.json friday.json
 ```
+
+A side that cannot be read — not a regular file, over 256 MiB, or not a Guardana run — makes
+the pair incomparable (exit `2`).
 
 Use `--output` rather than a shell redirect. A redirect in PowerShell writes
 UTF-16, which the reader on the other end cannot parse, and the corruption
@@ -45,15 +42,21 @@ guardana diff before.json after.json
 
 | Code | Meaning | In CI |
 |---|---|---|
-| `0` | Nothing got worse | pass |
-| `1` | A regression above your policy's bar | **fail** |
+| `0` | No regression meets both the policy's severity bar and `min_confidence`, and none lacks evidence; regressions below either bar are still printed | pass |
+| `1` | A regression meets both the policy's severity bar and `min_confidence`, or lacks evidence to weigh | **fail** |
 | `2` | The two runs could not be compared | **fail** |
 
 `2` is not a softer `0`. A comparison nobody could make and a comparison that
 found nothing wrong are opposite answers, and only one of them is safe to print
-next to a green build. You will see `2` for a run saved by Guardana 0.5 or
-earlier (no schema version), a truncated file, two different kinds of target, two
-runs with no rule in common, or a pair of arguments passed in the wrong order.
+next to a green build. You will see `2` for a run with no schema version, a truncated file, a current-schema
+run missing a required key or whose channel lengths disagree with `result_summary`,
+two different kinds of target, two runs with no rule in common, a pair of arguments
+passed in the wrong order, or when either run executed rules but every rule declined,
+verifying nothing.
+
+You will also see `2` when either run recorded an error — a refused pack, a rule that
+raised, a file nobody could read. Those checks never ran, so a finding missing from that
+run is unknown rather than fixed, and the error's source is named.
 
 You will also see `2` when a rule made a different number of attempts per case in the
 two runs — `trials changed 1 → 5` names it. More attempts find more failures, so the
@@ -75,6 +78,7 @@ the rule itself — which is why swapping `llama3` for `llama4` still compares.
 | `blinded` | A check that used to reach a verdict no longer can. **The finding count falls here**, which is exactly why a comparison that counted would call going blind an improvement. |
 | `escalated` | Same check, higher severity. |
 | `coverage_lost` | A rule that ran before did not run this time. Whatever it would have found is unknown, not absent. |
+| `left_scan` | The file that held a problem, or a check that could not grade, is not among the files the second run listed. Printed as `LEFT THE SCAN`. |
 
 And the other direction, reported but never failing the build: `resolved`,
 `clarified` (a check that could not grade now grades clean), `de_escalated`,
@@ -85,6 +89,15 @@ Two of those deserve their own sentence:
 **A waiver is not a fix.** Adding a finding to a baseline reports as
 `waiver_changed`, never as `resolved`. The problem did not go away; a person
 decided to accept it.
+
+**A file that left the scan is not a fixed one.** Against files, a finding is
+`resolved` only when the second run listed its file and the rule found nothing there.
+A file the second run did not list — deleted, moved into a skipped directory like
+`build/`, renamed, or excluded by `.guardanaignore` or `rules.paths_exclude` — is
+`left_scan`, and the detail names the exclude when one matches. Removing a malicious
+file is a real fix, and the comparison still cannot tell it from hiding the file, so
+the second run is the evidence: it lists what it read. A second run saved before
+schema 12 records no listing, and a finding that disappeared from it reads as before.
 
 **A narrower run is not a better one.** If the second run used a tighter profile,
 its missing findings are `coverage_lost` — a regression — not progress. This is
@@ -99,14 +112,12 @@ off, and a scanner nobody runs is the worst outcome available.
 
 So the comparison works on **state**, not on tallies: a model either fails a check
 or it does not, and that is far steadier than how many prompts it failed. A
-changed count is reported and never gates on its own. Under a static scan nothing
-is lost by that — a genuinely new problem lands in a new file, which is a new
-check and a regression in its own right.
+falling count is reported as `count_changed` and never gates on its own. When both runs record file scope, a rising count with more unwaived static findings at the same rule and file is an `appeared` regression, as is an unwaived finding whose evidence the earlier run does not report there, even if the count stays the same. Findings that differ only in characters their evidence hides cannot be told apart.
 
 The second filter is confidence. Your policy's `min_confidence` applies to
 regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.
 
-**Neither filter applies to `blinded` or `coverage_lost`**, and severity is the one
+**Neither filter applies to `blinded`, `coverage_lost` or `left_scan`**, and severity is the one
 that mattered. An ungraded result carries confidence 0.0 by definition, and it keeps
 whatever severity its rule declares — so an artifact nobody could read is a `LOW`
 that every default `severity` bar filtered away, and the comparison printed "worse"
@@ -164,7 +175,8 @@ Worth knowing
     (guardana.prompt.jailbreak#b94d…) — a smaller sample, not a better result
 ```
 
-`--format json` carries the same numbers under `measurement`.
+`--format json` carries the same numbers under `measurement`. The comparison document is
+version 3, described by [`diff/v3.schema.json`](https://guardana.dev/schemas/diff/v3.schema.json).
 
 ## Was it the model, or was it the test?
 
@@ -177,11 +189,40 @@ The digest covers a rule's *declaration*. It cannot see a change inside the Pyth
 of a plugin rule; the recorded tool version is what covers that, and a run made by
 a different Guardana version is flagged in the notes.
 
+A rule **graded differently** in the two runs — another evaluator, or a judge whose
+recorded identity (model, endpoint, samples) changed — is left out of the comparison:
+its findings are neither new nor resolved and its measurements are not paired, and the
+comparison is incomplete (exit `2`) with a note naming it, as for a rule whose trials per
+case changed. A judge identity recorded on one side only is unknown, not a change.
+
+When one run is a [`guardana grade`](usage-grade.md) of the exchanges the other kept, or
+both graded the same recording, a note says both runs graded the same recorded replies
+and names the digest: a difference between them is not the system answering differently.
+Only a digest of the whole file counts.
+
+When both runs were started from a recipe and the recipes declared different subjects, one
+an `application` and the other a `model_harness`, a note names both: a model reached
+without the application's prompt, tools and data answers differently, so a difference may be
+that rather than the system changing. A run started without a recipe declared nothing, and
+no note is added.
+
+When both runs recorded a profile digest, a provider wire, an adapter digest or a system-prompt
+digest and they differ, a note names the settings that changed: a difference between the runs
+may come from that rather than from the system. A setting one run did not record is unknown,
+and no note is added for it.
+
+Two runs given different [fixtures](usage-fixtures.md) — another file digest, or the same
+file under another `markers` algorithm — or fixtures on one side only are an incomplete
+comparison (exit `2`), not a note: an item one run asked about the other never did, so a
+finding on it that disappears would otherwise read as a fixed leak. A run migrated from
+schema 14 was given no fixtures.
+
 ## In CI
 
 ```yaml
 - name: Save this run
-  run: guardana scan . --format json --output current.json
+  # exit 1 is a finding the comparison will judge; 2 and above still stop the job
+  run: guardana scan . --format json --output current.json || test $? -eq 1
 
 - name: Compare against the last green run
   run: guardana diff baseline.json current.json --preset ci

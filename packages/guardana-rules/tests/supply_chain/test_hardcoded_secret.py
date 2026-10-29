@@ -1,10 +1,14 @@
 import base64
 import json
+import os
 import re
 from pathlib import Path
 
+import pytest
+from guardana.core.report import Finding
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES
 from guardana.rules.supply_chain.hardcoded_secret import HardcodedSecretRule, _is_printable_base64
 
 
@@ -225,3 +229,35 @@ def test_a_key_in_a_json_with_comments_file_still_fires(tmp_path: Path) -> None:
     findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
 
     assert [f.severity.name for f in findings] == ["HIGH"], "a key in a comment is still a key"
+
+
+def _unverified(findings: list[Finding]) -> list[Finding]:
+    return [f for f in findings if f.verdict is not None and f.verdict.outcome == "inconclusive"]
+
+
+def test_a_secret_padded_past_the_read_bound_leaves_the_file_unverified(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(" " * MAX_SCAN_BYTES + f"\nAWS_KEY={_fake_aws_key()}\n")
+
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["File not scanned for secrets"]
+    assert _unverified(findings) == findings
+    assert "read bound" in findings[0].evidence.summary
+
+
+def test_a_secret_before_the_bound_is_reported_with_the_unread_rest(tmp_path: Path) -> None:
+    (tmp_path / ".env").write_text(f"AWS_KEY={_fake_aws_key()}\n" + " " * MAX_SCAN_BYTES)
+
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.severity.name for f in findings] == ["HIGH", "LOW"]
+    assert len(_unverified(findings)) == 1
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_an_unreadable_file_is_unverified_not_clean(tmp_path: Path) -> None:
+    os.mkfifo(tmp_path / ".env")
+
+    findings = list(HardcodedSecretRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in _unverified(findings)] == ["File not scanned for secrets"]

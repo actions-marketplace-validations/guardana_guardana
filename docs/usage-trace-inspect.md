@@ -7,12 +7,7 @@ status: stable
 
 # `guardana trace inspect` — what a recorded execution can answer
 
-Grading a trace tells you whether invariants held. This tells you which questions
-the file can answer *at all* — before a run, before a policy, before a pipeline
-discovers it the hard way.
-
-It opens one file and no socket. It writes no run document, reaches no network,
-and exits `0` unless the file cannot be read.
+`guardana trace inspect` shows which evidence a trace records when you need to check coverage before analysis. It reads one file without network access, writes no run document, and exits `0` unless it cannot read the file.
 
 ```bash
 guardana trace inspect run.jsonl
@@ -59,7 +54,11 @@ happened
   that this framework simply does not describe.
 
 A report that collapsed the two would make those indistinguishable, which is the
-single inference [the trace design](design/trace-domain-model.md) exists to refuse.
+single inference the trace model exists to refuse.
+
+**`records` counts messages, not readable text.** When some messages carry neither text
+nor a tool call, a note says how many, because a rule reading message text grades them as
+empty. The JSON form carries the same count as `messages_without_text`.
 
 **There is no coverage percentage, and there never will be.** One number is
 compatible with having no identity evidence whatsoever, and a team that gates on a
@@ -122,6 +121,9 @@ guardana trace inspect run.jsonl --format json
   "producer": "checkout-agent",
   "spans": 3,
   "truncated": null,
+  "unreadable_records": 0,
+  "trace_rules_loaded": 11,
+  "messages_without_text": 0,
   "dimensions": [
     {
       "dimension": "approval",
@@ -148,7 +150,7 @@ consumer written against the older shape is unaffected.
 | `--profile PATH` / `--preset NAME` | resolve `trace.require:` so the `required` column and the verdict line mean something |
 | `--format human\|json` | the table, or the same facts named rather than aligned |
 | `--rules PATH` | include custom YAML rules when counting what each dimension is needed by; repeatable |
-| `--plugins`, `--allow-plugin` | the usual plugin-trust controls |
+| `--plugins`, `--allow-plugin` | the usual plugin-trust controls; `builtins` unless the flag or the profile's `plugins:` says otherwise |
 
 ## Filling a gap
 
@@ -162,5 +164,3 @@ missing pieces can be added by hand or by your own exporter. See
 - [`usage-analyze-trace.md`](usage-analyze-trace.md) — grading the execution
 - [`usage-contracts.md`](usage-contracts.md) — security contracts, which demand
   dimensions implicitly by asserting things that need them
-- [`design/trace-domain-model.md`](design/trace-domain-model.md) — why absence is
-  never read as evidence

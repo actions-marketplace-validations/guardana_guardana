@@ -48,10 +48,10 @@ def test_src_layout_package_treated_as_local(tmp_path: Path) -> None:
     assert any("totally_fake_zzz" in s for s in flagged)
 
 
-def test_non_utf8_file_skipped_without_raising(tmp_path: Path) -> None:
+def test_an_undecodable_file_is_declined_as_not_scanned(tmp_path: Path) -> None:
     (tmp_path / "bad.py").write_bytes(b"\xff\xfe\x00invalid utf-8\x80\x81")
     findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert findings == []
+    assert [f.title for f in findings] == ["Python file not scanned"]
 
 
 def test_curated_real_distribution_not_flagged(tmp_path: Path) -> None:
@@ -149,3 +149,76 @@ def test_installed_distribution_import_name_is_treated_as_known(tmp_path: Path) 
     (tmp_path / "a.py").write_text(f"import {sample}\n", encoding="utf-8")
     findings = list(HallucinatedPackageRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert findings == []
+
+
+def _flagged(target: ArtifactTarget) -> list[str]:
+    return [f.evidence.summary for f in HallucinatedPackageRule().run(target, RuleContext())]
+
+
+def test_a_package_installed_into_an_in_tree_venv_does_not_hide_its_own_import(
+    tmp_path: Path,
+) -> None:
+    # A slopsquatted package installed into the repo's own virtualenv is exactly
+    # what the lead exists for; the venv lies outside the scan, so it is no local module.
+    (tmp_path / "app.py").write_text("import zzfakepkgq\n", encoding="utf-8")
+    installed = tmp_path / ".venv" / "lib" / "site-packages" / "zzfakepkgq"
+    installed.mkdir(parents=True)
+    (installed / "__init__.py").write_text("x = 1\n", encoding="utf-8")
+    assert any("zzfakepkgq" in s for s in _flagged(ArtifactTarget(tmp_path)))
+
+
+@pytest.mark.parametrize("installed", ["zzfakepkgq/__init__.py", "zzfakepkgq-1.0/requirements.txt"])
+def test_a_package_in_a_virtualenv_of_any_name_does_not_hide_its_own_import(
+    tmp_path: Path, installed: str
+) -> None:
+    (tmp_path / "app.py").write_text("import zzfakepkgq\n", encoding="utf-8")
+    path = tmp_path / ".venv312" / "lib" / "python3.12" / "site-packages" / installed
+    path.parent.mkdir(parents=True)
+    path.write_text("zzfakepkgq\n" if path.suffix == ".txt" else "x = 1\n", encoding="utf-8")
+    assert any("zzfakepkgq" in s for s in _flagged(ArtifactTarget(tmp_path)))
+
+
+@pytest.mark.parametrize("via_ignore_file", [False, True])
+def test_a_module_under_an_excluded_directory_does_not_suppress_the_lead(
+    tmp_path: Path, via_ignore_file: bool
+) -> None:
+    (tmp_path / "app.py").write_text("import zzfakepkgq\n", encoding="utf-8")
+    (tmp_path / "vendor").mkdir()
+    (tmp_path / "vendor" / "zzfakepkgq.py").write_text("x = 1\n", encoding="utf-8")
+    if via_ignore_file:
+        (tmp_path / ".guardanaignore").write_text("vendor\n", encoding="utf-8")
+        target = ArtifactTarget(tmp_path)
+    else:
+        target = ArtifactTarget(tmp_path, excludes=("vendor",))
+    assert any("zzfakepkgq" in s for s in _flagged(target))
+
+
+def test_a_requirement_under_an_excluded_directory_does_not_declare_the_import(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "app.py").write_text("import zzfakepkgq\n", encoding="utf-8")
+    (tmp_path / "vendor").mkdir()
+    (tmp_path / "vendor" / "requirements.txt").write_text("zzfakepkgq\n", encoding="utf-8")
+    target = ArtifactTarget(tmp_path, excludes=("vendor",))
+    assert any("zzfakepkgq" in s for s in _flagged(target))
+
+
+def test_a_src_layout_package_is_a_local_module(tmp_path: Path) -> None:
+    (tmp_path / "src" / "mypkg").mkdir(parents=True)
+    (tmp_path / "src" / "mypkg" / "__init__.py").write_text("", encoding="utf-8")
+    (tmp_path / "app.py").write_text("import mypkg\n", encoding="utf-8")
+    assert _flagged(ArtifactTarget(tmp_path)) == []
+
+
+def test_a_namespace_package_is_a_local_module(tmp_path: Path) -> None:
+    (tmp_path / "nspkg" / "sub").mkdir(parents=True)
+    (tmp_path / "nspkg" / "sub" / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "app.py").write_text("import nspkg\n", encoding="utf-8")
+    assert _flagged(ArtifactTarget(tmp_path)) == []
+
+
+def test_the_scan_root_directory_name_is_not_a_local_module(tmp_path: Path) -> None:
+    root = tmp_path / "zzfakepkgq"
+    root.mkdir()
+    (root / "app.py").write_text("import zzfakepkgq\n", encoding="utf-8")
+    assert any("zzfakepkgq" in s for s in _flagged(ArtifactTarget(root)))

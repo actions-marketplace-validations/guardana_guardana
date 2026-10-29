@@ -55,8 +55,8 @@ def test_runner_runs_matching_rule_and_skips_wrong_target_kind(tmp_path: Path) -
 
 
 def test_runner_respects_policy_include(tmp_path: Path) -> None:
-    policy = Policy(include=("guardana.other.*",))
-    result = _runner(_Fires(), policy=policy).run(ArtifactTarget(tmp_path))
+    policy = Policy(include=("guardana.ep.*",))
+    result = _runner(_Fires(), _EndpointOnly(), policy=policy).run(ArtifactTarget(tmp_path))
     assert result.findings == ()
 
 
@@ -167,6 +167,7 @@ def test_gate_does_not_fail_on_inconclusive_by_default(tmp_path: Path) -> None:
     # Beside a rule that did conclude, on purpose: `fail_on_inconclusive` is about
     # *some* checks going dark, and a run where every one of them did is
     # indeterminate on its own evidence whatever this switch says.
+    (tmp_path / "model.txt").write_text("x")
     result = _runner(_Inconclusive(), _Clean()).run(ArtifactTarget(tmp_path))
     assert gate(result, Policy(fail_on=FailOn(severity=Severity.HIGH))) is False
 

@@ -1,14 +1,21 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, replace
 
-from guardana.core.assessment import case_id_for, from_verdict
-from guardana.core.evaluator.base import Evaluator, Expectation, Verdict
+from guardana.core.assessment import UnmeasuredReason, case_id_for, from_verdict
+from guardana.core.evaluator.base import (
+    Evaluator,
+    Expectation,
+    Verdict,
+    earlier_failure,
+    grade_decline,
+)
 from guardana.core.exchange import Exchange
 from guardana.core.report import Evidence, Finding
+from guardana.core.rule._send import decline_reason, decline_tags, send
 from guardana.core.rule.base import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError, RuleLoadError
 from guardana.core.rule.fixture import DeclaredFixture, RuleFixture, materialise
-from guardana.core.target import ChatMessage, Target
+from guardana.core.target import ChatMessage, Decline, Target
 from guardana.core.target.protocols import ChatEndpoint
 from guardana.core.trials import CaseOutcome, case_outcome, check_trials, failed_before_stop
 
@@ -73,6 +80,21 @@ class ScenarioRule(Rule):
         return len(self.steps) * self.trials_per_case
 
     @property
+    def graded_verdicts(self) -> Mapping[str, int]:
+        """One verdict per graded step and one for the conversation, per trial, by evaluator.
+
+        Keyed by each scope's own evaluator: a scenario's steps may grade with different
+        evaluators, and its `meta.evaluator` names none of them.
+        """
+        graded = [s.evaluator or "" for s in self.steps if s.expect is not None]
+        if self.conversation_expect is not None:
+            graded.append(self.conversation_evaluator or "")
+        counts: dict[str, int] = {}
+        for evaluator_id in graded:
+            counts[evaluator_id] = counts.get(evaluator_id, 0) + self.trials_per_case
+        return counts
+
+    @property
     def grades_one_case(self) -> bool:
         """Every graded turn and the whole-conversation grade are checkpoints of one walk."""
         return True
@@ -110,7 +132,12 @@ class ScenarioRule(Rule):
         )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Drive the turns once per trial, grade each `expect`, and the conversation at the end."""
+        """Drive the turns once per trial, grade each `expect`, and the conversation at the end.
+
+        A walk stops at a step the application declines: that step and the conversation
+        are graded with the decline, and every graded step it did not reach is recorded
+        `inconclusive`, so a trial never loses a case.
+        """
         if not isinstance(target, ChatEndpoint):
             # Unreachable while the capability contract holds: the runner only
             # plans this rule against a target that declared `chat`. If it ever
@@ -120,23 +147,26 @@ class ScenarioRule(Rule):
         graded: dict[str, list[tuple[_GradedScope, Verdict, str]]] = {}
         try:
             for trial in range(1, self.trials_per_case + 1):
-                for scope, verdict, transcript in self._conversation(target, ctx):
+                for scope, grading in self._conversation(target, ctx):
                     # The scope is part of the case id: a scenario grades the same
                     # conversation per turn and again whole, and folding those together
                     # would count one exchange as two measurements of the same thing.
                     case_id = case_id_for(self.meta.id, scope.name, scope.case_key)
                     ctx.record(
                         from_verdict(
-                            verdict,
+                            grading.verdict,
                             case_id=case_id,
                             subject_ref=target.ref,
                             rule_id=self.meta.id,
                             dataset=self.digest(),
-                            tags=(scope.name,),
+                            tags=(scope.name, *grading.tags),
                             trial=trial,
+                            reason=grading.reason,
                         )
                     )
-                    graded.setdefault(case_id, []).append((scope, verdict, transcript))
+                    graded.setdefault(case_id, []).append(
+                        (scope, grading.verdict, grading.transcript)
+                    )
         except Exception:
             # A failure already seen is kept when a later trial stops the rule: a
             # spent budget or a grader that raised must not take it back.
@@ -175,18 +205,29 @@ class ScenarioRule(Rule):
 
     def _conversation(
         self, target: ChatEndpoint, ctx: RuleContext
-    ) -> Iterator[tuple["_GradedScope", Verdict, str]]:
+    ) -> Iterator[tuple["_GradedScope", "_Grading"]]:
         """Walk the turns from an empty history once, grading every scope as it comes."""
         messages: list[ChatMessage] = []
-        for step in self.steps:
+        meta: Mapping[str, str] = {}
+        declined: Decline | None = None
+        # Where each grader stopped reading, by evaluator and expectation.
+        read_until: list[tuple[str | None, Expectation, int]] = []
+        for index, step in enumerate(self.steps):
             messages.append(ChatMessage(role="user", content=step.send))
             to_send = [messages[-1]] if self.stateful else list(messages)
-            messages.append(ChatMessage(role="assistant", content=target.chat(to_send)))
+            sent = send(target, to_send)
+            meta, declined = sent.meta, sent.decline
+            if declined is None:
+                messages.append(ChatMessage(role="assistant", content=sent.text or ""))
             if step.expect is not None:
                 scope = _GradedScope(_resolve(ctx, step.evaluator), step.expect, "turn", step.send)
-                exchange = Exchange(tuple(messages))
-                verdict = scope.evaluator.evaluate(exchange, scope.expectation)
-                yield scope, verdict, exchange.transcript
+                start = _read_from(read_until, step.evaluator, scope.expectation, len(messages))
+                exchange = Exchange(tuple(messages), meta=meta, graded_from=start, decline=declined)
+                yield scope, _graded(scope, exchange)
+            if declined is not None:
+                walked = Exchange(tuple(messages), meta=meta, decline=declined)
+                yield from _unreached(ctx, self.steps[index + 1 :], walked, declined, read_until)
+                break
         if self.conversation_expect is not None:
             scope = _GradedScope(
                 _resolve(ctx, self.conversation_evaluator),
@@ -194,8 +235,8 @@ class ScenarioRule(Rule):
                 "conversation",
                 "",
             )
-            exchange = Exchange(tuple(messages))
-            yield scope, scope.evaluator.evaluate(exchange, scope.expectation), exchange.transcript
+            exchange = Exchange(tuple(messages), meta=meta, decline=declined)
+            yield scope, _graded(scope, exchange)
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +252,88 @@ class _GradedScope:
     expectation: Expectation
     name: str
     case_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class _Grading:
+    """One scope's verdict, the transcript it read, and what its assessment records beside it."""
+
+    verdict: Verdict
+    transcript: str
+    tags: tuple[str, ...]
+    reason: UnmeasuredReason | None
+
+
+def _graded(scope: _GradedScope, exchange: Exchange) -> _Grading:
+    """Grade `exchange` for `scope`, a decline included."""
+    verdict, from_decline = grade_decline(scope.evaluator, exchange, scope.expectation)
+    return _Grading(
+        verdict,
+        exchange.transcript,
+        decline_tags(exchange, from_decline),
+        decline_reason(exchange),
+    )
+
+
+def _read_from(
+    read_until: list[tuple[str | None, Expectation, int]],
+    evaluator_id: str | None,
+    expect: Expectation,
+    end: int,
+) -> int:
+    """Return where a step's grader starts reading, and mark it as read up to `end`.
+
+    A step grades the replies since the last step graded by the same evaluator against the
+    same expectation: that grader reads each reply once, and a reply another grader checked
+    is still read by it.
+    """
+    start = next(
+        (
+            until
+            for evaluator, expectation, until in reversed(read_until)
+            if evaluator == evaluator_id and expectation == expect
+        ),
+        0,
+    )
+    read_until.append((evaluator_id, expect, end))
+    return start
+
+
+def _unreached(
+    ctx: RuleContext,
+    later: tuple[ScenarioStep, ...],
+    walked: Exchange,
+    decline: Decline,
+    read_until: list[tuple[str | None, Expectation, int]],
+) -> Iterator[tuple[_GradedScope, _Grading]]:
+    """Grade every graded step a decline kept from being sent, over the turns that were.
+
+    A reply its grader had not yet read can still fail the step: a leak before the decline
+    stands. Otherwise the step is not measured. A step never sent has no decline of its
+    own, so `read_decline` is never asked about it.
+    """
+    for step in later:
+        if step.expect is None:
+            continue
+        scope = _GradedScope(_resolve(ctx, step.evaluator), step.expect, "turn", step.send)
+        start = _read_from(read_until, step.evaluator, scope.expectation, len(walked.messages))
+        exchange = replace(walked, graded_from=start)
+        failed = earlier_failure(scope.evaluator, exchange, scope.expectation)
+        if failed is not None:
+            yield scope, _Grading(failed, exchange.transcript, (), None)
+            continue
+        verdict = Verdict(
+            "inconclusive",
+            0.0,
+            f"not sent: an earlier step was {decline.described}",
+            scope.evaluator.assessor_id,
+        )
+        yield (
+            scope,
+            _Grading(
+                verdict, exchange.transcript, (decline.tag,), UnmeasuredReason.TARGET_DECLINED
+            ),
+        )
 
 
 def _planted(expect: Expectation | None, canary: str) -> Expectation | None:

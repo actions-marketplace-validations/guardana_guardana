@@ -12,6 +12,7 @@ derives from it or is checked against it here.
 """
 
 import importlib.util
+import json
 import re
 import subprocess
 import sys
@@ -20,6 +21,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from _release_series import stable_series
 from guardana.core import __version__
 
 _MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
@@ -38,13 +40,11 @@ def _read(relative: str) -> str:
     return (_repo() / relative).read_text(encoding="utf-8")
 
 
-def _minor(version: str) -> str:
-    major, minor, *_rest = version.split(".")
-    return f"{major}.{minor}"
-
-
 def test_the_roadmap_describes_the_released_version() -> None:
-    match = re.search(r"## What ships today \((\d+\.\d+\.\d+)\)", _read("ROADMAP.md"))
+    match = re.search(
+        r"## What ships today \((\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?)\)",
+        _read("ROADMAP.md"),
+    )
     assert match is not None, "ROADMAP.md no longer states which version ships today"
     assert match.group(1) == __version__, (
         f"ROADMAP.md says {match.group(1)} ships today; the packages are at {__version__}"
@@ -57,9 +57,25 @@ def test_the_changelog_has_an_entry_for_the_released_version() -> None:
     )
 
 
+def test_the_stated_historical_range_is_the_corpus_range() -> None:
+    """The releases whose documents current tests read are named from the corpus, not recalled."""
+    releases = json.loads(
+        (_repo() / "packages/guardana-core/tests/historical/releases.json").read_text("utf-8")
+    )
+    ordered = sorted(releases, key=_capture_script().version_key)
+    expected = (ordered[0], ordered[-1])
+    for relative in ("FEATURES.md", "ROADMAP.md"):
+        stated = re.findall(
+            r"(\d+\.\d+\.\d+(?:rc\d+)?) through (\d+\.\d+\.\d+(?:rc\d+)?)", _read(relative)
+        )
+        assert stated, f"{relative} no longer states which releases' documents are read"
+        assert set(stated) == {expected}, f"{relative} states {stated}; the corpus holds {expected}"
+
+
 def test_documented_action_pins_track_the_released_minor() -> None:
     """A pin one minor behind sends users at a tag that predates the docs beside it."""
-    expected = f"guardana/guardana@v{_minor(__version__)}"
+    major, minor = stable_series()
+    expected = f"guardana/guardana@v{major}.{minor}"
     for relative in ("README.md", "docs/integrations.md", "site/index.html"):
         pins = set(re.findall(r"guardana/guardana@v\d+\.\d+", _read(relative)))
         assert pins == {expected}, f"{relative} pins {sorted(pins)}, expected {expected}"
@@ -68,12 +84,11 @@ def test_documented_action_pins_track_the_released_minor() -> None:
 def _product_prose() -> list[Path]:
     """Tracked markdown that makes claims *about the product*, and is checked for them.
 
-    Three exclusions, each for its own reason. `CHANGELOG.md` is a record of the
-    past, and the past is allowed to say the collector had none of this.
-    `docs/design/` states the problem a decision solved; an accepted decision is
-    superseded rather than rewritten. And `.claude/` holds agent procedures that
-    deliberately *quote* the stale phrasings as examples of what to hunt for — a
-    gate that fires on its own description of itself is a gate people delete.
+    Two exclusions, each for its own reason. `CHANGELOG.md` is a record of the
+    past, and the past is allowed to say the collector had none of this. And
+    `.claude/` holds agent procedures that deliberately *quote* the stale phrasings
+    as examples of what to hunt for — a gate that fires on its own description of
+    itself is a gate people delete.
 
     `CLAUDE.md` is deliberately **not** exempt. It is project law, it makes claims
     about the product, and it named a milestone as current for fifteen releases
@@ -82,9 +97,7 @@ def _product_prose() -> list[Path]:
     return [
         path
         for path in _tracked_markdown()
-        if path.name != "CHANGELOG.md"
-        and "design" not in path.parts
-        and ".claude" not in path.parts
+        if path.name != "CHANGELOG.md" and ".claude" not in path.relative_to(_repo()).parts
     ]
 
 
@@ -150,8 +163,7 @@ def test_no_page_still_denies_a_capability_the_collector_now_has() -> None:
     Every tracked page is checked rather than a hand-written list, because the list
     is what missed `product-status.md` the first time. `CHANGELOG.md` is exempt: it
     is a record of the past, and the past is allowed to say the collector had none
-    of this. So is `docs/design/`: a design document states the problem it solved,
-    and an accepted decision is superseded rather than rewritten.
+    of this.
     """
     offenders = [
         f"{path.relative_to(_repo())}: {claim!r}"
@@ -181,7 +193,13 @@ def test_the_collector_page_does_not_overstate_the_environment_boundary() -> Non
 
 @pytest.mark.parametrize(
     "script",
-    ["generate_docs.py", "sync_site.py", "generate_llms_txt.py", "generate_sitemap.py"],
+    [
+        "generate_docs.py",
+        "sync_site.py",
+        "generate_llms_txt.py",
+        "generate_sitemap.py",
+        "generate_well_known.py",
+    ],
 )
 def test_generated_truth_is_current(script: str) -> None:
     """The generated fragments and the landing page's counts match the registry.
@@ -198,6 +216,18 @@ def test_generated_truth_is_current(script: str) -> None:
         check=False,
     )
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _capture_script() -> types.ModuleType:
+    """Load `scripts/capture_historical_documents.py`, which owns how release versions order."""
+    spec = importlib.util.spec_from_file_location(
+        "capture_historical_documents", _repo() / "scripts" / "capture_historical_documents.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def _bump_script() -> types.ModuleType:
@@ -231,7 +261,8 @@ def test_no_tracked_file_pins_a_version_from_another_series(kind: str) -> None:
     pattern = getattr(bump, kind)
     # The script's patterns capture the prefix so a rewrite can keep it, which
     # makes the rest of the match the series this file names.
-    expected = _minor(__version__)
+    major, minor = stable_series()
+    expected = f"{major}.{minor}"
     stale = {
         f"{path}: {match.group(0)}"
         for path in bump.pin_bearing_files(pattern)
@@ -291,10 +322,10 @@ def test_no_page_promises_a_milestone_that_has_already_shipped(pattern: re.Patte
     is that schedule: the released version moves, and every page that named it as
     future has to be re-read.
 
-    `CHANGELOG.md` and `docs/design/` are exempt for the reason they always are —
-    both are records of what was true when written.
+    `CHANGELOG.md` is exempt for the reason it always is — it is a record of what
+    was true when written.
     """
-    released = tuple(int(part) for part in __version__.split(".")[:2])
+    released = stable_series()
     stale = [
         f"{path.relative_to(_repo())}: {match.group(0)}"
         for path in _product_prose()
@@ -305,3 +336,92 @@ def test_no_page_promises_a_milestone_that_has_already_shipped(pattern: re.Patte
         f"pages promising a milestone at or below the released {__version__}:\n  "
         + "\n  ".join(stale)
     )
+
+
+# Wording that describes the 1.0 candidate phase as current. A generic mention of
+# release candidates as a mechanism ("a risky minor may first use one") stays allowed.
+_CANDIDATE_WORDING = re.compile(
+    r"\bpre-1\.0\b"
+    r"|\b(?:until|before)\s+(?:the\s+)?(?:final\s+|stable\s+|first\s+stable\s+)?1\.0\b"
+    r"|\brelease[- ]candidate\s+(?:line|period|work|phase)\b"
+    r"|\bcandidate\s+(?:period|freeze|phase)\b"
+    r"|\b1\.0\.0rcN\b"
+    r"|\btry\s+a\s+(?:release\s+)?candidate\b"
+    r"|\bduring\s+the\s+(?:freeze|candidates)\b"
+    r"|\bstatus-beta\b"
+    r"|>\s*Release candidate\b",
+    re.IGNORECASE,
+)
+_FINAL_VERSION = re.compile(r"\d+\.\d+\.\d+")
+
+
+def _candidate_wording(text: str) -> list[str]:
+    return [match.group(0) for match in _CANDIDATE_WORDING.finditer(text)]
+
+
+def _release_prose() -> list[Path]:
+    """Product prose plus the landing page, without the dated notes."""
+    return [path for path in _product_prose() if path.relative_to(_repo()).parts[0] != "notes"] + [
+        _repo() / "site" / "index.html"
+    ]
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Guardana is pre-1.0 (0.41.x) and on the 1.0 release candidate line.",
+        "Until stable 1.0, candidates carry fixes only.",
+        "Before 1.0, a minor release may break.",
+        "Documentation fixes are open during the candidate period.",
+        "The `1.0.0rcN` candidates carry fixes only.",
+        "## Try a release candidate",
+        "During the freeze, contributions cover fixes.",
+        "[![Status: beta](https://img.shields.io/badge/status-beta-yellow.svg)]",
+        '<p class="status">Release candidate · engine and rules beta</p>',
+    ],
+)
+def test_candidate_wording_is_recognised(text: str) -> None:
+    assert _candidate_wording(text)
+
+
+def test_a_generic_mention_of_release_candidates_is_not_candidate_wording() -> None:
+    text = (
+        "A risky minor or major release may first use a release candidate, such as "
+        "`1.1.0rc1`. To install a release candidate, add `--pre`."
+    )
+    assert _candidate_wording(text) == []
+
+
+def test_a_final_release_describes_no_candidate_phase() -> None:
+    """Prose that calls the project a candidate is false once the version has no suffix."""
+    if _FINAL_VERSION.fullmatch(__version__) is None:
+        pytest.skip(f"{__version__} is a pre-release; the rule binds a final version")
+    stale = [
+        f"{path.relative_to(_repo())}:{number}: {phrase}"
+        for path in _release_prose()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        for phrase in _candidate_wording(line)
+    ]
+    assert not stale, (
+        f"product prose still describes a candidate phase at {__version__}:\n  "
+        + "\n  ".join(stale)
+    )
+
+
+def test_every_list_of_presets_names_every_preset() -> None:
+    """A page listing the presets on one line lists all of them.
+
+    Keyed on the two names no other word collides with, so a sentence about CI or
+    monitoring is not mistaken for a list.
+    """
+    from guardana.core.profile import PRESET_NAMES  # noqa: PLC0415 — the one test that needs it
+
+    stale = [
+        f"{path.relative_to(_repo())}:{number}"
+        for path in _product_prose()
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1)
+        if "pre-training" in line
+        and "monitor" in line
+        and not all(name in line for name in PRESET_NAMES)
+    ]
+    assert not stale, f"preset lists missing one of {PRESET_NAMES}:\n  " + "\n  ".join(stale)

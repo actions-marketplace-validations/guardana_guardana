@@ -135,11 +135,14 @@ def _pack() -> Document:
         "name": "acme-guardana-rules",
         "description": "Acme's private checks",
         "extension_api": ">=1,<2",
+        "output_api": ">=1,<2",
         "provides": {
             "rules": ["acme.agent.customer_data"],
             "evaluators": ["acme.strict_refusal"],
             "targets": ["acme.warehouse"],
             "taxonomies": ["ACME-CONTROLS"],
+            "renderers": ["acme-table"],
+            "reporters": ["acme-webhook"],
         },
     }
 

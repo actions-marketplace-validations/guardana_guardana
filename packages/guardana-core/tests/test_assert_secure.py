@@ -19,6 +19,7 @@ from guardana.core.profile import FailOn, Policy, Profile
 from guardana.core.redaction import EvidenceMode, RedactionPolicy
 from guardana.core.registry import Registry
 from guardana.core.report import Evidence, Finding
+from guardana.core.report.shortfall import ShortfallKind
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, Target, TargetKind
@@ -26,6 +27,12 @@ from guardana.core.testing import fake_aws_key
 from guardana.testing import SecurityAssertionError, assert_secure
 
 _FAKE_KEY = fake_aws_key()
+
+
+@pytest.fixture(autouse=True)
+def _a_file_to_scan(tmp_path: Path) -> None:
+    """Give the scanned directory a file, so only the rules decide the outcome."""
+    (tmp_path / "notes.txt").write_text("nothing to see\n", encoding="utf-8")
 
 
 class _Fires(Rule):
@@ -233,9 +240,21 @@ def test_a_path_that_is_not_there_refuses_rather_than_passing() -> None:
         assert_secure("no-such-directory-anywhere")
 
 
-def test_an_empty_directory_is_a_different_answer_and_may_pass(tmp_path: Path) -> None:
-    """Nothing to find is not nothing to look at."""
-    assert assert_secure(tmp_path, profile=_profile(), registry=_registry(_Quiet()))
+def test_an_empty_directory_is_not_a_pass(tmp_path: Path) -> None:
+    """A scan that read no file found nothing, which is not the directory found clean."""
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    with pytest.raises(SecurityAssertionError) as raised:
+        assert_secure(empty, profile=_profile(), registry=_registry(_Quiet()))
+
+    assert raised.value.outcome is GateOutcome.INDETERMINATE
+    assert [gap.kind for gap in raised.value.result.coverage_shortfall] == [
+        ShortfallKind.EMPTY_TARGET
+    ]
+    assert "1 piece(s) of coverage missing:" in str(raised.value)
+    assert "empty_target" in str(raised.value)
+    assert "holds no file to scan" in str(raised.value)
 
 
 def test_a_profile_and_a_preset_together_are_a_usage_error(tmp_path: Path) -> None:

@@ -39,9 +39,6 @@ Symptom: $ARGUMENTS
 - **A stale cache.** `.ruff_cache` has answered for a changed file; `__pycache__` reuses old
   bytecode after a same-size edit in the same second; a cached wheel in the isolated example
   runs hides the data files an extension change touches. `scripts/ci_local.sh` clears all three.
-- **`--help` is not safe on four scripts.** `release.py`, `clean_install_check.py`,
-  `generate_sbom.py` and `image_smoke.py` have no argument parser and run for real. Read the
-  docstring instead.
 - **A green suite is not a working command.** Every unit test can pass while the command drops a
   field, sends twice the budget or reports "no regression" over an indeterminate run — each of
   these has happened. Run the command; read the artifact.

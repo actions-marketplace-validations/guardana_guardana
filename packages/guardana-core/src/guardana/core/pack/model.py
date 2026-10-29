@@ -14,15 +14,15 @@ class PackError(Exception):
     """Raised when a pack manifest cannot be read, or declares an API this build lacks."""
 
 
-PACK_SCHEMA_VERSION = 2
+PACK_SCHEMA_VERSION = 3
 """Version of `guardana-pack.yaml`, moved independently of the extension API.
 
 Two numbers because they answer two questions. `extension_api` says which `Rule`,
 `Evaluator`, `Target` and `Finding` a pack was written against; this says what a
-*manifest* may contain. Schema 2 adds `provides.taxonomies`, so the fourth
-extension group can finally be declared — and a v1 manifest still loads, migrated
-forward in memory, because a manifest belongs to its author and Guardana does not
-rewrite somebody else's file.
+*manifest* may contain. Schema 2 adds `provides.taxonomies`; schema 3 adds
+`provides.renderers`, `provides.reporters` and `output_api`. Older manifests still
+load, migrated forward in memory, because a manifest belongs to its author and
+Guardana does not rewrite somebody else's file.
 
 Declared here rather than beside the loader: the model is what both the loader and
 every reader of a `PackManifest` depend on, and a version living in the parser is a
@@ -89,21 +89,25 @@ class ApiRange:
             f"upgrade the pack"
         )
 
-    def why_not_any(self, apis: Iterable[int]) -> str:
-        """Explain incompatibility with a build that implements several API editions."""
+    def why_not_any(self, apis: Iterable[int], *, what: str = "extension API") -> str:
+        """Explain incompatibility with a build that implements several API editions.
+
+        `what` names the contract the range is about, so an `output_api` range is
+        explained in the same words as an `extension_api` one.
+        """
         supported = tuple(sorted(set(apis)))
         if not supported:
-            return "this build declares no extension API, so it cannot load any pack"
+            return f"this build declares no {what}, so it cannot load any pack"
         if self.accepts_any(supported):
             return ""
         shown = ", ".join(str(api) for api in supported)
         if self.minimum > supported[-1]:
             return (
-                f"needs extension API >={self.minimum} and this build implements {shown} — "
+                f"needs {what} >={self.minimum} and this build implements {shown} — "
                 "the pack is newer than Guardana; upgrade Guardana"
             )
         return (
-            f"needs extension API <{self.below} and this build implements {shown} — the pack "
+            f"needs {what} <{self.below} and this build implements {shown} — the pack "
             "is older than every compatible API retained by Guardana; upgrade the pack"
         )
 
@@ -139,6 +143,19 @@ class PackManifest:
     none of the three things it could list were what that pack shipped.
     """
 
+    renderers: tuple[str, ...] = field(default_factory=tuple)
+    """Installed formats this pack provides, by entry-point name (schema 3)."""
+
+    reporters: tuple[str, ...] = field(default_factory=tuple)
+    """Installed reporters this pack provides, by entry-point name (schema 3)."""
+
+    output_api: ApiRange | None = None
+    """The output API versions the pack's renderers and reporters work with.
+
+    Declared exactly when the pack provides an output: the output contract is
+    versioned apart from `extension_api`, so a pack shipping only rules names none.
+    """
+
     description: str = ""
     schema_version: int = PACK_SCHEMA_VERSION
     migrated_from: int | None = None
@@ -151,11 +168,42 @@ class PackManifest:
 
     @property
     def provides(self) -> tuple[str, ...]:
-        """Every id this pack claims to register, in one sequence."""
-        return (*self.rules, *self.evaluators, *self.targets, *self.taxonomies)
+        """Every id this pack claims to register, in one sequence.
+
+        An output is spelled `renderer:<name>` or `reporter:<name>`, the spelling every
+        place that pools ids uses, because an output name is not unique across kinds.
+        """
+        return (
+            *self.rules,
+            *self.evaluators,
+            *self.targets,
+            *self.taxonomies,
+            *(output_id("renderer", name) for name in self.renderers),
+            *(output_id("reporter", name) for name in self.reporters),
+        )
+
+    @property
+    def declares_outputs(self) -> bool:
+        """Whether this pack provides a renderer or a reporter."""
+        return bool(self.renderers or self.reporters)
 
     def loadable_by(self, apis: int | Iterable[int] = SUPPORTED_EXTENSION_API_VERSIONS) -> bool:
         """Whether this build may load the pack under any supported API edition."""
         if isinstance(apis, int):
             return self.extension_api.accepts(apis)
         return self.extension_api.accepts_any(apis)
+
+    def outputs_loadable_by(self, apis: Iterable[int]) -> bool:
+        """Whether this build can run the pack's outputs under one of `apis`.
+
+        A pack declaring no output is trivially loadable; one declaring an output
+        without an `output_api` is not, because nothing says what it was written against.
+        """
+        if not self.declares_outputs:
+            return True
+        return self.output_api is not None and self.output_api.accepts_any(apis)
+
+
+def output_id(kind: str, name: str) -> str:
+    """Spell an output as pooled ids spell it: `renderer:<name>` or `reporter:<name>`."""
+    return f"{kind}:{name}"

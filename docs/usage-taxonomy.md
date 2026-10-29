@@ -7,10 +7,7 @@ status: stable
 
 # `guardana taxonomy` — which framework entry a rule actually means
 
-Every Guardana rule maps to a public framework, because a finding nobody can look
-up is a finding nobody can answer for. This command shows what those mappings can
-name: which catalogues are installed, what each entry is called, and what an entry
-recorded years ago corresponds to today.
+`guardana taxonomy` shows installed framework catalogues and rule mappings when you need to look up a finding's reference.
 
 ## Why an edition is part of a reference
 
@@ -89,8 +86,9 @@ same plugin-trust flags:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+| `--profile PATH` | none | A `guardana.yaml` whose `plugins:` decides which installed plugins load — see [`profiles.md`](profiles.md#plugin-trust-plugins) |
 
 ## What this never does
 
@@ -122,11 +120,14 @@ ACME-CONTROLS — registered by an installed package
     ACME-14          Internal data does not leave the support boundary
 ```
 
-**Your entries carry no digest, and that is deliberate.** A package registers
-references; a catalogue file is what gets hashed and pinned into a run manifest, so
-there is nothing here to pin and inventing a value would claim a provenance nobody
-has. In `--format json` the entry appears in the same list as the built-in
-catalogues with `"digest": null`, which is how a script tells the two apart.
+**The listing shows no catalogue digest for your entries, and that is deliberate.** A
+package registers references rather than a catalogue file, so there is no file to hash.
+Inventing a file digest would claim a provenance nobody has. In `--format json`, the entry
+appears in the same list as the built-in catalogues with `"digest": null`, which lets a script
+tell the two apart.
 
-See [`extending.md`](extending.md) and
-[`design/taxonomy-editions.md`](design/taxonomy-editions.md).
+The content a package registers is still pinned. For each framework, a run manifest records
+a digest of the references registered by installed packages (`run.coverage.taxonomies`).
+`guardana pack lock` pins the same digest ([catalogues in a lock](usage-pack.md)).
+
+See [`extending.md`](extending.md).

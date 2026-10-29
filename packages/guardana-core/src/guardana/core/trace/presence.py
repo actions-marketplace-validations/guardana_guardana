@@ -43,9 +43,22 @@ def _records_identity(span: Span) -> bool:
     )
 
 
+def _records_tools(span: Span) -> bool:
+    """Whether this span records a tool: one it ran, one it offered, or a call a message made.
+
+    A chat export carries its tool calls as message parts with no execution span beside
+    them, and those calls are exactly what a rule reading tool arguments examines.
+    """
+    return (
+        span.tool is not None
+        or bool(span.tool_offers)
+        or any(message.tool_calls() for message in span.messages)
+    )
+
+
 _PRESENCE: tuple[tuple[Dimension, Callable[[Span], bool]], ...] = (
     (Dimension.MESSAGES, lambda s: bool(s.messages or s.system_instructions)),
-    (Dimension.TOOLS, lambda s: s.tool is not None or bool(s.tool_offers)),
+    (Dimension.TOOLS, _records_tools),
     (Dimension.RETRIEVAL, lambda s: s.retrieval is not None),
     (Dimension.MEMORY, lambda s: s.memory is not None),
     (Dimension.HANDOFF, lambda s: s.handoff is not None),

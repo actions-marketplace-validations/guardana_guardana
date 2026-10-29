@@ -13,28 +13,14 @@ covers). This resolves the common case; genuine import≠distribution mismatches
 the curated allowlist's job.
 """
 
-import os
 import re
 import tomllib
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from guardana.rules.supply_chain._reading import read_text_bounded
 
 _NAME = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)")
-_SKIP_DIRS = frozenset(
-    {
-        ".git",
-        ".venv",
-        "venv",
-        "env",
-        "node_modules",
-        "__pycache__",
-        "site-packages",
-        "dist",
-        "build",
-    }
-)
 
 
 def normalize(name: str) -> str:
@@ -78,28 +64,21 @@ def _names_from_pyproject(text: str) -> Iterator[str]:
             yield name
 
 
-def _dependency_files(root: Path) -> Iterator[Path]:
-    if root.is_file():
-        return
-    for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS and not d.endswith(".egg-info")]
-        for filename in filenames:
-            if filename == "pyproject.toml" or (
-                filename.startswith("requirements") and filename.endswith(".txt")
-            ):
-                yield Path(dirpath) / filename
+def _is_dependency_file(path: Path) -> bool:
+    name = path.name.lower()
+    return name == "pyproject.toml" or (name.startswith("requirements") and name.endswith(".txt"))
 
 
-def declared_import_names(root: Path) -> frozenset[str]:
-    """Return normalized names of the distributions the target repo declares."""
+def declared_import_names(files: Iterable[Path]) -> frozenset[str]:
+    """Return normalized names of the distributions declared by the listed files."""
     names: set[str] = set()
-    for path in _dependency_files(root):
+    for path in filter(_is_dependency_file, files):
         text = read_text_bounded(path)
         if text is None:
             continue
         parsed = (
             _names_from_pyproject(text)
-            if path.name == "pyproject.toml"
+            if path.name.lower() == "pyproject.toml"
             else (_names_from_requirements(text))
         )
         names.update(normalize(n) for n in parsed)

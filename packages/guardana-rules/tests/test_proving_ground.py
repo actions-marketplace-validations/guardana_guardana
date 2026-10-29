@@ -16,6 +16,7 @@ Guardana, and Guardana does not look like the repositories people point a scanne
 """
 
 import pytest
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.report import Finding
@@ -29,7 +30,8 @@ def findings(tmp_path_factory: pytest.TempPathFactory) -> tuple[Finding, ...]:
     """Scan the proving ground once, the way `guardana scan <path>` does."""
     root = build(tmp_path_factory.mktemp("proving-ground"))
     result = Runner(
-        registry=Registry.discover(), profile=Profile(name="proving-ground", policy=Policy())
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="proving-ground", policy=Policy()),
     ).run(ArtifactTarget(root))
     return tuple(result.findings)
 

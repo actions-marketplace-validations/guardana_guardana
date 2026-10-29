@@ -6,58 +6,78 @@
 <title>Threat model — Guardana documentation</title>
 <meta name="description" content="what Guardana defends against, what it does not, and where the trust boundaries sit">
 <link rel="canonical" href="https://guardana.dev/docs/threat-model">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,65 +98,115 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>Threat model</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html" aria-current="page">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>Threat model</h1><p class="lede">what Guardana defends against, what it does not, and where the trust boundaries sit</p><p>What Guardana defends against, what it deliberately does not, and where the
 trust boundaries sit. A security tool without a stated threat model is asking to
 be trusted on vibes.</p>
-<p><strong>Status:</strong> first published for v0.7. Reviewed each minor release.</p>
 <h2 id="the-shape-of-the-system">The shape of the system</h2>
 <pre><code>┌─ your machine / CI runner ──────────────────────────────┐
 │  guardana CLI                                           │
@@ -163,6 +234,7 @@ arguments. Frequently the most sensitive text in a deployment.</li>
 defeated the control, without touching the model.</li>
 <li><strong>The machine it runs on</strong> — a CI runner with repository write access is a
 valuable target in its own right.</li>
+<li><strong>The collector database and its backups</strong> — either can expose every project's findings; database writes can change keys, submissions and audit rows.</li>
 </ol>
 <h2 id="threats-and-where-we-stand">Threats, and where we stand</h2>
 <h3 id="t1--a-malicious-repository-or-model-file-under-scan">T1 — A malicious repository or model file under scan</h3>
@@ -171,7 +243,12 @@ pickle, a zip bomb, a 40 GB &quot;model&quot;, or a file designed to exploit a p
 <p><strong>Stance:</strong> scanning must never execute what it reads. Model-format readers are
 bounded and fail closed: size caps, member caps, recursion caps, and a read that
 fails becomes an <code>errors</code> entry rather than an exception or a silent skip. Pickle
-is parsed at the opcode level, never unpickled.</p>
+is parsed at the opcode level, never unpickled. The repository cannot hide its own
+model files: its <code>.guardanaignore</code> excludes ordinary files only, never a file a model
+loader reads (a model, an archive or compressed file, and configuration, chat templates and Keras
+metadata beside a model or tokenizer). The output names every applied pattern and
+counts model files inside directories every scan skips (<code>build</code>, <code>env</code>,
+<code>node_modules</code>, …). Only the profile's <code>rules.paths_exclude</code> excludes such a file.</p>
 <p><strong>Residual risk:</strong> a parser bug is still a parser bug. Since 0.22.0 every rule that
 opens a file is property-tested against generated input — arbitrary bytes behind
 each format's magic number, declared lengths up to 2⁶³ pointed past the end of the
@@ -180,10 +257,7 @@ escapes but the declared <code>RuleError</code> and that a crafted length does n
 hang. The corpus of extensions is measured from what the rules actually ask for,
 so a rule for a new format is fed automatically rather than when somebody
 remembers.</p>
-<p>What that is not: a long-running fuzzing campaign, a coverage-guided one, or
-OSS-Fuzz. It is a fixed budget of generated cases per run, chosen so it can live
-in every pull request. A crash-free property suite is evidence that the obvious
-malformations are handled, not that the parsers are correct.</p>
+<p>What that is not: a long-running fuzzing campaign or OSS-Fuzz. Property tests still run in every pull request with a fixed case budget; crash-free runs provide evidence that obvious malformations are handled. <code>.github/workflows/fuzz.yml</code> adds coverage-guided Atheris fuzzing of artifact rules (pickle, PyTorch zip, safetensors), the trace reader and profile loader: <code>120</code> seconds per target, on every push to <code>main</code>, weekly and on manual dispatch, on Linux <code>x86_64</code> only. Neither the property suite nor these short runs shows that the parsers are correct.</p>
 <h3 id="t2--a-malicious-or-hostile-target-endpoint">T2 — A malicious or hostile target endpoint</h3>
 <p><strong>Scenario:</strong> the endpoint under test returns a 10 GB response, hangs forever,
 returns crafted content designed to exploit the evaluator, or is not the endpoint
@@ -192,7 +266,7 @@ address that Guardana then fetches</strong> — which turns the target from some
 answers into something that can aim the scanner.</p>
 <p><strong>Stance:</strong> responses are size-bounded and timed out; a hang is an error, not a
 pass. Model output is treated as untrusted throughout — it is never executed, and
-since v0.7 it is redacted before it reaches any output path.</p>
+it is redacted before it reaches any output path.</p>
 <p>The address a target <em>chooses</em> is a different question from the address an
 operator <em>types</em>, and they are answered differently.</p>
 <ul>
@@ -200,10 +274,15 @@ operator <em>types</em>, and they are answered differently.</p>
 is the one place where the server supplies a URL and the client is expected to
 fetch it: <code>resource_metadata</code> in a <code>WWW-Authenticate</code> challenge, then the
 authorization servers named in that document. Guardana will not follow one that
-resolves to a link-local, multicast or reserved address (<code>169.254.169.254</code>
-first among them), one that reaches into the network running the scan while the
-server under test is outside it, one served over plain <code>http</code> when the target is
-not local, or one whose scheme a client must reject. It does not fetch the
+resolves to a cloud metadata address (<code>169.254.169.254</code>, <code>fd00:ec2::254</code>,
+<code>100.100.100.200</code>) or to a link-local, multicast or reserved address, whatever
+the target; one that resolves to any address that is not globally routable —
+private, loopback, carrier-grade NAT — while the server under test is not local;
+one served over plain <code>http</code> when the target is not local; or one whose scheme a
+client must reject. An IPv6 address that carries an IPv4 address — IPv4-mapped,
+IPv4-compatible, NAT64 (<code>64:ff9b::/96</code>) or 6to4 (<code>2002::/16</code>) — is judged as the IPv4
+address it carries, so <code>2002:a9fe:a9fe::</code> is the metadata address; one that carries it
+in a form Guardana does not read (NAT64 local-use, Teredo) is refused. It does not fetch the
 address to confirm the address is dangerous — that would be performing the
 attack in order to report it — and <code>guardana.mcp.discovery_target</code> reports the
 refusal. Loopback and private addresses are permitted when the server under test
@@ -216,7 +295,9 @@ credential. <code>urllib</code> copies every request header onto a redirected re
 permitted hop used to hand the bearer token from <code>--mcp-token-env</code> to whatever
 origin the server named — the same confused deputy as the address, aimed at the
 credential. A hop to a different scheme, host or port now carries no
-<code>Authorization</code> and no <code>Mcp-Session-Id</code>.</li>
+<code>Authorization</code> and no <code>Mcp-Session-Id</code>. The model endpoint, an <code>--adapter</code>
+endpoint and the collector follow no redirect at all: a <code>3xx</code> there is an
+unavailable target or a rejected submission, never a request sent elsewhere.</li>
 <li><strong>Typed by the operator — unrestricted, deliberately.</strong> <code>--url</code> and <code>--mcp</code> go
 where they are pointed, including at internal and loopback addresses. That is
 not an oversight and it is not pending work: scanning an internal endpoint is the
@@ -224,58 +305,118 @@ normal case for this tool, and an allowlist would make the tool refuse its own
 primary use while stopping nobody who can already edit the command line. The
 boundary that matters is who chose the address, and Guardana enforces it there.</li>
 </ul>
-<p><strong>Residual risk:</strong> DNS rebinding across the check. A discovery host is resolved
-when it is validated and connected to by name afterwards, so a domain that answers
-differently between the two calls is not caught. Pinning the resolved address needs
-a custom opener on every request path; it is recorded here rather than implied to
-be solved. Guardana also still fetches whatever the <em>operator</em> points it at, per
-the position above.</p>
+<p><strong>DNS rebinding.</strong> Every connection to an address the server chose — each discovery
+request, and each redirect hop on the server's own requests to an origin other than
+the operator's — connects only to an address it checked. Its connection resolves the host once,
+holds every address in the answer to the rules above (one refused address refuses
+the host), and dials one of the accepted addresses; the host name still travels as
+the <code>Host</code> header and as TLS SNI, and the certificate is verified against the name.
+A name that answers differently between the guard's lookup and the connection's is
+caught at the connection, and <code>guardana.mcp.discovery_target</code> reports it as a
+refused address. A discovery host that does not resolve is a document that could
+not be read, never a refused address.</p>
+<p>Whether the server under test is local is decided once per discovery, and never by
+looking its name up again, because the server answers that lookup itself. It is
+local when the <code>--mcp</code> URL names it by an address inside the network or as
+<code>localhost</code>, or when every connection Guardana made to it reached an address
+inside the network. A connection made through a proxy reached the proxy, so it
+does not count; neither does the absence of any connection.</p>
+<p>These connections use no HTTP proxy: <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code> and their
+lowercase forms are ignored for them, because a proxy resolves the name again
+where the guard cannot see it. On a network that reaches the internet only through
+a proxy, discovery documents read as unreadable rather than as fetched, and a
+redirect from the server under test is not followed through it.</p>
+<p><strong>Residual risk:</strong> the first hop of a request to the server under test itself
+(<code>--mcp</code>) connects by name and honours the proxy settings, because the operator
+chose that address; Guardana fetches whatever the <em>operator</em> points it at, per the
+position above. A server that rebinds its own name between those requests is
+reached at whichever address the name answered; that loosens discovery only when
+every connection to the server landed inside the network. The authorization checks have further limits; see <a href="usage-probe.html#what-these-checks-cannot-see">what these checks cannot see</a>.</p>
 <h3 id="t3--a-malicious-plugin-or-rule-pack">T3 — A malicious plugin or rule pack</h3>
 <p><strong>Scenario:</strong> <code>pip install</code> of a package that registers a <code>guardana.rules</code> entry
 point and runs arbitrary code on discovery.</p>
+<p><strong>Scenario, stdio MCP:</strong> <code>probe --mcp &lt;command&gt;</code> starts the server process with the user's privileges. Without <code>--allow-exec</code>, Guardana refuses it with exit <code>3</code> and starts nothing. Supplying the flag is the same trust decision as installing a pack.</p>
 <p><strong>Stance:</strong> this is the sharpest edge in the product, and it is <strong>partially</strong>
 mitigated. Entry-point discovery imports installed packages; a malicious one runs
 with the user's privileges, and no amount of engine design changes that.</p>
-<p>What exists: <code>--plugins builtins|allowlist|disabled</code> loads the reviewed built-ins
-without discovering arbitrary installed packages; a pack manifest declares what a
+<p>What exists: every command starts with <code>--plugins builtins</code>, which loads the reviewed
+built-ins and refuses every other installed package before importing it, and records
+each refusal as an error, so under the default <code>fail_on_error</code> every run is <code>indeterminate</code>
+while a pack stays refused; a
+pack is admitted by name (<code>--plugins allowlist --allow-plugin</code>, or <code>plugins:</code> in a
+profile), and <code>guardana doctor</code> lists what an installed pack would execute without
+importing it; a pack manifest declares what a
 pack provides and <code>guardana pack lock</code> pins each rule by its hashed declaration;
 and since 0.22.0 the registry refuses an id another distribution already holds,
 enforces the reserved <code>guardana.*</code> namespace against installed packages, and
 records in the saved run which distribution and version supplied every rule that
 ran. That last part is what a compromise is <em>detectable</em> by after the fact.</p>
-<p>What does not exist: <code>--plugins all</code> is still the default, so an ordinary run
-imports whatever is installed. <strong>v1.0:</strong> a declarative pack format that executes
-no Python at all, and subprocess isolation for those that do.</p>
+<p>What does not exist: once a pack is admitted it runs with the user's privileges, and a
+package's dependencies and <code>.pth</code> startup hooks run when Python starts, before any
+trust decision. A declarative pack format that executes no Python is decided
+but not built, and subprocess
+isolation for packs that do execute has no stated release.</p>
 <p><strong>Until then:</strong> treat installing a Guardana pack exactly like installing any other
 Python package into your environment — because that is what it is. <code>SECURITY.md</code>
 says so.</p>
+<p>An installed format or reporter (<a href="outputs.html">installed outputs</a>) is the same kind of code
+with one difference: no run imports it until <code>--format</code> or <code>--reporter</code> names it, so a run
+that does not select one is not exposed to it at all. A selected reporter sends data off the
+machine to a destination the operator names, as a probe target is named; Guardana applies no
+address policy to it.</p>
+<p>Proxy variables are read two ways. The collector client honours <code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>
+and their lowercase forms, as the first hop to a probe target does: the collector is a
+destination the operator names, reached through the operator's network. An installed reporter
+is asked to ignore them, and the reference webhook does, because a proxy the environment names
+would see the delivery and could answer in the receiver's place. Guardana cannot enforce that
+for an installed reporter, since the reporter's own code makes the connection; the
+<a href="conformance-kit.html">conformance kit</a> does not check it either.</p>
 <h3 id="t4--evidence-containing-secrets">T4 — Evidence containing secrets</h3>
 <p><strong>Scenario:</strong> a rule finds a leaked API key, records it as evidence, and the
 report is committed to a repository or uploaded to a collector.</p>
-<p><strong>Stance:</strong> evidence is redacted, and after v0.7 centrally rather than by
-convention (see <a href="design/privacy-and-redaction.html">privacy design</a>). Prompts and
-responses are not stored by default; <code>full</code> evidence mode warns loudly.</p>
+<p><strong>Stance:</strong> evidence is redacted centrally rather than by
+convention (see <a href="privacy.html">privacy</a>). Prompts and
+responses are not stored by default. <code>guardana doctor</code> warns when a profile selects <code>full</code> evidence mode. Commands that run checks do not repeat the warning.</p>
 <p><strong>Residual risk:</strong> a third-party rule that writes a secret into a field the
 redactor does not know about. Mitigated by redacting at one seam every output path
-goes through, rather than trusting rules.</p>
+goes through, rather than trusting rules. An installed output receives what the saved run
+holds, redacted a second time, and a reporter never receives kept exchanges. The reference
+webhook sends no evidence, yet its rule ids, severities and titles per deployment are an
+inventory of weaknesses: it should go only where the report itself may go.</p>
 <h3 id="t5--a-compromised-collector-api-key">T5 — A compromised collector API key</h3>
 <p><strong>Scenario:</strong> a CI secret leaks; the holder can write findings to the collector.</p>
-<p><strong>Stance (v0.7):</strong> keys are scoped to a project, revocable, hashed at rest, shown
+<p><strong>Stance:</strong> keys are scoped to a project, revocable, hashed at rest, shown
 once. A runner key can <strong>write runs, not read other projects</strong> — so a leaked CI
 key does not become a read of the whole fleet's findings.</p>
 <p><strong>Residual risk:</strong> a write-capable key can poison history with fabricated clean
 runs. Audit log records the key used; detecting a fabricated <em>pass</em> is harder than
-detecting a fabricated <em>finding</em>, and is an open problem.</p>
+detecting a fabricated <em>finding</em>, and is an open problem. Anyone with database write access can fabricate a run and its audit row. The log has no per-row signature or hash chain, so it does not prove the run occurred.</p>
 <h3 id="t6--cross-tenant-access-in-the-collector">T6 — Cross-tenant access in the collector</h3>
 <p><strong>Scenario:</strong> one organization reads another's findings by guessing an id.</p>
-<p><strong>Stance (v0.7):</strong> tenancy enforced at the query boundary, not in handlers; no
+<p><strong>Stance:</strong> tenancy enforced at the query boundary, not in handlers; no
 unscoped query exists. Tested per entity, both read and write.</p>
+<p><strong>Residual risk:</strong> tenancy is enforced only in the API. Anyone with the database credential or a backup can read every project. Database write access can add API keys, rewrite submissions and edit the audit log. Stored API keys are digests, so a leak does not expose existing keys.</p>
 <h3 id="t7--stored-xss-through-evidence-in-the-dashboard">T7 — Stored XSS through evidence in the dashboard</h3>
 <p><strong>Scenario:</strong> a model's reply contains a script tag; it lands in evidence; the
 dashboard renders it.</p>
-<p><strong>Stance:</strong> evidence is attacker-influenced text by definition. It is escaped and
-sanitized on render, and the dashboard ships a restrictive CSP. Tested with a
-crafted payload.</p>
+<p><strong>Stance:</strong> evidence is attacker-influenced text by definition. Two layers stand
+between it and a script. The page carries no data: findings arrive only by <code>fetch</code>
+as JSON, and the page's script HTML-escapes every value before it inserts it.
+The page is served with a Content-Security-Policy that allows exactly one script
+and one stylesheet, the page's own, by the SHA-256 of the text actually served:
+<code>default-src 'none'</code>, no <code>'unsafe-inline'</code> or <code>'unsafe-eval'</code> for scripts or
+styles, <code>connect-src 'self'</code>, <code>img-src 'self' data:</code>, <code>base-uri 'none'</code>,
+<code>form-action 'self'</code>, <code>frame-ancestors 'none'</code>, plus <code>X-Content-Type-Options: nosniff</code> and <code>Referrer-Policy: no-referrer</code>. The page uses no <code>style</code> attributes,
+so styles need no inline allowance either. Tests check the header, that the hash
+matches the served script, and, without a browser, that every value the script
+splices into markup is escaped; a crafted finding reaches the API as data, and
+the served page holds none of it until the script fetches and escapes it.</p>
+<p>There is no CSRF token because every route the dashboard cookie can authenticate is a read-only <code>GET</code>. A state-changing route reachable by the cookie would need a CSRF token; that is an invariant of the guard.</p>
+<p><strong>Residual risk:</strong> the escaping test reads the script's structure rather than
+rendering it in a browser, so a value passed through a call that returns raw text
+is outside what it can see. If escaping did fail, the policy still blocks the
+injected script and any outside image or stylesheet, but injected markup could
+change what the reader sees.</p>
 <h3 id="t8--denial-of-service-through-huge-inputs">T8 — Denial of service through huge inputs</h3>
 <p><strong>Scenario:</strong> a 40 GB file, a 5 GB model response, a report with a million
 findings posted to the collector.</p>
@@ -284,25 +425,48 @@ rate limits on ingest, bounded submission counts in storage.</p>
 <h3 id="t9--unsafe-active-testing-against-production">T9 — Unsafe active testing against production</h3>
 <p><strong>Scenario:</strong> a probe against a production agent calls a real tool, writes to real
 memory, sends a real email.</p>
-<p><strong>Stance:</strong> tool calls go to doubles; Guardana never executes a real tool. After
-v0.7, rules declare <code>impact</code> and destructive checks require an explicit
-<code>--allow-side-effects</code>. Documented in <a href="safe-testing.html">safe testing</a>.</p>
+<p><strong>Stance:</strong> tool calls go to doubles; Guardana never executes a real tool. Rules
+declare <code>impact</code> and destructive checks require an explicit
+<code>--allow-destructive</code>. Documented in <a href="safe-testing.html">safe testing</a>.</p>
 <p><strong>Residual risk:</strong> a <em>model</em> wired to real tools by its own deployment can take
 actions Guardana merely prompted. Probing staging is the recommendation, and the
 README says so before the quickstart.</p>
 <h3 id="t10--a-compromised-guardana-release">T10 — A compromised Guardana release</h3>
 <p><strong>Scenario:</strong> a malicious version is published to PyPI.</p>
-<p><strong>Stance:</strong> trusted publishing via OIDC (no long-lived token), signed tags, and
-from v0.7: SBOM, provenance attestations, checksums and container signatures.
-Documented immutable pins for high-security environments, not just the moving tag.</p>
+<p><strong>Stance:</strong> trusted publishing via OIDC uses no long-lived token. Each release publishes Sigstore-signed build provenance and PyPI's PEP 740 attestation for the distributions, a CycloneDX SBOM per distribution, and an SBOM and provenance attestation beside each container image. From the first release after <code>1.0.0rc5</code>, the distribution provenance bundle is attached to the GitHub Release as <code>guardana-&lt;version&gt;.sigstore.json</code>; the reference pack has its own bundle, <code>guardana-reference-pack-&lt;pack version&gt;.sigstore.json</code>. Both images install third-party dependencies as wheels only, using versions and hashes exported from <code>uv.lock</code>. The Guardana packages built in each image are installed with <code>--require-hashes</code>, using the digests computed when those wheels are built. This checks the installed wheels against that build, without an outside-source check. The images run the versions CI tested, and no build step resolves unpinned build requirements. Check them as described in
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>.</p>
+<p>A tag ruleset lets only maintainers create, move or delete <code>v*</code> tags. <code>main</code> accepts changes only through a pull request with required status checks; force pushes are refused, and administrators are held to the same rules. <code>scripts/release.py</code> puts the release commit on a <code>release/vX.Y.Z</code> branch and opens a pull request into <code>main</code>. It squash-merges the pull request only after the checks <code>main</code> requires pass, with <code>--match-head-commit</code> naming the commit those checks ran on, and stops unless the merge commit holds that commit's tree. It then waits for a green CI run on the merge commit, creates the tag on that commit with <code>git tag -s</code> and pushes it only after <code>git tag -v</code> verifies the signature. Any step it cannot complete or check stops the release before a tag is pushed. The <code>pypi</code> environment requires one reviewer's approval for every publish. The <code>publish</code> job requires <code>ci-passed</code>, so a tag publishes only a commit CI passed. Both ghcr packages are public. <code>scripts/check_repo_settings.py</code> reports each setting, including these protections for <code>main</code>, as <code>PRESENT</code>, <code>ABSENT</code> or <code>NOT CHECKED</code>. <code>scripts/reproduce_release.py</code> rebuilds a release from its tag and reports whether each PyPI file matches byte for byte (<a href="reproducible-builds.html">reproducible builds</a>).</p>
+<p><strong>Residual risk:</strong> Release tags from <code>v1.0.0rc3</code> are signed with an SSH key registered to the maintainer's GitHub account, and GitHub reports them verified. Tags <code>v1.0.0rc2</code> and earlier are not signed, and neither is the moving <code>vX.Y</code> tag the Action is pinned by. Images before 0.33.0 carry unsigned
+attestations only, so <code>gh attestation verify</code> cannot check them; from 0.33.0 each
+image digest has a signed provenance statement. The documented pins are moving <code>X.Y</code>
+tags. Pinning an image by digest is documented (<a href="install.html#run-it-as-a-container">installing</a>,
+<a href="https://github.com/guardana/guardana/blob/main/deploy/docker/README.md"><code>deploy/docker/README.md</code></a>) and is not the default.</p>
+<h3 id="t11--a-hostile-a2a-agent">T11 — A hostile A2A agent</h3>
+<p><strong>Scenario:</strong> the A2A agent under <code>probe --a2a</code> is a separate actor from an MCP server or
+a model endpoint, and it writes the document that tells Guardana where to send: its agent
+card names the interface every later request goes to. A hostile card names another
+origin to collect the operator's tokens, or an internal address to aim the scanner.</p>
+<p><strong>Stance:</strong> the card is read from the origin the operator named, and nothing is sent to
+an interface on any other origin: the run reports that the card points elsewhere and
+every check that needs the agent is <code>inconclusive</code>. Both bearer tokens therefore never
+leave the named origin, and are sent only where the card declares a requirement a bearer
+token alone can meet. A redirect to another origin arrives without <code>Authorization</code>, as on
+an MCP server's own requests. Only reads are sent — never <code>SendMessage</code>, <code>CancelTask</code>, a
+subscription or a push-notification configuration — and task ids the agent reveals are
+withheld from every output like a credential.</p>
+<p><strong>Residual risk:</strong> the card's signatures are not verified, so a card is graded on what it
+declares, not on who signed it. Only the JSON-RPC binding is spoken.</p>
+<h3 id="t12--a-reply-that-steers-its-grader">T12 — A reply that steers its grader</h3>
+<p><strong>Scenario:</strong> the reply under test is attacker-influenced input to <code>llm_judge</code>, <code>guard</code>, <code>keyword</code> and <code>reference_judge</code>. A crafted reply can make a judge grade an attack as a pass; wrappers often flip judges.</p>
+<p><strong>Stance:</strong> prefer deterministic evaluators (<code>canary</code>, <code>tool_call</code> and the equality checks). A judge-graded rate is corrected only with a calibration that measures the judge's error per class. Otherwise it reads <code>uncorrected</code> and declines. An evaluator that does not declare itself <code>deterministic</code> is treated as a judge.</p>
+<p><strong>Residual risk:</strong> correction assumes the judge errs the same way on the calibration corpus and this run's replies. One model's refusals do not calibrate a judge reading another model's jailbreaks. The corpus digest is printed beside the rate for readers to check. With the default prompt version <code>2026.1</code>, <code>llm_judge</code> receives the conversation as one JSON-encoded string on a single line between <code>TRANSCRIPT BEGIN</code> and <code>TRANSCRIPT END</code>. A reply cannot end that block or start its own line. The prompt tells the judge everything inside is data. Within the string, turns remain <code>role: content</code> lines joined by encoded line breaks. A role label within a reply looks like a real turn, so the reply can impersonate another speaker and argue for a verdict. With the opt-in <code>prompt_version: &quot;2025.1&quot;</code>, the judge receives those lines as raw text without a surrounding block. A reply can also write text that looks like the transcript's end. Deterministic evaluators (<code>canary</code>, <code>tool_call</code>, the equality checks) do not read the transcript this way.</p>
 <h2 id="explicit-non-goals">Explicit non-goals</h2>
 <ul>
 <li>Guardana is <strong>not an inline control</strong>. It does not sit in the request path and
 cannot block an attack in production.</li>
 <li>Guardana <strong>does not protect the model from its own users</strong> at run time. It tells
 you what a model does when attacked; a guardrail is a different product.</li>
-<li>Guardana <strong>does not verify the correctness of a model's outputs</strong> beyond
-security-relevant behaviour.</li>
+<li>Guardana <strong>does not verify every answer's correctness</strong>. A suite measures answers against a dataset the team supplies, alongside security-relevant checks. Guardana does not grade answers outside that dataset or watch production traffic.</li>
 </ul>
 <h2 id="reporting">Reporting</h2>
 <p>Vulnerabilities in Guardana itself: see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a>. Private
@@ -311,8 +475,10 @@ vulnerability reporting is enabled on the repository.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/threat-model.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

@@ -129,6 +129,30 @@ def test_tenant_boundary_reports_documents_nobody_attributed() -> None:
     assert "carry no tenant" in inconclusive(graded(rule, trace))[0].evidence.summary
 
 
+def test_tenant_boundary_reports_a_query_nobody_attributed_beside_a_named_one() -> None:
+    """A query made for no recorded tenant may have been made for another one."""
+    rule = rule_of(_ONE_TENANT)
+    trace = trace_of(
+        span(
+            "s1",
+            SpanKind.RETRIEVAL,
+            retrieval=_retrieval("acme", RetrievedDocument(id="d1", tenant="acme")),
+        ),
+        span(
+            "s2",
+            SpanKind.RETRIEVAL,
+            retrieval=_retrieval(None, RetrievedDocument(id="d2", tenant="acme")),
+        ),
+    )
+
+    graded_result = graded(rule, trace)
+
+    assert findings(graded_result) == ()
+    assert len(inconclusive(graded_result)) == 1
+    assert "s2" in inconclusive(graded_result)[0].evidence.summary
+    assert "no tenant on its query" in inconclusive(graded_result)[0].evidence.summary
+
+
 # --- approval_required -----------------------------------------------------
 
 

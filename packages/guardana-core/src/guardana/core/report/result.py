@@ -1,5 +1,6 @@
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from guardana.core.assessment import Assessment, AssessmentStatus
 from guardana.core.observation import Observation
@@ -9,7 +10,11 @@ from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
+from guardana.core.target.scope import FileScope, SkippedModels
 from guardana.core.usage import TargetUsage, total
+
+if TYPE_CHECKING:  # the manifest records a result's summaries; the result only carries them
+    from guardana.core.manifest.records import SuiteSummary
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +52,7 @@ class ScanResult:
     errors: tuple[CheckError, ...] = ()
     observations: tuple[Observation, ...] = ()
     coverage_shortfall: tuple[CoverageShortfall, ...] = ()
-    """Coverage the operator demanded and this run did not get. Never a pass.
+    """Coverage the verdict needed and this run did not get. Never a pass.
 
     The one channel with no policy toggle in front of it, and that is what it is
     for: `fail_on_skipped` defaults to off because most skips are ordinary, so a
@@ -92,6 +97,20 @@ class ScanResult:
     what it did. A rule absent here made one attempt per case.
     """
 
+    suites: Mapping[str, "SuiteSummary"] = field(default_factory=dict)
+    """What each suite concluded about its pass rate, by rule id, a budget-stopped one included.
+
+    Built by the suite while it ran and carried as it was built, so the manifest stores
+    and every renderer prints the conclusion the gate read.
+    """
+
+    scope: FileScope | None = None
+    """Every file a file target listed and the excludes it applied; None for any other run.
+
+    What lets a comparison call a finding resolved only where the later run still listed
+    its file, rather than wherever the finding stopped appearing.
+    """
+
     @classmethod
     def merged(cls, results: Sequence["ScanResult"]) -> "ScanResult":
         """Combine several results into one, carrying every channel.
@@ -111,11 +130,14 @@ class ScanResult:
             rules_skipped=tuple({s.rule_id: s for r in results for s in r.rules_skipped}.values()),
             unverified=tuple(f for r in results for f in r.unverified),
             waived=tuple(f for r in results for f in r.waived),
-            # De-duplicated by comparability key and trial: probe runs each case once
-            # per planted canary, and three copies would inflate every rate — while
-            # the K trials of one case share a key and are K observations, not one.
+            # De-duplicated by case, assessor, dataset and trial: probe runs each case
+            # once per planted canary, and three copies would inflate every rate — while
+            # the K trials of one case are K observations, not one. The measurement half
+            # of the key is left out because an ungraded copy carries none.
             assessments=tuple(
-                {(a.comparable_key, a.trial): a for r in results for a in r.assessments}.values()
+                {
+                    (a.comparable_key[:3], a.trial): a for r in results for a in r.assessments
+                }.values()
             ),
             errors=tuple(e for r in results for e in r.errors),
             # De-duplicated by ref: probe runs the same target several times (one
@@ -132,7 +154,7 @@ class ScanResult:
             # one result per planted canary, and a budget that ran out during the
             # third pass leaves the first two looking complete. Dropping it here
             # would hand the merged report a completeness it does not have.
-            stopped_by=next((r.stopped_by for r in results if r.stopped_by is not None), None),
+            stopped_by=_merged_stop([r.stopped_by for r in results]),
             # Summed across passes: probe builds one target per planted canary, and
             # the run's bill is all of them. One unmetered pass makes the total
             # unknown rather than partial — see `total`.
@@ -143,6 +165,8 @@ class ScanResult:
             # it entirely whenever that pass happened not to open a session.
             protocols={name: v for r in results for name, v in r.protocols.items()},
             trials_per_case={rule: k for r in results for rule, k in r.trials_per_case.items()},
+            suites={rule: summary for r in results for rule, summary in r.suites.items()},
+            scope=_merged_scope([r.scope for r in results]),
         )
 
     @property
@@ -205,3 +229,45 @@ class ScanResult:
         score: a broken judge otherwise reports a perfect rate over two cases.
         """
         return tuple(a for a in self.assessments if a.status is AssessmentStatus.INCONCLUSIVE)
+
+
+def _merged_stop(stops: Sequence[StopReason | None]) -> StopReason | None:
+    """Return the stop a merged run records: the highest ranked, else the first one recorded.
+
+    A target that went away outranks one that changed, which outranks a budget that ran
+    out alongside it, because a larger budget would not have let the run finish.
+    """
+    recorded = [stop for stop in stops if stop is not None]
+    if not recorded:
+        return None
+    return max(recorded, key=lambda stop: stop.rank)
+
+
+def _merged_scope(scopes: Sequence[FileScope | None]) -> FileScope | None:
+    """Combine the file scopes of several passes; unknown excludes anywhere stay unknown."""
+    known = [scope for scope in scopes if scope is not None]
+    if not known:
+        return None
+    excludes = [scope.excludes for scope in known]
+    return FileScope(
+        files=tuple(dict.fromkeys(path for scope in known for path in scope.files)),
+        excludes=None
+        if any(e is None for e in excludes)
+        else tuple(dict.fromkeys(p for e in excludes if e is not None for p in e)),
+        ignored_directories=tuple(
+            dict.fromkeys(name for scope in known for name in scope.ignored_directories)
+        ),
+        kept_models=tuple(dict.fromkeys(kept for scope in known for kept in scope.kept_models)),
+        skipped_models=_merged_skipped([scope.skipped_models for scope in known]),
+    )
+
+
+def _merged_skipped(searches: Sequence[SkippedModels | None]) -> SkippedModels | None:
+    """Combine the skipped-directory searches of several passes; one unsearched pass is unknown."""
+    if any(search is None for search in searches):
+        return None
+    known = [search for search in searches if search is not None]
+    return SkippedModels(
+        directories=tuple(dict.fromkeys(d for search in known for d in search.directories)),
+        searched_all=all(search.searched_all for search in known),
+    )

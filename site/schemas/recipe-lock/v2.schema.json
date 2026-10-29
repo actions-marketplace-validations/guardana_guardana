@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/recipe-lock/v2.schema.json",
+  "title": "Guardana Recipe Lock v2",
+  "description": "guardana-recipe.lock.yaml: what a recipe's run is pinned to, written by `guardana recipe lock`. Every digest sits under a `digest` key. Version 2 adds `target` and `sources`, and gives the reason for every `unpinned` entry; this build reads version 1 too.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "recipe",
+    "guardana",
+    "plugins",
+    "profile",
+    "rules",
+    "evaluators",
+    "skipped",
+    "subject_files",
+    "target",
+    "sources",
+    "unpinned"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 2
+    },
+    "recipe": {
+      "$ref": "#/$defs/digested"
+    },
+    "guardana": {
+      "$ref": "#/$defs/text"
+    },
+    "plugins": {
+      "$ref": "#/$defs/text",
+      "description": "The plugin trust in force: a mode, then the allowed distributions."
+    },
+    "profile": {
+      "$ref": "#/$defs/digested"
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "digest",
+          "distribution",
+          "version",
+          "trials"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "$ref": "#/$defs/text"
+          },
+          "distribution": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "version": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "trials": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "evaluators": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "distribution",
+          "version",
+          "judge",
+          "calibration"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "distribution": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "version": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "judge": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "calibration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/digested"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "missing_capability",
+          "unsafe_mode",
+          "not_applicable"
+        ]
+      }
+    },
+    "subject_files": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/digested"
+      }
+    },
+    "target": {
+      "description": "The installed target the recipe names: its scheme and the distribution that registers it. Null for a connection or a recording.",
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "required": [
+            "scheme",
+            "distribution",
+            "version"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "scheme": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9-]*$"
+            },
+            "distribution": {
+              "$ref": "#/$defs/nullable_text"
+            },
+            "version": {
+              "$ref": "#/$defs/nullable_text"
+            }
+          }
+        }
+      ]
+    },
+    "sources": {
+      "type": "object",
+      "description": "Every distribution installed from a directory or a URL that registers a pinned rule, evaluator or target, or is required by one that does, under its PEP 503 name: an editable install by the files of its source directory, any other by the hashes its installed RECORD lists.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "digest",
+          "files"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "files": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "unpinned": {
+      "type": "object",
+      "description": "Each pin the lock cannot vouch for, to the reason: a rule, evaluator or target from a distribution whose code can change under one version and whose files could not be pinned, or such a distribution one of them requires.",
+      "propertyNames": {
+        "pattern": "^(rule|evaluator|target|distribution):\\S+$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/text"
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "nullable_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "\\S"
+    },
+    "digested": {
+      "type": "object",
+      "required": [
+        "digest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

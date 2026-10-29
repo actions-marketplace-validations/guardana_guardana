@@ -7,12 +7,14 @@ status: stable
 
 # `guardana import-observations` — carry another tool's results in as claims
 
-You ran garak. You ran promptfoo. You have an internal harness. Their results are real
-evidence and they belong beside Guardana's — without Guardana pretending it produced them.
+`guardana import-observations` brings external test results into Guardana when you need to review them beside its findings. It keeps results from garak, promptfoo, or an internal harness attributed to their source.
 
 ```bash
 guardana import-observations garak.report.jsonl --target https://llm.internal/v1
 ```
+
+The file is read only when it is a regular file of at most 64 MiB; a FIFO, a device or a larger
+file is refused with exit `3` before anything is imported.
 
 ## This command never exits 0, and that is the design
 
@@ -22,7 +24,7 @@ and the gate is `indeterminate` — exit `2`.
 
 ```
 $ guardana import-observations garak.report.jsonl
-imported 2 claim(s) from garak 0.13.1 via garak from garak.report.jsonl into the
+imported 2 claim(s) from garak 0.17.0 via garak from garak.report.jsonl into the
   unverified channel — Guardana did not send these prompts and has not graded them
 note: 1 result(s) the producer marked as passing were not imported — a pass is not a finding
 note: 2 record(s) were setup or raw-attempt records, not verdicts, and were not imported
@@ -55,6 +57,10 @@ the evidence, where it reads as a quotation.
 `fail_on_error` on by default — makes the run indeterminate. A dropped record is a failing
 check that disappears, which is a false green arriving through the import path.
 
+**The document is identified by its bytes.** Each claim's evidence names the SHA-256 of the
+file it came from, and the saved run records the same digest under `run.target.document`
+with `kind: content`, so `sha256sum` on the file you kept reproduces it.
+
 ## Three formats
 
 Detected from the file's structure rather than its name; `--producer` overrides.
@@ -63,10 +69,16 @@ Detected from the file's structure rather than its name; `--producer` overrides.
 
 A `*.report.jsonl` file. `eval` records are the verdicts.
 
-- `fails > 0` → one claim, `failed`.
+- `fails > 0` → one claim, `failed`. A record from garak before 0.14 states `passed` and
+  `total` instead; `total` counts passed and failed outputs, so the failures are the
+  difference.
 - **`nones > 0` → its own claim, `undecided`.** That field is garak telling you its own
-  detector could not score an output. An importer reading only `passed` and `total` folds
-  those into passes, which is the same mistake Guardana refuses to make about itself.
+  detector could not score an output; neither `total` nor `total_evaluated` counts it, and
+  `total_processed` does. An importer reading only `passed` and the total folds those into
+  passes, which is the same mistake Guardana refuses to make about itself.
+- A record whose counts do not add up to its totals, that scored no output, or that states
+  no undecided count (garak always writes `nones`) is reported unreadable, never counted as
+  clean.
 - A clean `eval` is **counted, not imported** — two hundred passing probes in the
   unverified channel would bury the four that matter.
 - `attempt` records are the raw exchanges behind an `eval` and are not imported; importing
@@ -112,9 +124,9 @@ unreadable — not assumed to be a pass.
 | `--producer garak\|promptfoo\|generic` | Override detection |
 | `--target REF` | What the other tool was pointed at, when the file does not say |
 | `--format`, `--output` | As for every command; `json` is what `diff` reads |
-| `--reporter server://URL` | Forward the claims to a collector |
+| `--reporter server://URL` | Forward the claims to a collector; the command loads no plugins, so an [installed reporter](outputs.md) is refused with exit `3` |
 | `--ai-system`, `--environment` | What these results are about. Never guessed |
-| `--profile`, `--preset` | Policy — `fail_on_inconclusive` is the switch that makes imported claims block |
+| `--profile`, `--preset` | Policy, evidence and delivery settings for the saved run. No `fail_on_*` switch changes the exit code: `2`, or `8` when `delivery.required` is on and delivery lacks acknowledgement. |
 
 ## Turning a claim into a finding
 
@@ -127,6 +139,4 @@ can be traced back to the document that carried it.
 
 - [`usage-analyze-trace.md`](usage-analyze-trace.md) — grading a recorded execution with
   Guardana's own rules
-- [`design/trace-domain-model.md`](design/trace-domain-model.md) — why an import is a claim
-  and not a verdict
 - [`usage-collector.md`](usage-collector.md) — where the claims land when `--reporter` is set

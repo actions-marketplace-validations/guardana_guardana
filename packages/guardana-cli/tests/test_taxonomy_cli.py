@@ -8,10 +8,13 @@ build without asking anybody to remember which edition was installed.
 
 import json
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
+from _fake_distribution import EXPLODING_MODULE, MARKING_MODULE, FakeSite
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core.entrypoints import EVALUATOR_GROUP, RULE_GROUP, TARGET_GROUP, TAXONOMY_GROUP
 from guardana.core.taxonomy import TaxonomyRef, register
 from guardana.core.taxonomy._builtin import index as _taxonomy_registry
 from typer.testing import CliRunner
@@ -54,19 +57,74 @@ def test_an_unknown_reference_says_so_rather_than_printing_nothing() -> None:
     assert "no installed catalogue defines" in result.output
 
 
-def test_a_restrictive_plugin_mode_says_refused_rather_than_absent() -> None:
-    """`--plugins disabled` refuses every entry point, this build's own built-ins
-    included, so `registry.load_errors` is non-empty regardless of which reference
-    is asked for. A miss under that condition is unproven, not absent — the
-    catalogue that would have defined it may be exactly the one just refused — so
-    the command must say so instead of declaring the reference does not exist.
-    """
-    result = runner.invoke(app, ["taxonomy", "LLM99:2025", "--plugins", "disabled"])
+@pytest.fixture
+def site(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeSite]:
+    (tmp_path / "site").mkdir()
+    fake = FakeSite(tmp_path / "site", monkeypatch)
+    yield fake
+    fake.forget_imports()
+
+
+def _install(site: FakeSite, group: str) -> None:
+    site.distribution("acme-pack", (group, "acme", site.module(MARKING_MODULE).name))
+
+
+@pytest.mark.parametrize("trust", [[], ["--plugins", "disabled"]], ids=["default", "disabled"])
+def test_a_refused_taxonomy_provider_makes_a_miss_unproven_rather_than_absent(
+    site: FakeSite, trust: list[str]
+) -> None:
+    """The catalogue that would have defined the reference may be exactly the one refused."""
+    _install(site, TAXONOMY_GROUP)
+
+    result = runner.invoke(app, ["taxonomy", "LLM99:2025", *trust])
 
     assert result.exit_code == ExitCode.INDETERMINATE, result.output
     assert "no installed catalogue" not in result.output
     assert "no loaded catalogue" in result.stderr
-    assert "refused by plugin trust" in result.stderr
+    assert "1 provider(s) were refused by plugin trust" in " ".join(result.stderr.split())
+
+
+@pytest.mark.parametrize("group", [RULE_GROUP, EVALUATOR_GROUP, TARGET_GROUP])
+def test_a_refused_pack_that_provides_no_taxonomy_leaves_a_typo_a_usage_error(
+    site: FakeSite, group: str
+) -> None:
+    """Only a refused `guardana.taxonomies` provider could have defined the reference."""
+    _install(site, group)
+
+    result = runner.invoke(app, ["taxonomy", "LLM99:2025"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert "no installed catalogue defines" in result.output
+    assert "refused by plugin trust" not in result.output
+
+
+def test_a_taxonomy_provider_that_fails_to_import_makes_a_miss_unproven_rather_than_absent(
+    site: FakeSite,
+) -> None:
+    """Admitted and broken is no more proof of absence than refused."""
+    site.distribution("acme-pack", (TAXONOMY_GROUP, "acme", site.module(EXPLODING_MODULE).name))
+
+    result = runner.invoke(app, ["taxonomy", "LLM99:2025", "--plugins", "all"])
+
+    assert result.exit_code == ExitCode.INDETERMINATE, result.output
+    assert "no installed catalogue" not in result.output
+    stderr = " ".join(result.stderr.split())
+    assert "1 provider(s) failed to load" in stderr
+    assert "refused by plugin trust" not in stderr
+
+
+@pytest.mark.parametrize("group", [RULE_GROUP, EVALUATOR_GROUP, TARGET_GROUP])
+def test_a_failed_pack_that_provides_no_taxonomy_leaves_a_typo_a_usage_error(
+    site: FakeSite, group: str
+) -> None:
+    """Only a `guardana.taxonomies` provider that did not load could have defined the reference."""
+    site.distribution("acme-pack", (group, "acme", site.module(EXPLODING_MODULE).name))
+
+    result = runner.invoke(app, ["taxonomy", "LLM99:2025", "--plugins", "all"])
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert "no installed catalogue defines" in result.output
+    assert "may be theirs" not in result.output
 
 
 def test_the_json_form_carries_the_edition_as_its_own_field() -> None:

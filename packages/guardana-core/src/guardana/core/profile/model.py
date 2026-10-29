@@ -1,9 +1,11 @@
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from fnmatch import fnmatch
+from pathlib import Path
 
 from guardana.core.budget import Budgets
-from guardana.core.redaction import RedactionPolicy
+from guardana.core.plugins import PluginTrust
+from guardana.core.redaction import OMITTED_WHEN_DEFAULT, RedactionPolicy
 from guardana.core.safety import Impact
 from guardana.core.severity import Severity
 from guardana.core.trace.model import Dimension
@@ -30,6 +32,34 @@ class FailOn:
     get it", which is the setting a team uses once they have decided what their
     provider must support.
     """
+
+    min_graded_share: float | None = field(default=None, metadata={OMITTED_WHEN_DEFAULT: True})
+    """The least share of a rule's attempted cases it must grade, in `(0, 1]`; None for none.
+
+    Checked per rule after the run, never over the whole run: a rule graded nowhere would
+    otherwise hide behind one graded everywhere. A rule below it is a coverage shortfall.
+    """
+
+    def __post_init__(self) -> None:
+        """Refuse a bar `guardana.yaml` would refuse, so code cannot build a gate that never fails.
+
+        NaN or an out-of-range number passes every comparison it is used in the wrong way:
+        no confidence is `>=` NaN, so every graded failure would fall under the bar.
+        """
+        if not isinstance(self.severity, Severity):
+            raise TypeError(f"fail_on.severity must be a Severity, got {self.severity!r}")
+        confidence = self.min_confidence
+        if (
+            isinstance(confidence, bool)
+            or not isinstance(confidence, int | float)
+            or not 0.0 <= confidence <= 1.0
+        ):
+            raise ValueError(f"fail_on.min_confidence must be in [0.0, 1.0], got {confidence!r}")
+        share = self.min_graded_share
+        if share is not None and (
+            isinstance(share, bool) or not isinstance(share, int | float) or not 0.0 < share <= 1.0
+        ):
+            raise ValueError(f"fail_on.min_graded_share must be in (0, 1], got {share!r}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -120,6 +150,28 @@ class Profile:
 
     Beside `rule_paths` and read the same way, so a team that keeps one config for a
     pipeline does not have to repeat `--contract` in every job.
+    """
+
+    plugins: PluginTrust | None = None
+    """Which installed distributions' entry points this profile trusts, from `plugins:`.
+
+    None when the profile does not say, and then whoever discovers decides: the
+    library loads everything, a command applies its own default. A stated trust is
+    honoured wherever this profile drives discovery.
+    """
+
+    delivery_required: bool = False
+    """Whether every delivery the run makes must be acknowledged, from `delivery.required`.
+
+    Not part of the verdict: a command decides the exit after the gate, so the digest
+    leaves it out and no run record moves when it is set.
+    """
+
+    source: Path | None = None
+    """The `guardana.yaml` this profile was read from; None for a preset or one built in code.
+
+    Relative entries in `rules.paths`, `contracts:` and `calibrations:` are read beside
+    this file, and a command names it when an entry only exists somewhere else.
     """
 
     def demanding(self, dimensions: Iterable[Dimension]) -> "Profile":

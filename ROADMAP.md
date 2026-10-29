@@ -1,180 +1,110 @@
 # Guardana roadmap
 
-This file is the ordered plan. It intentionally does not repeat the feature
-catalog, framework coverage, release history, or design debates:
+Guardana should give an individual developer a useful result on the first run,
+then let a team turn the same evidence into its own tests, gates, reports and
+tools without forking the engine. It is an offline-first verification framework
+with a usable CLI and optional collection, outside the production request path.
 
-- [FEATURES.md](FEATURES.md) says what ships;
-- [the generated rule summary](docs/generated/rule-summary.md) and
-  [rule catalog](docs/generated/rule-catalog.md) are the coverage source of truth;
-- [CHANGELOG.md](CHANGELOG.md) records history;
-- [docs/design/](docs/design/) records accepted and rejected design choices.
+[GitHub Issues](https://github.com/guardana/guardana/issues) are the live work queue.
+[Milestones](https://github.com/guardana/guardana/milestones) group release scope.
+The `1.0.1` milestone holds compatible corrections to package code that a patch can carry, `1.1.0` holds behaviour, report-shape and supported-surface changes for the next minor release that a patch cannot carry, and `next` holds documentation, evidence and process work that ships without a package release. A milestone is a
+scope, not a date.
+Ideas without a reproducible problem or acceptance test start in
+[Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
 
-Items are ordered by dependency, not promised dates. Work moves up when user
-evidence changes the order.
+## What ships today (1.0.0)
+
+The current release carries the stable compatibility promise for its supported surface; [Product status](docs/product-status.md) lists maturity by component.
+It scans model and code artifacts offline, probes live endpoints, MCP servers and A2A agents, grades recordings, compares runs and gates CI.
+Historical documents from 0.2.0 through 1.0.0rc5 are read by current tests.
+See [FEATURES.md](FEATURES.md) for shipped behaviour, [Product status](docs/product-status.md) for limits, and the [generated rule summary](docs/generated/rule-summary.md) and [rule catalog](docs/generated/rule-catalog.md) for coverage.
+
+## The 1.0 promise
+
+1.0 promises that incompatible changes to the supported surface require a major
+release. [Compatibility](docs/compatibility.md) defines that surface and the
+deprecation rules. Every 1.x release reads earlier persisted documents and
+supports extension API 2 and output API 1.
+
+The [versioning policy](docs/compatibility.md#versioning) chooses releases by
+change impact. Fixes merge whenever ready. The maintainer reviews package
+changes each Monday; urgent fixes use the same gates outside that schedule
+([release cadence](CONTRIBUTING.md#release-cadence)). The criteria the first
+stable release had to meet are in
+[product status](docs/product-status.md#stable-release-criteria).
+
+Adoption measures — five consented first runs, two independent application teams, a team's live retrieval pilot and independent third-party customization and its reproduction — are published separately, not release criteria. The generated [first-run](docs/generated/first-run.md) and [application](docs/generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. Invitations remain open.
+
+Six maintainer-run proofs are published as notes. The [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points) passed against 1.0.0rc5 from PyPI ([run](https://github.com/guardana/guardana/actions/runs/39424046832)). Linux and macOS first-run cells passed; all Windows cells passed and are required, with the displayed path `model\weights.pkl` recorded as a known difference ([#167](https://github.com/guardana/guardana/issues/167)). The reference pack 0.1.3, installed from PyPI outside the repository, passed the conformance kit; its wheel and sdist are also attached to each GitHub Release. The [retrieval pilot](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter), [regression loop](https://guardana.dev/notes/regression-loop-with-a-redacted-regression) and [collector recovery runbooks](https://guardana.dev/notes/collector-recovery-runbooks) passed against 1.0.0rc5 in a later [workflow run](https://github.com/guardana/guardana/actions/runs/40005613709), covering the pilot's broken modes, redacted regression promotion, database migration and Compose restores. The maintainer recorded the [security runbook drill](https://guardana.dev/notes/security-runbook-drill), covering a made-up report, TestPyPI release and withdrawal, disclosure on paper, and lessons; no real Guardana release was touched.
 
 ## Product constraints
 
-Every roadmap item must preserve these properties:
+1. An unavailable check, ungraded case, partial run or invalid comparison never becomes a pass.
+2. Offline scanning stays offline; target and judge traffic is explicit and bounded.
+3. Engine capabilities and built-in checks remain open source, without an account.
+4. Application-specific checks and output destinations work without an engine fork.
+5. Public data formats are versioned, with tested readers and migrations.
+6. Findings, quality measurements, errors and missing evidence remain separate.
+7. Results explain their source, coverage, execution cost and comparability.
+8. The collector is optional; local files and Python deliver independent value.
 
-1. A check that did not run or could not decide is never reported as a pass.
-2. Offline scanning stays offline; active checks run only when requested.
-3. Guardana remains outside the production request path.
-4. Cost and side effects are bounded before a run starts.
-5. Application-specific risk remains expressible without forking the engine.
-6. Public schemas are versioned and migratable.
+## After 1.0
 
-## What ships today (0.27.0)
+The order is conditional: a row without its start evidence does not displace an application pilot or a reproducible defect.
 
-The current release is beta. It provides artifact scanning, controlled endpoint
-and MCP probing with repeated trials, recorded-trace analysis, regression comparison, policy and
-baseline gates, extension APIs with scaffolding for a new pack, and an optional
-authenticated PostgreSQL-backed collector. See [FEATURES.md](FEATURES.md) for the concise overview and
-[Product status](docs/product-status.md) for limitations.
+| ID | Work | Start when | Done when |
+|---|---|---|---|
+| I1 | Evidence-preserving imports | Two independent teams bring saved observations from an existing tool or agent recorder and cannot retain the evidence they need through the current supported subset. | One requested source has a documented field and trust mapping, positive, negative and incomplete fixtures, bounded parsing and redaction, explicit judge and sampling identity, and a versioned compatibility policy. Imported claims never become a local pass by omission. Promotion to a local regression requires reviewed reproduction. Add another source only after the first has an independent consumer. |
+| A1 | A real application's tool effects | An application pilot supplies a controlled injected input, a complete action trace and a harmless oracle for the application's actual tools. | The team's own agent runs an allowed task and an injected task against doubles. The oracle proves a forbidden effect. Missing or truncated action evidence remains indeterminate. Cover one requested workflow, including the allowed control case. Do not present a model harness as the application or build an inline enforcement layer. Review target, fixture and trace compatibility first. |
+| M1 | Paired statistical diff | Two independent pilot teams each use local `diff` on comparable saved before/after application runs for a documented ship decision, and one requests uncertainty because descriptive counts are insufficient. | Compatible cases and grading identities are paired. Repeated trials are handled at case level. Insufficient coverage or power is refused. Effect size and uncertainty are reported. Declared effects can gate, and multiple gated suites are controlled. Version the comparison and grading-identity contract. Label existing descriptive diff accurately. |
+| M3 | Collector measurements | Two independent teams submit and read their own locked application runs in the optional collector, and each asks the same cross-run question that local files cannot answer. | Versioned envelope and storage queries answer that recorded question by the necessary system, deployment, dataset and assessor dimensions. They enforce tenancy and report sample counts, uncertainty, coverage gaps, missingness and unknowns beside trends. Keep the envelope versioned independently from the run schema. |
 
-## Now: repeatable application assurance
+Compatible additions can extend versioned contracts in 1.x.
 
-Target locators are complete since 0.24.0 and declarative fixtures since 0.25.0,
-and one command now writes an installable pack whose rules already grade their own
-finding, clean, and inconclusive samples. The remaining milestone turns a
-repeatable extension into measurement a team can compare and operate. The order below reflects the
-[0.23 repository and market audit](docs/design/audit-0.23-market.md): author
-workflow and honest measurement come before additional output destinations. The
-[0.25 audit](docs/design/audit-0.25-market.md) re-read the standards and the
-comparable projects a month later and moved no row. The
-[0.26 measurement audit](docs/design/audit-0.26-measurement.md) widened rows 1 and
-2 and added row 3: a clean result that rests on one trial per prompt, graded by a
-judge whose error was never measured, is not yet a measurement.
+## Later
 
-| Order | Deliverable | Done when |
-|---:|---|---|
-| 1 | Suites, versioned datasets, and assessors, with repeated trials and judge-error correction | a run records the sample, trials, assessor, denominator, and uncertainty rather than only findings; a clean result states its trials and bound; a judge-graded rate is corrected for the judge's measured error or declines to gate |
-| 2 | Paired statistical diff | comparison refuses unequal or undersized samples and unequal trials, prints the smallest effect its sample can detect, adjusts for several gated suites, and gates only on a declared minimum effect |
-| 3 | Re-gradable evidence | an opted-in run keeps its redacted exchanges, and `guardana run regrade` grades them with a new assessor without target traffic |
-| 4 | Renderer and reporter plugins | outputs are discoverable entry points and every output remains behind the common redaction boundary |
-| 5 | Provider conformance matrix | documented endpoint support is backed by repeatable capability tests |
-| 6 | Assessments in the collector | trends are keyed by system, deployment, dataset, and assessor version; findings and quality measurements stay separate |
+This is an unordered, unversioned set of possibilities, not a plan for 2.0.
+Promotion to active work requires pilot pain, a reproducible failing case,
+an acceptance criterion and a versioned contract review.
+2.0 requires evidence that a needed public-contract break cannot be a compatible 1.x addition.
 
-Design inputs exist for everything shipped so far and for rows 1 to 4:
+- Synthetic scheduled verification with anytime-valid monitoring, rather than repeated fixed-level tests presented as reliable alerts.
+- A Prometheus reporter over the common output contract, once a team names the measurements and unknowns it needs.
+- Live RAG and application targets beyond the retrieval pilot, with safe fixtures and explicit data boundaries, ordered by pilot needs.
+- Model-artifact inventory and parser completeness, starting with unlisted formats; malformed, unreadable and partially scanned inputs must not look clean under the versioned scan and coverage contract.
+- Central distribution of signed, versioned profiles and policies, after local locks and recipes prove useful.
+- Profiles distributed in packs as a compatible 1.x addition; `guardana.yaml`, presets and the versioned profile schema remain the 1.0 contract.
+- Optional A2A agent-card signature verification, keeping the JOSE dependency outside `guardana-core`.
+- Agent supply-chain provenance beyond a manifest hash: approved tool schema, package or image identity, resolved server origin, and skill and configuration identity.
+- OIDC/SSO, human roles and Helm when collector users need them, with exercised upgrade, rollback, backup, restore and deletion.
 
-- [target locators](docs/design/target-locators.md)
-- [declarative fixtures](docs/design/declarative-fixtures.md)
-- [pack scaffolding](docs/design/pack-scaffolding.md)
-- [output plugins](docs/design/output-plugins.md)
-- [extension author tooling](docs/design/extension-author-tooling.md)
-- [quality suites](docs/design/quality-suites.md)
-- [paired regression statistics](docs/design/paired-regression-statistics.md)
-- [repeated trials](docs/design/repeated-trials.md)
-- [judge error in a measured rate](docs/design/judge-error-correction.md)
-- [re-grading stored exchanges](docs/design/regrading-stored-exchanges.md)
+An exported recording remains an explicit supported subset behind an adapter.
+OpenTelemetry conventions are input formats, not Guardana's storage contract.
+Live production intake and supervision belong to Guardana Control.
 
-The full OTLP intake remains in the next milestone because the OpenTelemetry
-GenAI agent conventions are still changing. A compatibility spike may proceed
-after items 1 and 2, in parallel with items 5 and 6, but it must normalize an
-explicit supported subset behind an adapter rather than make a development
-convention a persisted Guardana schema.
+## Contributing
 
-### Milestone exit criteria
+New checks, adapters and formats follow demonstrated application needs and the
+issue process.
+Heavy dependencies, niche corpora and experimental graders belong in extension packages.
+Built-in security rules retain public-framework mappings. Application quality
+checks use the team's own criteria; see [CONTRIBUTING.md](CONTRIBUTING.md#principles).
 
-- A third-party target, rule, evaluator, renderer, and reporter are usable without
-  modifying Guardana; target locators satisfy the target part from 0.24.0, and
-  `guardana new-pack` scaffolds the rest.
-- A suite records passes as well as failures and names its dataset version.
-- A clean result states how many trials it rests on, and a rate graded by a judge
-  is corrected for that judge's measured error or declines to gate.
-- `guardana diff` can say better, worse, unchanged, or incomparable with an
-  auditable statistical reason.
-- The collector can plot measurements without turning missing samples into zero.
+Contributor priorities include ATLAS provenance with separate monthly-content and data-format pins, positive and negative fixtures for new techniques, fixture expressiveness, and non-executing declarative packs.
+A public extension-ID service is excluded: namespaces, local validation and locks cover the author workflow.
 
-## Next: continuous assurance
-
-Consume a bounded sample of real interactions without becoming an APM or an
-inline control.
-
-1. OTLP intake with redaction before persistence or queuing.
-2. A bounded queue, backpressure, sampling, and stateless workers.
-3. Continuous rules over synthetic runs and recorded traffic, alerting through a
-   confidence sequence rather than a fixed level on every look
-   ([anytime-valid monitoring](docs/design/anytime-valid-monitoring.md)).
-4. Prometheus and webhook outputs through the reporter seam.
-5. Retention, deletion, and audit behavior proven under the new data volume.
-
-This lane starts as soon as suite and statistical shapes are stable; it does not
-wait for every provider-matrix entry. That ordering responds to the market need
-for continuous inventory and post-deployment evidence without freezing a moving
-external telemetry convention into Guardana's own documents.
-
-Exit criteria: overload fails closed without affecting the application; raw
-sensitive payloads are not retained by default; every trend identifies its sample
-and deployment revision.
-
-## Then: self-hosted platform fit
-
-- Helm deployment with tested upgrade, rollback, backup, and restore.
-- OIDC/SSO and role-based access for human users.
-- Live RAG targets with safe fixtures and explicit data boundaries.
-- Central policy distribution with signed, versioned policy artifacts.
-- Integrations through output plugins rather than product-specific engine code.
-
-## 1.0: compatibility, not a feature count
-
-Guardana reaches 1.0 when external authors can rely on it:
-
-- the extension API and package manifest are frozen with a deprecation policy;
-- schemas have published compatibility guarantees and migration tests;
-- a standalone conformance kit covers targets, rules, evaluators, and outputs;
-- two release candidates ship without an unplanned public API change;
-- security and recovery runbooks are exercised, not merely documented.
-
-## Parallel contributor lane
-
-New artifact formats, deterministic rules, framework adapters, and taxonomy
-updates may proceed in parallel when they do not delay the ordered milestone.
-Prefer extension packs when a feature adds a large dependency, a niche corpus, or
-an experimental evaluator.
-
-One taxonomy update is open now: the MITRE ATLAS catalogue records a data-format
-version rather than the content release its entries were transcribed from, and
-three content releases have landed since.
-
-Stateful tool doubles are open in this lane too. Agent rules grade tool calls
-today; a double that keeps state would let a rule assert on what an agent left
-behind, and report utility under attack beside attack success.
-
-## Researched after the foundations
-
-- multi-agent protocols and delegated identity;
-- multimodal attack carriers;
-- adaptive attack generation inside a strict sandbox;
-- reusable attack techniques composed with rules
-  ([design](docs/design/attack-techniques.md));
-- broader multilingual and domain-specific corpora.
-
-These need measured evaluation quality and bounded execution first. They are not
-shortcuts around the current milestone. Repeated trials and judge-error
-correction are that measurement: sampling many transformed attacks is trials over
-techniques, and an adaptive attacker is only as honest as the judge that scores
-it.
+Further multi-agent protocols beyond the A2A fixture, multimodal carriers beyond one document or image carrier a pilot uses, adaptive attackers, reusable techniques and broad multilingual or domain corpora follow the foundations.
+Their priority depends on measured usefulness, evaluation quality and bounded execution.
+Import or buy coverage rather than grow prompt counts; attack volume is not the adoption metric.
 
 ## Non-goals
 
-Guardana is not planned to become:
+An inline firewall or guardrail proxy; production agent supervision; a general
+SAST, CVE, secret or network scanner; a second production trace store; compliance
+certification; a marketplace of unverified prompts; autonomous production attacks.
 
-- an inline firewall, WAF, or guardrail proxy;
-- a general SAST, CVE, secret, or network-discovery scanner;
-- a second trace store competing with observability platforms;
-- a compliance certification or legal-advice engine;
-- a marketplace of unverified prompts;
-- an autonomous production attacker.
+## Changing priorities
 
-## Release gate for roadmap work
-
-Every increment needs tests, user documentation, explicit exit behavior, redacted
-evidence, and a changelog entry. The full repository gate in
-[CONTRIBUTING.md](CONTRIBUTING.md) must pass. A feature that cannot distinguish
-"safe" from "not measured" is incomplete.
-
-## Changing the order
-
-Open an issue or design document with the user problem, evidence, affected exit
-criterion, dependencies, and what moves down. New work is not prioritized by
-adding more prose to this file.
+Open an issue or discussion with the user problem, observed evidence, affected
+item ID, dependencies and the work that moves down.
+The owner decides changes to release criteria.

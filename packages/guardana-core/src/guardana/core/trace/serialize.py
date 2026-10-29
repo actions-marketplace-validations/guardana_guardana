@@ -29,7 +29,7 @@ from guardana.core.trace.handoff import Handoff
 from guardana.core.trace.identity import CredentialRef, Delegation, Identity
 from guardana.core.trace.memory import MemoryOperation
 from guardana.core.trace.message import Message
-from guardana.core.trace.model import Trace
+from guardana.core.trace.model import Trace, TraceTruncation
 from guardana.core.trace.retrieval import Retrieval, RetrievedDocument
 from guardana.core.trace.span import ModelCall, Span
 from guardana.core.trace.tool import ToolDeclaration, ToolExecution
@@ -60,10 +60,21 @@ def header_of(trace: Trace) -> dict[str, Any]:
                 }
             ),
             "instrumented": sorted(str(d) for d in trace.instrumented),
-            "truncated": str(trace.truncated) if trace.truncated is not None else None,
+            "truncated": _truncation(trace),
             "attributes": dict(trace.attributes),
         }
     )
+
+
+def _truncation(trace: Trace) -> str | None:
+    """Say why the written trace is incomplete, counting records the reader could not interpret.
+
+    The records themselves are not written, so without this a converted file would read
+    as complete and every rule that found nothing over it would pass.
+    """
+    if trace.truncated is not None:
+        return str(trace.truncated)
+    return str(TraceTruncation.RECORDS_LOST) if trace.unreadable else None
 
 
 def span_of(span: Span) -> dict[str, Any]:

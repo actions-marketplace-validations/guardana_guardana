@@ -4,6 +4,7 @@ severity: medium
 target_kind: endpoint
 taxonomy: [LLM10:2025, LLM06:2026, AML.T0034.002]
 requires: [chat]
+detection: heuristic
 evaluator: amplification
 # Deliberately tiny. What `unbounded_consumption` measures is how long a reply
 # runs; what this measures is the ratio, which is what makes denial-of-wallet an

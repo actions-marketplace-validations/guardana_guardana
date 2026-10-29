@@ -22,10 +22,11 @@ _NO_RESULT = "(the trace records no result for this call)"
 def as_trajectory(trace: Trace) -> Trajectory:
     """Read a recorded execution as a driven one, carrying the truncation across.
 
-    The truncation is the part that matters. A trace cut short becomes a trajectory
-    marked truncated, so every evaluator that already reads truncation as
-    inconclusive keeps doing so on imported evidence — rather than grading a partial
-    run as a complete one because it arrived through a different door.
+    The truncation is the part that matters. A trace cut short, or holding records
+    the reader could not interpret, becomes a trajectory marked truncated, so every
+    evaluator that already reads truncation as inconclusive keeps doing so on imported
+    evidence — rather than grading a partial run as a complete one because it arrived
+    through a different door.
 
     The task is the first user text in the trace, and `""` when there is none. Never
     invented: an evaluator that grades "did the agent stay on task" against a task
@@ -38,7 +39,7 @@ def as_trajectory(trace: Trace) -> Trajectory:
         offered=tuple(
             dict.fromkeys(offer.name for span in trace.spans for offer in span.tool_offers)
         ),
-        truncated=Truncation.MAX_STEPS if trace.truncated is not None else None,
+        truncated=Truncation.MAX_STEPS if trace.truncated is not None or trace.unreadable else None,
     )
 
 

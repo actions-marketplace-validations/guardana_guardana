@@ -19,10 +19,17 @@ class Impact(StrEnum):
     """
 
     PASSIVE = "passive"
-    """Reads only. A file scan, or reading a tool manifest."""
+    """Sends nothing: reads files, a trace or a saved run.
+
+    A rule that sends any request to a live target, a manifest read included, is at
+    least `ACTIVE`.
+    """
 
     ACTIVE = "active"
-    """Sends prompts to a model. Costs money and appears in the target's logs."""
+    """Sends requests to a live target: prompts to a model, or reads of a server's manifest.
+
+    Costs money or quota and appears in the target's logs.
+    """
 
     SIDE_EFFECTING = "side_effecting"
     """May cause the target to act: call a tool, write to a memory store.
@@ -52,3 +59,29 @@ class Maturity(StrEnum):
     EXPERIMENTAL = "experimental"
     BETA = "beta"
     STABLE = "stable"
+
+
+class Detection(StrEnum):
+    """What a finding from a rule states about the target: a checked fact, or a lead.
+
+    Defined by the fact a finding states, not by how it was computed. A rule that can
+    emit both kinds declares `HEURISTIC`, because a reader cannot tell from one finding
+    which kind it is holding.
+    """
+
+    INVARIANT = "invariant"
+    """Every finding states a checked fact about the target.
+
+    A planted marker seen in output, a byte sequence or opcode present, a server
+    answering without credentials, a recorded span showing the forbidden step.
+    """
+
+    HEURISTIC = "heuristic"
+    """A finding is a lead a person confirms.
+
+    A keyword, a phrase or name list, a threshold, an entropy or pattern match decides
+    whether the risk is real.
+    """
+
+    UNDECLARED = "undeclared"
+    """The rule's author has not said which of the two its findings are."""

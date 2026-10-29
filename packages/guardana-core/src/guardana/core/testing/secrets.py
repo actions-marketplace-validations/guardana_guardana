@@ -25,6 +25,11 @@ def fake_llm_key() -> str:
     return "sk" + "-" + "guardana" + _FAKE.lower() + _ZEROS
 
 
+def fake_github_pat() -> str:
+    """Return a fine-grained GitHub token shape: `github_pat_` and an opaque tail."""
+    return "github" + "_pat_" + "11" + _FAKE + _ZEROS[:16] + "_" + _FAKE * 15
+
+
 def fake_jwt() -> str:
     """Return a JWT-shaped token: three base64url segments separated by dots."""
     header = "eyJ" + "hbGciOiJIUzI1NiJ9"
@@ -35,4 +40,4 @@ def fake_jwt() -> str:
 
 def fake_secrets() -> tuple[str, ...]:
     """Every fake credential this module builds, for a test that asserts none leaked."""
-    return (fake_aws_key(), fake_llm_key(), fake_jwt())
+    return (fake_aws_key(), fake_llm_key(), fake_github_pat(), fake_jwt())

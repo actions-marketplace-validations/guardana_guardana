@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext
 from guardana.core.rule.verify import verify_rules
@@ -45,7 +46,7 @@ def test_scaffolded_rule_loads_and_is_a_valid_endpoint_rule(tmp_path: Path) -> N
     # fails to load is worse than no template.
     runner.invoke(app, ["new-rule", "acme.prompt.demo", "--dir", str(tmp_path)])
 
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     outcome = registry.load_yaml_rule_dirs([tmp_path])
 
     assert outcome.errors == ()
@@ -57,7 +58,9 @@ def test_scaffolded_canary_rule_loads(tmp_path: Path) -> None:
         app, ["new-rule", "acme.leak.demo", "--evaluator", "canary", "--dir", str(tmp_path)]
     )
 
-    outcome = Registry.discover().load_yaml_rule_dirs([tmp_path])
+    outcome = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).load_yaml_rule_dirs(
+        [tmp_path]
+    )
 
     assert outcome.errors == ()
     assert outcome.loaded == ("acme.leak.demo",)
@@ -76,7 +79,9 @@ def test_the_scaffolded_rule_grades_its_own_samples(tmp_path: Path, evaluator: s
         ["new-rule", f"acme.prompt.{evaluator}", "--dir", str(tmp_path), "--evaluator", evaluator],
     )
     rules = load_yaml_rules(tmp_path / f"{evaluator}.yaml")
-    ctx = RuleContext(evaluators=Registry.discover().evaluators())
+    ctx = RuleContext(
+        evaluators=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).evaluators()
+    )
 
     verified = list(verify_rules(rules, ctx))
 

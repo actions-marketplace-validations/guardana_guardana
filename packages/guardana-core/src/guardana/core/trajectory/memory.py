@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from guardana.core.target.endpoint import ToolCall
+from guardana.core.trajectory.arguments import argument_values, as_text
 from guardana.core.trajectory.tool_double import ToolDouble
 
 _EMPTY = "(no saved notes)"
@@ -33,8 +34,18 @@ class AgentMemory:
         return _Reader(self)
 
     def recalled(self) -> str:
-        """Everything saved so far, as the reader would hand it back."""
-        return "\n".join(self.entries) if self.entries else _EMPTY
+        """Everything saved so far, as the reader would hand it back.
+
+        Each note is handed back as the values the model saved, without the
+        argument names around them. A name is the tool's vocabulary, not the
+        note, and a payload marker read off this text must not be satisfied by a
+        note that merely sat under a key of the same name.
+        """
+        if not self.entries:
+            return _EMPTY
+        return "\n".join(
+            "\n".join(as_text(value) for value in argument_values(entry)) for entry in self.entries
+        )
 
 
 @dataclass(frozen=True, slots=True)

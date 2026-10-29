@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Detection limits — Guardana documentation</title>
+<meta name="description" content="Per rule family, whether a finding is a tested invariant, a heuristic lead, or undeclared.">
+<link rel="canonical" href="https://guardana.dev/docs/generated/detection-limits">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="../../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html" aria-current="page">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Detection limits</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html" aria-current="page">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Detection limits</h1><p class="lede">Per rule family, whether a finding is a tested invariant, a heuristic lead, or undeclared.</p><p>What a finding from each built-in rule states about the target, grouped by rule family and read from the <code>detection</code> each rule declares.</p>
+<ul>
+<li><strong>Tested invariant</strong>: every finding the rule can emit states a checked fact about the target (a planted marker seen in output, a byte sequence or opcode present, a server answering without credentials, a recorded span showing the forbidden step), and the rule ships a finding sample and a clean sample that it classifies correctly.</li>
+<li><strong>Invariant, not sampled</strong>: the rule declares that every finding states a checked fact, and does not ship both a finding sample and a clean sample that it classifies correctly.</li>
+<li><strong>Heuristic lead</strong>: a finding is a lead a person confirms. A keyword, a phrase or name list, a threshold, an entropy or pattern match decides whether the risk is real. A rule that can emit both kinds is listed here.</li>
+<li><strong>Not declared</strong>: the rule does not say which of the two its findings are.</li>
+</ul>
+<p>A framework mapping says a rule is relevant to that entry, not that the entry is covered.</p>
+<h2 id="a2a">a2a</h2>
+<h3 id="tested-invariant">Tested invariant</h3>
+<ul>
+<li><code>guardana.a2a.agent_card</code>: A2A agent card is incomplete, or declares what no caller can satisfy</li>
+<li><code>guardana.a2a.caller_identity</code>: A2A agent answers a caller presenting no credential</li>
+<li><code>guardana.a2a.task_visibility</code>: A2A agent shows a task to a caller who does not own it</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>ASI03:2026</code>: Identity and Privilege Abuse</li>
+<li><code>ASI04:2026</code>: Agentic Supply Chain Vulnerabilities</li>
+<li><code>ASI07:2026</code>: Insecure Inter-Agent Communication</li>
+</ul>
+<h2 id="agent">agent</h2>
+<h3 id="tested-invariant-1">Tested invariant</h3>
+<ul>
+<li><code>guardana.agent.credential_exfiltration</code>: Agent leaks a planted secret through a tool argument</li>
+<li><code>guardana.agent.excessive_tool_use</code>: Model invokes a destructive tool it was not asked to use</li>
+<li><code>guardana.agent.hidden_context.tool_schema</code>: Hidden context in a tool schema disclosed on request</li>
+<li><code>guardana.agent.memory_poisoning</code>: Poisoned memory steers the agent in a later session</li>
+<li><code>guardana.agent.tool_argument_scope</code>: Agent widens a tool argument beyond the task it was given</li>
+<li><code>guardana.agent.tool_result_injection</code>: Agent obeys an instruction found in a tool result (confused deputy)</li>
+</ul>
+<h3 id="heuristic-lead">Heuristic lead</h3>
+<ul>
+<li><code>guardana.agent.mcp_server_manifest</code>: Live MCP tool manifest carries a hidden instruction or has drifted</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-1">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0053</code>: AI Agent Tool Invocation</li>
+<li><code>AML.T0080</code>: AI Agent Context Poisoning</li>
+<li><code>AML.T0080.000</code>: AI Agent Context Poisoning: Memory</li>
+<li><code>AML.T0084.001</code>: Discover AI Agent Configuration: Tool Definitions</li>
+<li><code>AML.T0086</code>: Exfiltration via AI Agent Tool Invocation</li>
+<li><code>AML.T0098</code>: AI Agent Tool Credential Harvesting</li>
+<li><code>AML.T0101</code>: Data Destruction via AI Agent Tool Invocation</li>
+<li><code>AML.T0109</code>: AI Supply Chain Rug Pull</li>
+<li><code>AML.T0110</code>: AI Agent Tool Poisoning</li>
+<li><code>ASI01:2026</code>: Agent Goal Hijack</li>
+<li><code>ASI02:2026</code>: Tool Misuse</li>
+<li><code>ASI03:2026</code>: Identity and Privilege Abuse</li>
+<li><code>ASI04:2026</code>: Agentic Supply Chain Vulnerabilities</li>
+<li><code>ASI06:2026</code>: Memory and Context Poisoning</li>
+<li><code>LLM01:2025</code>: Prompt Injection</li>
+<li><code>LLM01:2026</code>: Prompt Injection</li>
+<li><code>LLM02:2025</code>: Sensitive Information Disclosure</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+<li><code>LLM03:2025</code>: Supply Chain</li>
+<li><code>LLM03:2026</code>: Excessive Agency</li>
+<li><code>LLM04:2026</code>: Supply Chain</li>
+<li><code>LLM06:2025</code>: Excessive Agency</li>
+<li><code>LLM08:2026</code>: Hidden Context Exposure</li>
+<li><code>MCP03:2025</code>: Tool Poisoning</li>
+<li><code>MCP04:2025</code>: Software Supply Chain Attacks &amp; Dependency Tampering</li>
+<li><code>MCP06:2025</code>: Intent Flow Subversion</li>
+<li><code>MCP10:2025</code>: Context Injection &amp; Over-Sharing</li>
+</ul>
+<h2 id="mcp">mcp</h2>
+<h3 id="tested-invariant-2">Tested invariant</h3>
+<ul>
+<li><code>guardana.mcp.authorization_discovery</code>: Protected MCP server publishes no usable authorization surface</li>
+<li><code>guardana.mcp.cache_scope</code>: MCP server declares a credential-gated tool listing publicly cacheable</li>
+<li><code>guardana.mcp.discovery_target</code>: MCP server directs its client to an address a client must not follow</li>
+<li><code>guardana.mcp.issuer_identification</code>: Authorization server gives an MCP client no way to detect an issuer mix-up</li>
+<li><code>guardana.mcp.registry_entry</code>: MCP server is not the one its registry entry publishes</li>
+<li><code>guardana.mcp.task_identity</code>: MCP server shows tasks to a caller who presented no credential</li>
+<li><code>guardana.mcp.token_audience</code>: MCP server accepts a bearer token it could not have issued</li>
+<li><code>guardana.mcp.unauthenticated_access</code>: MCP server answers a tool listing with no credential</li>
+</ul>
+<h3 id="heuristic-lead-1">Heuristic lead</h3>
+<ul>
+<li><code>guardana.mcp.scope_breadth</code>: MCP server advertises scopes that cannot express least privilege</li>
+<li><code>guardana.mcp.session_binding</code>: MCP session id is guessable, or stands in for authentication</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-2">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0084.001</code>: Discover AI Agent Configuration: Tool Definitions</li>
+<li><code>ASI03:2026</code>: Identity and Privilege Abuse</li>
+<li><code>ASI04:2026</code>: Agentic Supply Chain Vulnerabilities</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+<li><code>LLM03:2026</code>: Excessive Agency</li>
+<li><code>MCP01:2025</code>: Token Mismanagement &amp; Secret Exposure</li>
+<li><code>MCP02:2025</code>: Privilege Escalation via Scope Creep</li>
+<li><code>MCP04:2025</code>: Software Supply Chain Attacks &amp; Dependency Tampering</li>
+<li><code>MCP07:2025</code>: Insufficient Authentication &amp; Authorization</li>
+<li><code>MCP09:2025</code>: Shadow MCP Servers</li>
+<li><code>MCP10:2025</code>: Context Injection &amp; Over-Sharing</li>
+</ul>
+<h2 id="output">output</h2>
+<h3 id="heuristic-lead-2">Heuristic lead</h3>
+<ul>
+<li><code>guardana.output.secrets</code>: Secret leaked in model output</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-3">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>LLM02:2025</code>: Sensitive Information Disclosure</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+</ul>
+<h2 id="prompt">prompt</h2>
+<h3 id="tested-invariant-3">Tested invariant</h3>
+<ul>
+<li><code>guardana.prompt.system_prompt_leak.canary</code>: System prompt leakage via canary marker</li>
+</ul>
+<h3 id="heuristic-lead-3">Heuristic lead</h3>
+<ul>
+<li><code>guardana.prompt.cost_asymmetry</code>: A cheap request that is expensive to answer (cost asymmetry)</li>
+<li><code>guardana.prompt.hidden_instructions</code>: Hidden instruction smuggled into a file an agent reads as context</li>
+<li><code>guardana.prompt.injection.ignore_previous</code>: Prompt injection via instruction override</li>
+<li><code>guardana.prompt.jailbreak.dan_style</code>: Jailbreak via persona override and encoding smuggling</li>
+<li><code>guardana.prompt.mcp_tool_poisoning</code>: MCP tool description carries a hidden instruction (tool poisoning)</li>
+<li><code>guardana.prompt.unbounded_consumption</code>: Unbounded output generation (denial-of-wallet)</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-4">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0011.002</code>: User Execution: Poisoned AI Agent Tool</li>
+<li><code>AML.T0034.002</code>: Cost Harvesting: Agentic Resource Consumption</li>
+<li><code>AML.T0051</code>: LLM Prompt Injection</li>
+<li><code>AML.T0056</code>: Extract LLM System Prompt</li>
+<li><code>AML.T0080</code>: AI Agent Context Poisoning</li>
+<li><code>AML.T0110</code>: AI Agent Tool Poisoning</li>
+<li><code>ASI01:2026</code>: Agent Goal Hijack</li>
+<li><code>ASI04:2026</code>: Agentic Supply Chain Vulnerabilities</li>
+<li><code>LLM01:2025</code>: Prompt Injection</li>
+<li><code>LLM01:2026</code>: Prompt Injection</li>
+<li><code>LLM05:2025</code>: Improper Output Handling</li>
+<li><code>LLM06:2026</code>: Unbounded Consumption</li>
+<li><code>LLM07:2025</code>: System Prompt Leakage</li>
+<li><code>LLM08:2026</code>: Hidden Context Exposure</li>
+<li><code>LLM10:2025</code>: Unbounded Consumption</li>
+<li><code>LLM10:2026</code>: Improper Output Handling</li>
+<li><code>MCP03:2025</code>: Tool Poisoning</li>
+<li><code>MCP10:2025</code>: Context Injection &amp; Over-Sharing</li>
+</ul>
+<h2 id="retrieval">retrieval</h2>
+<h3 id="tested-invariant-4">Tested invariant</h3>
+<ul>
+<li><code>guardana.retrieval.poisoned_document</code>: The application followed an instruction planted in a retrieved document</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-5">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0051</code>: LLM Prompt Injection</li>
+<li><code>AML.T0080</code>: AI Agent Context Poisoning</li>
+<li><code>ASI06:2026</code>: Memory and Context Poisoning</li>
+<li><code>LLM01:2025</code>: Prompt Injection</li>
+<li><code>LLM01:2026</code>: Prompt Injection</li>
+<li><code>LLM08:2025</code>: Vector and Embedding Weaknesses</li>
+<li><code>LLM09:2026</code>: Vector and Embedding Weaknesses</li>
+</ul>
+<h2 id="scenario">scenario</h2>
+<h3 id="tested-invariant-5">Tested invariant</h3>
+<ul>
+<li><code>guardana.scenario.indirect_injection</code>: Indirect prompt injection via a retrieved document</li>
+</ul>
+<h3 id="heuristic-lead-4">Heuristic lead</h3>
+<ul>
+<li><code>guardana.scenario.gradual_jailbreak</code>: Gradual multi-turn jailbreak</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-6">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0051</code>: LLM Prompt Injection</li>
+<li><code>AML.T0080</code>: AI Agent Context Poisoning</li>
+<li><code>ASI01:2026</code>: Agent Goal Hijack</li>
+<li><code>LLM01:2025</code>: Prompt Injection</li>
+<li><code>LLM01:2026</code>: Prompt Injection</li>
+<li><code>LLM08:2025</code>: Vector and Embedding Weaknesses</li>
+<li><code>LLM09:2026</code>: Vector and Embedding Weaknesses</li>
+</ul>
+<h2 id="supply_chain">supply_chain</h2>
+<h3 id="tested-invariant-6">Tested invariant</h3>
+<ul>
+<li><code>guardana.supply_chain.keras_lambda</code>: Keras Lambda layer (arbitrary code on model load)</li>
+<li><code>guardana.supply_chain.pickle_opcode</code>: Dangerous pickle opcode (arbitrary code on load)</li>
+</ul>
+<h3 id="heuristic-lead-5">Heuristic lead</h3>
+<ul>
+<li><code>guardana.supply_chain.chat_template</code>: Chat template carries a code-execution gadget</li>
+<li><code>guardana.supply_chain.code_execution</code>: Dynamic code or shell execution sink</li>
+<li><code>guardana.supply_chain.dependency_risk</code>: Unsafe model/deserialization loader call</li>
+<li><code>guardana.supply_chain.hallucinated_package</code>: Import of unknown package (possible slopsquat lead)</li>
+<li><code>guardana.supply_chain.hardcoded_secret</code>: Hardcoded secret in repository file</li>
+<li><code>guardana.supply_chain.insecure_transport</code>: Insecure transport for a model or dataset fetch</li>
+<li><code>guardana.supply_chain.malicious_dependency</code>: Known-malicious dependency or install-time payload</li>
+<li><code>guardana.supply_chain.model_format</code>: Risky construct in a non-pickle model file format</li>
+<li><code>guardana.supply_chain.notebook_payload</code>: Dangerous payload in a notebook cell</li>
+<li><code>guardana.supply_chain.onnx_graph</code>: Risky construct in an ONNX model graph</li>
+<li><code>guardana.supply_chain.provenance</code>: Model provenance: unpinned download or risky license lead</li>
+<li><code>guardana.supply_chain.remote_code</code>: Remote code execution enabled on model/dataset load</li>
+<li><code>guardana.supply_chain.remote_code_config</code>: Model config requests custom-code execution on load</li>
+<li><code>guardana.supply_chain.saved_model_ops</code>: TensorFlow SavedModel filesystem operator</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-7">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0018</code>: Manipulate AI Model</li>
+<li><code>ASI05:2026</code>: Unexpected Code Execution</li>
+<li><code>LLM02:2025</code>: Sensitive Information Disclosure</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+<li><code>LLM03:2025</code>: Supply Chain</li>
+<li><code>LLM04:2026</code>: Supply Chain</li>
+<li><code>LLM05:2025</code>: Improper Output Handling</li>
+<li><code>LLM10:2026</code>: Improper Output Handling</li>
+<li><code>ML06:2023</code>: AI Supply Chain Attacks</li>
+<li><code>supply-chain</code>: GenAI Supply Chain Attack</li>
+</ul>
+<h2 id="tenancy">tenancy</h2>
+<h3 id="tested-invariant-7">Tested invariant</h3>
+<ul>
+<li><code>guardana.tenancy.cross_tenant_answer</code>: Another tenant's seeded data reached a reply</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-8">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0057</code>: LLM Data Leakage</li>
+<li><code>LLM02:2025</code>: Sensitive Information Disclosure</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+<li><code>LLM08:2025</code>: Vector and Embedding Weaknesses</li>
+<li><code>LLM09:2026</code>: Vector and Embedding Weaknesses</li>
+</ul>
+<h2 id="trace">trace</h2>
+<h3 id="tested-invariant-8">Tested invariant</h3>
+<ul>
+<li><code>guardana.trace.consent_scope_exceeded</code>: A scope was exercised that no consent record granted</li>
+<li><code>guardana.trace.credential_passthrough</code>: A credential was presented across two different trust boundaries</li>
+<li><code>guardana.trace.cross_tenant_retrieval</code>: A retrieval returned a document belonging to another tenant</li>
+<li><code>guardana.trace.handoff_authority_expansion</code>: An agent exercised more authority than the handoff carried to it</li>
+<li><code>guardana.trace.identity_disagreement</code>: A token was presented to a resource outside its audience</li>
+<li><code>guardana.trace.policy_decision_ignored</code>: An action a policy refused, or could not decide, went ahead</li>
+<li><code>guardana.trace.session_as_identity</code>: A state-changing step was identified by a session rather than a credential</li>
+<li><code>guardana.trace.unapproved_side_effect</code>: A consequential effect executed without an approval that was recorded as needed</li>
+</ul>
+<h3 id="heuristic-lead-6">Heuristic lead</h3>
+<ul>
+<li><code>guardana.trace.secret_in_tool_argument</code>: A credential appeared in a recorded tool argument</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-9">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>AML.T0057</code>: LLM Data Leakage</li>
+<li><code>ASI02:2026</code>: Tool Misuse</li>
+<li><code>ASI03:2026</code>: Identity and Privilege Abuse</li>
+<li><code>ASI07:2026</code>: Insecure Inter-Agent Communication</li>
+<li><code>ASI09:2026</code>: Human-Agent Trust Exploitation</li>
+<li><code>LLM02:2026</code>: Sensitive Information Disclosure</li>
+<li><code>LLM03:2026</code>: Excessive Agency</li>
+<li><code>LLM09:2026</code>: Vector and Embedding Weaknesses</li>
+<li><code>LLM10:2026</code>: Improper Output Handling</li>
+<li><code>MCP01:2025</code>: Token Mismanagement &amp; Secret Exposure</li>
+<li><code>MCP02:2025</code>: Privilege Escalation via Scope Creep</li>
+<li><code>MCP07:2025</code>: Insufficient Authentication &amp; Authorization</li>
+</ul>
+<h2 id="training">training</h2>
+<h3 id="heuristic-lead-7">Heuristic lead</h3>
+<ul>
+<li><code>guardana.training.dataset_integrity</code>: Training-data integrity gap (loader script or unpinned dataset)</li>
+</ul>
+<h3 id="framework-entries-these-rules-are-relevant-to-not-coverage-of-them-10">Framework entries these rules are relevant to, not coverage of them</h3>
+<ul>
+<li><code>LLM04:2025</code>: Data and Model Poisoning</li>
+<li><code>LLM05:2026</code>: Data and Model Poisoning</li>
+<li><code>ML02:2023</code>: Data Poisoning Attack</li>
+<li><code>poisoning</code>: Poisoning Attack</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/generated/detection-limits.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

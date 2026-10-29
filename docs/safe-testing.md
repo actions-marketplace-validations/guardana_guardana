@@ -26,9 +26,12 @@ that means it:
 - **changes MCP server state** if a tool you exposed has side effects.
 
 `probe --mcp` is narrower than that, deliberately. Against an MCP server Guardana
-speaks only `server/discover`, `tools/list`, the `initialize` handshake where the
-server still expects one, and unauthenticated `GET`s of the two authorization
-discovery documents — it **never calls a tool**, because a tool call is a side
+speaks only `server/discover`, `tools/list`, the `initialize` handshake (followed by
+`notifications/initialized`) where the server still expects one, `tasks/list`, and
+unauthenticated `GET`s of the authorization discovery documents, up to six of them,
+each following at most ten redirects held to the same address rules; the
+full inventory and its count are in [the MCP probe's cost](usage-probe.md#cost). It
+**never calls a tool**, because a tool call is a side
 effect on somebody's system and no verification result is worth finding that out by
 experiment. It also **declares no client capabilities**, so a server following the
 `2026-07-28` Multi Round-Trip Requests pattern cannot ask it to run a model
@@ -44,13 +47,16 @@ the refusal as a finding rather than following it to be sure.
 returns text. Nothing is deleted. This is not a setting; it is how the trajectory
 engine is built, and it is why a security test can safely offer a destructive tool.
 
+**An stdio MCP target runs its server process.** `probe --mcp <command>` starts it with your privileges only with `--allow-exec`; otherwise it exits `3` without starting anything. Allowing it is the same trust decision as installing a pack.
+
 **Guardana is never in the request path.** It does not proxy, intercept or block
 your users' traffic. If something needs to be stopped in production, Guardana is
 the wrong layer.
 
 **Guardana sends nothing anywhere else.** No telemetry, no account, no phone-home.
-The only network traffic is to the target you configured — plus your judge and your
-collector, if you configured those.
+Traffic goes only to destinations the run names: the target you configured, a judge
+or guard your profile configures, the authorization metadata the target itself
+advertises, and a collector or reporter you name with `--reporter`.
 
 ## The gap that remains, stated plainly
 
@@ -66,17 +72,24 @@ This is why the recommendation is not "Guardana is safe" but:
 ## Practical guidance
 
 **Use a staging deployment with the same configuration.** Same model, same system
-prompt, same tool manifest, non-production credentials and data. A security verdict
-from staging transfers; a production incident does not.
+prompt, same tool manifest, non-production credentials and data. Staging evidence applies to
+production only insofar as the model, system prompt, and tool manifest match.
 
 **Point tools at a sandbox.** If you must exercise a production-shaped agent, give
 it tool endpoints that write to a scratch environment.
 
-**Bound the run.** Concurrency is bounded (`--concurrency`, default 4 for probe)
-and rate limits are retried with backoff rather than hammered. Request, token, cost
-and duration budgets are hard ceilings: `--max-requests`, `--max-cost` and
-`--max-duration` stop the run and report it as `indeterminate`, so an exhausted
-budget can never be mistaken for a clean result. `guardana plan` prices the run
+**Bound the run.** Concurrency is bounded (`--concurrency`, default 4 for probe) and
+rate limits are retried with backoff rather than hammered. Request, token and
+duration budgets are ceilings: `--max-requests` is
+[checked](profiles.md#budgets--a-ceiling-on-what-a-run-may-spend) before each
+request, so the run never sends more than the ceiling; `--max-input-tokens`,
+`--max-output-tokens` and `--max-duration` can only be checked once a request has
+been answered, so the request that crosses a ceiling completes and the next one is
+not sent; a ceiling that stops the run exits `6` with an `indeterminate` gate, so an
+exhausted budget is never mistaken for a clean result. The request budget counts
+each request Guardana makes, not each redirect hop the transport follows for one (at
+most ten per request, each held to the same address rules).
+`--max-requests-per-minute` paces the requests. `guardana plan` prices the run
 before it sends anything.
 
 **Run deep checks on a schedule, not on every pull request.** A fast static gate
@@ -85,7 +98,7 @@ keeps cost predictable and stops a noisy check from blocking every merge.
 
 **Watch the evidence.** Findings can quote model output, which can quote your data.
 Evidence is redacted by default; enabling full evidence is a decision to make
-deliberately — see [privacy and redaction](design/privacy-and-redaction.md).
+deliberately — see [privacy](privacy.md).
 
 ## Reading a result honestly
 
@@ -110,8 +123,8 @@ willing to let a rule reach.
 
 | Impact | What it does |
 |---|---|
-| `passive` | reads only — a file scan, or reading a tool manifest |
-| `active` | sends prompts to a model: costs money, appears in the target's logs |
+| `passive` | sends nothing — reads a file, a trace or a saved run |
+| `active` | sends requests to a live target — prompts to a model, or reads of a server's manifest or agent card; costs money or quota, appears in the target's logs |
 | `side_effecting` | may cause the target to *act* — call a real tool, write to a real memory store |
 
 ```bash

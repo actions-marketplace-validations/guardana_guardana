@@ -5,13 +5,16 @@ say "I could not tell", which is the property this whole tool is built around.
 """
 
 import acme_rules
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext
 from guardana.core.rule.verify import verify_rules
 
+_ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
+
 
 def test_every_acme_rule_proves_all_three_outcomes() -> None:
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     ctx = RuleContext(evaluators=registry.evaluators())
 
     unproven = [

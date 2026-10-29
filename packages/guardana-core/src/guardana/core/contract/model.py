@@ -47,8 +47,7 @@ class SecurityContract:
 
     Not a profile and not a rule file. A profile selects among checks that exist and
     sets the bar they clear; this creates checks nobody shipped, in the vocabulary of
-    the application rather than of an attack. See `docs/design/security-contracts.md`
-    for what that boundary rules out and why.
+    the application rather than of an attack.
     """
 
     name: str

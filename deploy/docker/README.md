@@ -4,12 +4,23 @@ Two images, published to the GitHub Container Registry on every release:
 
 | Image | What it is | Entrypoint |
 |---|---|---|
-| `ghcr.io/guardana/guardana:0.27` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
-| `ghcr.io/guardana/guardana-collector:0.27` | the optional collector | `guardana-collector` |
+| `ghcr.io/guardana/guardana:1.0` | the CLI — `scan`, `probe`, `monitor`, `diff` and the rest | `guardana` |
+| `ghcr.io/guardana/guardana-collector:1.0` | the optional collector | `guardana-collector` |
 
 Three tags: the exact version, the moving minor (what the table above pins), and
 `latest`. Pin the **moving minor** in a pipeline — it picks up fixes without changing which rules
 run. A pre-release never moves `latest` or the minor tag.
+
+To run exactly the bytes you reviewed, pin the digest as well. A tag can move; a digest
+cannot, and Docker checks it on every pull:
+
+```bash
+docker buildx imagetools inspect ghcr.io/guardana/guardana:<version>   # prints the Digest
+docker run --rm ghcr.io/guardana/guardana:<version>@sha256:<digest> --version
+```
+
+Keep the tag beside the digest so a reader still sees the version. Updating then means
+changing both in one review.
 
 Both are built from `python:3.13-slim-bookworm` in two stages, so the shipped
 image carries no build tooling, and both run as **uid 10001**, not root. Each
@@ -19,7 +30,7 @@ provenance attestation attached in the registry.
 ## The CLI
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.27 scan /work
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 scan /work
 ```
 
 `/work` is the working directory inside the image; mounting read-only is enough,
@@ -31,7 +42,7 @@ command.
 Writing a report out needs a writable mount:
 
 ```bash
-docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:0.27 \
+docker run --rm -v "$PWD:/work" ghcr.io/guardana/guardana:1.0 \
   scan /work --format sarif --output /work/guardana.sarif
 ```
 
@@ -47,7 +58,7 @@ Run it as yourself and it reads what you can read:
 
 ```bash
 docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" \
-  ghcr.io/guardana/guardana:0.27 scan /work
+  ghcr.io/guardana/guardana:1.0 scan /work
 ```
 
 ## The collector
@@ -55,11 +66,11 @@ docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" \
 ```bash
 docker run --rm \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.27 migrate
+  ghcr.io/guardana/guardana-collector:1.0 migrate
 
 docker run -d --name guardana-collector -p 8000:8000 \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:...@db:5432/guardana" \
-  ghcr.io/guardana/guardana-collector:0.27
+  ghcr.io/guardana/guardana-collector:1.0
 ```
 
 The default command is `serve --host 0.0.0.0 --port 8000`. Binding every
@@ -86,8 +97,7 @@ Compose file, TLS, upgrades — is
 The images are public. If a fresh machine cannot pull one, the package's
 visibility was never flipped after the first release — a package created by a
 workflow starts private whatever the repository is. That is a maintainer setting,
-not something to work around with a token:
-[`docs/maintainers/github-setup.md`](../../docs/maintainers/github-setup.md).
+not something to work around with a token.
 
 ## Building them yourself
 
@@ -98,8 +108,41 @@ docker build -f deploy/docker/cli.Dockerfile -t guardana-cli:dev .
 docker build -f deploy/docker/collector.Dockerfile -t guardana-collector:dev .
 ```
 
+### Where the dependencies come from
+
+Neither image resolves dependencies at build time. Each installs a requirement file
+exported from `uv.lock`, the lock CI tests against, with every version pinned, every
+file checked by hash and wheels only
+(`pip install --only-binary=:all: --require-hashes --no-deps`):
+
+| File | Installed into |
+|---|---|
+| `cli-requirements.txt` | the CLI image: dependencies of `guardana-cli`, `guardana-core`, `guardana-rules` and `guardana-report` |
+| `collector-requirements.txt` | the collector image: `guardana-server` with its `serve` extra, with no engine dependencies |
+| `build-requirements.txt` | a build-only environment: `hatchling`, the build backend, from the lock's `image-build` group |
+
+The lock also records source archives, and building one would pull build
+requirements that nothing pins. With `--only-binary=:all:`, a package without a
+wheel for the platform being built fails the build instead.
+
+The locked `hatchling` builds the Guardana packages from the copied source without
+build isolation. They are installed with `--no-deps`; `pip check` then fails the build
+if the locked set does not cover their declared dependencies. The build environment
+stays in the first stage, so the shipped image contains no `hatchling`. The image
+keeps its base image's `pip` without upgrading it.
+
+After any change to `uv.lock`, regenerate the three files. CI fails if the export
+is stale:
+
+```bash
+uv run python scripts/export_image_requirements.py           # rewrite them from uv.lock
+uv run python scripts/export_image_requirements.py --check   # what CI runs
+```
+
 `uv run python scripts/image_smoke.py` builds both and runs them — the same
 checks CI runs on every push, including a scan of the deliberately malicious
 fixture that must exit `1`. An image whose rule catalog failed to ship reports
 "no findings" and exits `0`, and that is the failure this project exists to
-prevent.
+prevent. Before building, it checks that every package in those files has a
+wheel in `uv.lock` for each release platform, `linux/amd64` and `linux/arm64`, on the
+images' CPython and glibc. It names any package that would fail a release build.

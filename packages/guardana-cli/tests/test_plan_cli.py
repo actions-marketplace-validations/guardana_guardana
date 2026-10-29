@@ -14,7 +14,7 @@ import pytest
 from guardana.cli import _endpoint as endpoint_module
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
-from guardana.core.target.endpoint import ChatMessage
+from guardana.core.target.endpoint import RETRIES_PER_REQUEST, ChatMessage
 from typer.testing import CliRunner, Result
 
 runner = CliRunner()
@@ -49,12 +49,33 @@ def test_a_probe_plan_states_a_ceiling(monkeypatch: pytest.MonkeyPatch) -> None:
     assert payload["complete"] is True, payload["unknown_cost"]
 
 
+def test_a_probe_plan_names_the_retries_its_ceiling_leaves_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A retry counts toward `--max-requests`, so a ceiling silent about them overstates the fit."""
+    ceiling = json.loads(_probe_plan(monkeypatch, "--format", "json").output)["requests"]["max"]
+
+    text = " ".join(_probe_plan(monkeypatch).output.split())
+
+    assert f"at most {ceiling} — plus up to {ceiling * RETRIES_PER_REQUEST} retries" in text
+    assert f"retried up to {RETRIES_PER_REQUEST} times" in text
+    assert "counts toward --max-requests" in text
+
+
+def test_an_mcp_plan_names_no_retries(monkeypatch: pytest.MonkeyPatch) -> None:
+    result = runner.invoke(app, ["plan", "probe", "--mcp", "http://mcp.test/mcp"])
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert "retries" not in result.output
+
+
 def test_a_scan_plan_lists_the_rules_it_would_run(tmp_path: Path) -> None:
+    (tmp_path / "requirements.txt").write_text("requests==2.32.3\n", encoding="utf-8")
     result = runner.invoke(app, ["plan", "scan", str(tmp_path), "--format", "json"])
 
     payload = json.loads(result.output)
     assert payload["rules"], "a scan plan that lists no rules would be describing nothing"
-    assert payload["schema_version"] == 2
+    assert payload["schema_version"] == 4
 
 
 def test_a_restrictive_plugin_mode_says_so_in_the_plan(tmp_path: Path) -> None:
@@ -62,11 +83,11 @@ def test_a_restrictive_plugin_mode_says_so_in_the_plan(tmp_path: Path) -> None:
     "0 rule(s) would run" and, thanks to the zero-request sentence, "requests: 0 —
     every selected rule declares it sends nothing" — which together read as a scan
     that is free and fine, about a scan where nothing loaded at all. Loading
-    nothing must say so.
+    nothing must say so, and a plan for a run that loads nothing is refused.
     """
     result = runner.invoke(app, ["plan", "scan", str(tmp_path), "--plugins", "disabled"])
 
-    assert result.exit_code == ExitCode.OK, result.output
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
     assert "could not load rule" in result.output
     assert "plugin trust is disabled" in result.output
 
@@ -122,7 +143,7 @@ def test_a_plan_document_satisfies_its_published_schema(
     from jsonschema import Draft202012Validator  # noqa: PLC0415
 
     schema = _json.loads(
-        (_Path(__file__).resolve().parents[3] / "schemas" / "plan-v2.schema.json").read_text(
+        (_Path(__file__).resolve().parents[3] / "schemas" / "plan-v4.schema.json").read_text(
             encoding="utf-8"
         )
     )

@@ -51,8 +51,8 @@ _SECRET_BYTES = 32
 Which is why a plain SHA-256 is the right digest here and a password hash is not.
 Argon2 and bcrypt exist to make *guessing* expensive, and guessing only matters
 against a secret a human chose. There is nothing to guess in 256 random bits, so
-the cost would buy nothing and the dependency would be real — see CLAUDE.md on the
-dependency surface being part of the posture. This is the same reasoning GitHub
+the cost would buy nothing and the dependency would be real, and the dependency
+surface is part of the security posture. This is the same reasoning GitHub
 publishes for personal access tokens.
 """
 
@@ -164,6 +164,9 @@ class Authenticated:
         return TenantScope.for_project(self.project_id, self.environment, self.key_id)
 
 
+# What an unknown prefix is compared against; the refusal never depends on it not matching.
+_NO_SUCH_KEY_DIGEST = "sha256:" + "0" * 64
+
 _KEY_COLUMNS = (
     "k.name, k.secret_hash, k.scopes, k.created_at, k.last_used_at, k.revoked_at, "
     "k.expires_at, k.project_id, o.slug, p.slug, k.environment, k.id"
@@ -182,7 +185,8 @@ def authenticate(
 
     The stored digest is compared with `hmac.compare_digest` rather than `==`. The
     lookup is by prefix, so a timing signal here would leak whether a *secret*
-    matched a prefix somebody already knows — small, and free to remove.
+    matched a prefix somebody already knows — small, and free to remove. An unknown
+    prefix is digested and compared too, so it is not refused measurably sooner.
 
     `last_used_at` is written on success, because "this key has not been used in
     four months" is the question that gets an unused credential revoked.
@@ -197,11 +201,11 @@ def authenticate(
     with connection.cursor() as cursor:
         cursor.execute(f"select {_KEY_COLUMNS} {_KEY_JOIN} where k.prefix = %s", (prefix,))
         row = cursor.fetchone()
-    if row is None:
+    stored = _NO_SUCH_KEY_DIGEST if row is None else str(row[1])
+    matched = hmac.compare_digest(stored, hash_secret(secret))
+    if row is None or not matched:
         raise AuthError("unknown API key")
     record = _record(prefix, row)
-    if not hmac.compare_digest(str(row[1]), hash_secret(secret)):
-        raise AuthError("unknown API key")
     if not record.is_usable(moment):
         raise AuthError("this API key is revoked or expired")
     _touch(connection, prefix, moment)

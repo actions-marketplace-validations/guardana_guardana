@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from time import time
 from typing import Any
 
+from guardana.server.db.connection import connect
 from guardana.server.deployment import labelled_for
 from guardana.server.envelope import (
     CheckErrorIn,
@@ -28,8 +29,7 @@ from guardana.server.envelope import (
 from guardana.server.lifecycle import record_sighting
 from guardana.server.store import StoredSubmission
 from guardana.server.tenancy import TenantScope
-from psycopg import Connection, Cursor, connect
-from psycopg.rows import tuple_row
+from psycopg import Connection, Cursor, IsolationLevel
 
 _FINDINGS = "findings"
 _UNVERIFIED = "unverified"
@@ -160,7 +160,7 @@ class PostgresStore:
 
     @contextmanager
     def _connection(self) -> Iterator[Connection[tuple[Any, ...]]]:
-        with connect(self._url, row_factory=tuple_row) as connection:
+        with connect(self._url) as connection:
             yield connection
 
     def add(self, scope: TenantScope, submission: Submission) -> bool:
@@ -196,7 +196,8 @@ class PostgresStore:
                           %s, %s, %s, %s, %s, %s, %s, %s,
                           %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                           %s)
-                on conflict (project_id, run_id) where run_id is not null do nothing
+                on conflict (project_id, (coalesce(environment, '')), run_id)
+                    where run_id is not null do nothing
                 returning id
                 """,
                 (
@@ -338,6 +339,9 @@ class PostgresStore:
         """
         project = scope.require_project()
         with self._connection() as connection, connection.cursor() as cursor:
+            # One snapshot for both queries: under READ COMMITTED a retention pass
+            # committing between them would return a submission without its findings.
+            connection.isolation_level = IsolationLevel.REPEATABLE_READ
             cursor.execute(
                 """
                 select id, extract(epoch from received_at), source, schema_version, rules_run,

@@ -1,0 +1,3 @@
+plugins:
+  mode: allowlist
+  allow: [acme-guardana-rules]

@@ -20,6 +20,9 @@ a published schema in writing. So the question is now every module-level `*VERSI
 constant, and the answer for each is either a round-trip gate or an entry in
 `NOT_A_DOCUMENT` with the reason. Classifying it is a person's job; noticing it is
 not.
+
+A line-oriented format numbers itself `*_FORMAT` and a derivation recorded by number
+`*_ALGORITHM`, so those suffixes are asked about too.
 """
 
 import ast
@@ -27,6 +30,8 @@ from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[3]
 _TESTS = "packages/{package}/tests/{module}"
+_SUFFIXES = ("VERSION", "_FORMAT", "_ALGORITHM")
+"""What a constant that numbers a persisted shape ends in."""
 
 GATED_BY: dict[str, str] = {
     "guardana.core.manifest.model.MANIFEST_SCHEMA_VERSION": _TESTS.format(
@@ -74,13 +79,38 @@ GATED_BY: dict[str, str] = {
     "guardana.core.report.baseline.BASELINE_VERSION": _TESTS.format(
         package="guardana-core", module="report/test_baseline_round_trip.py"
     ),
+    "guardana.core.profile.loader.PROFILE_SCHEMA_VERSION": _TESTS.format(
+        package="guardana-core", module="profile/test_profile_schema_version.py"
+    ),
+    "guardana.core.recipe.RECIPE_SCHEMA_VERSION": _TESTS.format(
+        package="guardana-core", module="test_recipe_documents.py"
+    ),
+    "guardana.core.recipe.RECIPE_LOCK_SCHEMA_VERSION": _TESTS.format(
+        package="guardana-core", module="test_recipe_documents.py"
+    ),
+    "guardana.core.fixtures.FIXTURES_SCHEMA_VERSION": _TESTS.format(
+        package="guardana-core", module="test_fixtures_documents.py"
+    ),
+    "guardana.cli._artifact.ARTIFACT_SCHEMA_VERSION": _TESTS.format(
+        package="guardana-cli", module="test_recipe_artifact.py"
+    ),
+    "guardana.core.dataset.DATASET_FORMAT": _TESTS.format(
+        package="guardana-core", module="test_dataset.py"
+    ),
+    "guardana.core.recording.RECORDING_FORMAT": _TESTS.format(
+        package="guardana-core", module="test_recording.py"
+    ),
+    "guardana.core.fixtures.MARKERS_ALGORITHM": _TESTS.format(
+        package="guardana-core", module="test_fixtures_file.py"
+    ),
 }
 """Which gate walks which document. The keys are checked against the source below.
 
 A schema may share a gate with another — the collector envelope is one document
 declared on both sides of a package boundary, and the three hand-written formats
 answer one question — but no schema may be absent, and no gate may be a file that
-does not exist.
+does not exist. A derivation's algorithm is gated by a test that pins its output,
+since a run records the number and not what it derived.
 """
 
 NOT_A_DOCUMENT: dict[str, str] = {
@@ -88,15 +118,24 @@ NOT_A_DOCUMENT: dict[str, str] = {
         "the version of the Rule/Evaluator/Target contract this build implements — a "
         "property of the code, not of a file anybody keeps"
     ),
+    "guardana.core.output.OUTPUT_API_VERSION": (
+        "the version of the renderer and reporter contract this build implements — a "
+        "property of the code, not of a file anybody keeps"
+    ),
     "guardana.core.target._mcp_wire.LATEST_VERSION": "an MCP protocol revision the other end names",
     "guardana.core.target._mcp_wire.LEGACY_VERSION": "an MCP protocol revision the other end names",
     "guardana.core.target._mcp_wire.META_PROTOCOL_VERSION": "the name of an MCP metadata key",
     "guardana.core.target._mcp_wire.UNSUPPORTED_PROTOCOL_VERSION": "a JSON-RPC error code",
+    "guardana.core.target._a2a_wire.A2A_VERSION": "an A2A protocol version the other end names",
     "guardana.core.formats.gguf._MIN_VERSION": (
         "the oldest GGUF container this reader parses — somebody else's format, which "
         "Guardana reads and never writes"
     ),
-    "guardana.cli._evaluators._DEFAULT_PROMPT_VERSION": (
+    "guardana.core.formats.gguf._MAX_VERSION": (
+        "the newest GGUF container this reader parses — somebody else's format, which "
+        "Guardana reads and never writes"
+    ),
+    "guardana.core.evaluator.llm_judge.DEFAULT_PROMPT_VERSION": (
         "which judge prompt a run used, recorded inside the run manifest, which has its own gate"
     ),
     "guardana.rules.supply_chain._advisories._ANY_VERSION": "a glob meaning every package version",
@@ -106,8 +145,19 @@ NOT_A_DOCUMENT: dict[str, str] = {
     "guardana.rules.supply_chain.malicious_dependency._LOCK_VERSION": (
         "a regex that reads a version out of somebody else's lock file"
     ),
+    "guardana.core.testing.artifacts._DEFAULT_VERSION": (
+        "the GGUF container version a test builder writes — somebody else's format"
+    ),
+    "guardana.core.fingerprint._ALGORITHM": (
+        "the name of the hash every digest is qualified with, which each digest carries"
+    ),
+    "guardana.core.profile.digest._FORMAT": (
+        "a label hashed into the profile digest, which the run manifest records under its own gate"
+    ),
+    "guardana.cli._output.COMPARABLE_FORMAT": "a value of the --format flag, not a file format",
+    "guardana.cli._output._TERMINAL_FORMAT": "a value of the --format flag, not a file format",
 }
-"""`*VERSION` constants that are not a document Guardana persists, and why.
+"""Constants with those suffixes that are not a document Guardana persists, and why.
 
 Every one of these was classified by hand, which is the point: a new constant lands
 in neither table and fails the test below until somebody decides which it is. The
@@ -117,7 +167,7 @@ silently, and a non-document misfiled above costs one line of prose.
 
 
 def _declared_versions() -> dict[str, Path]:
-    """Every module-level `*VERSION` constant in the shipped source.
+    """Every module-level constant with one of `_SUFFIXES` in the shipped source.
 
     Parsed rather than imported: an import list is a list, and this has to be an
     inventory. Deliberately wider than "looks like a schema": the constant that
@@ -132,20 +182,24 @@ def _declared_versions() -> dict[str, Path]:
 
 
 def _constants_in(source: Path, package: Path) -> dict[str, Path]:
-    """The `*VERSION` names one module assigns at its top level.
+    """The names with one of `_SUFFIXES` one module assigns at its top level.
 
-    A plural (`SUPPORTED_VERSIONS`) is a set of versions this build accepts and a
-    `*_VERSION_KEY` is the name of a field, so neither ends in `VERSION` and neither
-    needs classifying.
+    A plural (`SUPPORTED_VERSIONS`, `READ_FORMATS`) is a set of versions this build
+    accepts and a `*_VERSION_KEY` is the name of a field, so none of them ends in a
+    suffix and none needs classifying.
     """
     tree = ast.parse(source.read_text(encoding="utf-8"), filename=str(source))
     module = ".".join(source.relative_to(package).with_suffix("").parts)
+    names = [
+        target
+        for node in tree.body
+        if isinstance(node, ast.Assign | ast.AnnAssign)
+        for target in (node.targets if isinstance(node, ast.Assign) else [node.target])
+    ]
     return {
         f"{module}.{target.id}": source
-        for node in tree.body
-        if isinstance(node, ast.Assign)
-        for target in node.targets
-        if isinstance(target, ast.Name) and target.id.endswith("VERSION")
+        for target in names
+        if isinstance(target, ast.Name) and target.id.endswith(_SUFFIXES)
     }
 
 

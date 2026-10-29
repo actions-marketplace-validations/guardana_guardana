@@ -13,21 +13,8 @@ import yaml
 
 from sitegen.errors import SiteBuildError
 
-STATUSES = frozenset(
-    {
-        # For a documentation page: how far the thing it documents has got.
-        "stable",
-        "beta",
-        "draft",
-        # For a design document: the first word of its `**Status:**` line, so the
-        # site says the same thing the document does. `docs/design/README.md` is
-        # where those four are defined.
-        "proposed",
-        "accepted",
-        "implemented",
-        "superseded",
-    }
-)
+STATUSES = frozenset({"stable", "beta", "draft"})
+"""How far the thing a page documents has got."""
 
 _REQUIRED = ("title", "nav_order", "summary", "status")
 _FENCE = "---\n"
@@ -54,7 +41,7 @@ class Page:
     """A markdown source file, its declared metadata, and the HTML it becomes."""
 
     relative: Path
-    """Where the source sits under `docs/`, e.g. `design/exit-codes.md`."""
+    """Where the source sits under `docs/`, e.g. `studies/first-run-study.md`."""
 
     title: str
     nav_order: int
@@ -75,18 +62,9 @@ class Page:
 
 def read_pages(docs: Path) -> list[Page]:
     """Read every markdown file under `docs/`, refusing one that does not describe itself."""
-    pages = [
-        _page(path, path.relative_to(docs))
-        for path in sorted(docs.rglob("*.md"))
-        if not _ignored(path.relative_to(docs))
-    ]
+    pages = [_page(path, path.relative_to(docs)) for path in sorted(docs.rglob("*.md"))]
     _refuse_duplicate_nav_orders(pages)
     return pages
-
-
-def _ignored(relative: Path) -> bool:
-    """`docs/work/` holds work in flight, not documentation."""
-    return relative.parts[0] == "work"
 
 
 def _page(path: Path, relative: Path) -> Page:

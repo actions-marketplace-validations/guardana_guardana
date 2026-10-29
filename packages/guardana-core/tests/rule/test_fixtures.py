@@ -10,14 +10,18 @@ never saw.
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.evaluator.base import Expectation, Verdict
 from guardana.core.evaluator.canary import CanaryEvaluator
 from guardana.core.report import Evidence, Finding
+from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.rule import (
     FixtureOutcome,
+    NotOffered,
     Rule,
     RuleContext,
     RuleFixture,
@@ -26,6 +30,7 @@ from guardana.core.rule import (
     YamlRule,
     load_yaml_rules,
 )
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES
 from guardana.core.rule.verify import FixtureVerdict, verify_rule
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, EndpointTarget, Target, TargetKind
@@ -172,16 +177,85 @@ def test_a_rule_that_raises_errors_rather_than_failing() -> None:
     assert "RuntimeError: boom" in verification.errored[0].detail
 
 
-def test_an_inconclusive_verdict_outranks_a_finding_in_the_same_run() -> None:
-    """Otherwise a rule passes a positive sample while quietly declining on the same input."""
+def test_a_finding_outranks_an_inconclusive_verdict_in_the_same_run_as_a_run_reads_it() -> None:
     rule = _Rule(
-        [_finding(), _finding("inconclusive")],
-        [RuleFixture("fires", _endpoint("a"), FixtureOutcome.FINDING)],
+        [_finding("fail"), _finding("inconclusive")],
+        [RuleFixture("fires", _endpoint("a"), FixtureOutcome.INCONCLUSIVE)],
     )
 
     verification = verify_rule(rule)
 
-    assert verification.failed[0].observed is FixtureOutcome.INCONCLUSIVE
+    assert verification.failed[0].observed is FixtureOutcome.FINDING
+
+
+class _Gapping(_Rule):
+    """Reports a coverage shortfall on the reply `gap` and yields what `_Rule` would."""
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        if getattr(getattr(target, "transport", None), "scripted", ("",))[0] == "gap":
+            ctx.shortfall(
+                CoverageShortfall(ShortfallKind.SEED_NOT_REACHED, "item asked as b", "unreached")
+            )
+        return super().run(target, ctx)
+
+
+def test_a_sample_whose_run_reported_a_shortfall_and_no_finding_is_inconclusive() -> None:
+    rule = _Gapping(
+        [],
+        [
+            RuleFixture("falls short", _endpoint("gap"), FixtureOutcome.INCONCLUSIVE),
+            RuleFixture("claimed clean", _endpoint("gap"), FixtureOutcome.CLEAN),
+        ],
+    )
+
+    verification = verify_rule(rule)
+
+    assert [r.observed for r in verification.results] == [FixtureOutcome.INCONCLUSIVE] * 2
+    assert [r.fixture for r in verification.failed] == ["claimed clean"]
+    assert "item asked as b" in verification.failed[0].detail
+
+
+def test_a_sample_that_yielded_a_finding_beside_a_shortfall_is_a_finding() -> None:
+    rule = _Gapping(
+        [_finding("fail")],
+        [
+            RuleFixture("fires and falls short", _endpoint("gap"), FixtureOutcome.FINDING),
+            RuleFixture("declared as declining", _endpoint("gap"), FixtureOutcome.INCONCLUSIVE),
+        ],
+    )
+
+    verification = verify_rule(rule)
+
+    assert [r.observed for r in verification.results] == [FixtureOutcome.FINDING] * 2
+    assert [r.fixture for r in verification.failed] == ["declared as declining"]
+
+
+def test_each_sample_runs_in_a_context_of_its_own() -> None:
+    rule = _Gapping(
+        [],
+        [
+            RuleFixture("falls short", _endpoint("gap"), FixtureOutcome.INCONCLUSIVE),
+            RuleFixture("clean", _endpoint("b"), FixtureOutcome.CLEAN),
+        ],
+    )
+    ctx = RuleContext(config={"k": "v"})
+
+    verification = verify_rule(rule, ctx)
+
+    assert not verification.failed
+    assert ctx.shortfalls() == ()
+
+
+def test_a_fresh_context_keeps_the_configuration_and_empties_every_sink() -> None:
+    ctx = RuleContext(config={"k": "v"}, evaluators={"canary": CanaryEvaluator()})
+    ctx.shortfall(CoverageShortfall(ShortfallKind.SEED_NOT_REACHED, "x", "unreached"))
+    ctx.examined("model.pkl")
+
+    fresh = ctx.fresh()
+
+    assert (fresh.config, fresh.evaluators) == (ctx.config, ctx.evaluators)
+    assert (fresh.shortfalls(), fresh.examined_paths()) == ((), frozenset())
+    assert len(ctx.shortfalls()) == 1
 
 
 def test_a_yaml_rule_declares_fixtures_as_data(tmp_path: Path) -> None:
@@ -192,7 +266,7 @@ def test_a_yaml_rule_declares_fixtures_as_data(tmp_path: Path) -> None:
     verification = verify_rule(rule, RuleContext(evaluators={"canary": CanaryEvaluator()}))
 
     assert verification.is_proven, [f.detail for f in verification.failed] + list(verification.gaps)
-    assert len(verification.results) == len(FixtureOutcome)
+    assert len(verification.results) == len(DEMANDED_OUTCOMES)
 
 
 @pytest.mark.parametrize(
@@ -267,3 +341,115 @@ def test_a_hand_built_yaml_rule_can_still_hold_finished_fixtures() -> None:
     verification = verify_rule(rule, RuleContext(evaluators={"canary": CanaryEvaluator()}))
 
     assert verification.is_proven, [r.detail for r in verification.results]
+
+
+class _NotOffering(_Rule):
+    """A rule that finds the examined capability absent on the sample `c`."""
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        reply = getattr(getattr(target, "transport", None), "scripted", ("",))[0]
+        if reply == "c":
+            raise NotOffered("the sample offers nothing to examine", missing=("tasks",))
+        yield from super().run(target, ctx)
+
+
+def test_a_rule_that_raised_not_offered_is_observed_as_not_offered() -> None:
+    rule = _NotOffering(
+        [_finding()], [RuleFixture("absent", _endpoint("c"), FixtureOutcome.NOT_OFFERED)]
+    )
+
+    (result,) = verify_rule(rule).results
+
+    assert result.observed is FixtureOutcome.NOT_OFFERED
+    assert result.verdict is FixtureVerdict.PASSED
+
+
+def test_not_offered_is_never_read_as_inconclusive() -> None:
+    rule = _NotOffering(
+        [_finding()], [RuleFixture("absent", _endpoint("c"), FixtureOutcome.INCONCLUSIVE)]
+    )
+
+    (result,) = verify_rule(rule).results
+
+    assert result.verdict is FixtureVerdict.FAILED
+    assert result.observed is FixtureOutcome.NOT_OFFERED
+
+
+def test_not_offered_after_a_finding_errors_the_sample() -> None:
+    class _Late(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            yield _finding()
+            raise NotOffered("too late")
+
+    (result,) = verify_rule(
+        _Late([], [RuleFixture("late", _endpoint("a"), FixtureOutcome.NOT_OFFERED)])
+    ).results
+
+    assert result.verdict is FixtureVerdict.ERRORED
+    assert result.detail == "raised NotOffered after reporting"
+
+
+def test_a_rule_need_not_declare_a_not_offered_sample() -> None:
+    samples = [
+        RuleFixture("fires", _endpoint("a"), FixtureOutcome.FINDING),
+        RuleFixture("silent", _endpoint("b"), FixtureOutcome.CLEAN),
+        RuleFixture("declines", _endpoint(""), FixtureOutcome.INCONCLUSIVE),
+    ]
+
+    verification = verify_rule(_Rule([_finding()], samples))
+
+    assert verification.gaps == ()
+    assert verification.is_proven
+
+
+@pytest.mark.parametrize("code", [0, 2])
+def test_a_fixture_whose_rule_calls_sys_exit_errors_the_sample(code: int) -> None:
+    class _Exiting(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            raise SystemExit(code)
+
+    (result,) = verify_rule(
+        _Exiting([], [RuleFixture("exits", _endpoint("a"), FixtureOutcome.CLEAN)])
+    ).results
+
+    assert result.verdict is FixtureVerdict.ERRORED
+    assert "SystemExit" in result.detail
+
+
+def test_a_keyboard_interrupt_in_a_fixture_still_stops_the_verification() -> None:
+    class _Interrupted(_Rule):
+        def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+            raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        verify_rule(_Interrupted([], [RuleFixture("stops", _endpoint("a"), FixtureOutcome.CLEAN)]))
+
+
+@pytest.mark.parametrize("section", ["rule", "fixture"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_rule_keys_raise_ruleloaderror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_RULE_WITH_FIXTURES)
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    block = document if section == "rule" else document["fixtures"][0]
+    block.update(extra)
+
+    path = tmp_path / "rule.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RuleLoadError, match="unknown") as caught:
+        load_yaml_rules(path)
+
+    prefix = f"invalid rule in {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

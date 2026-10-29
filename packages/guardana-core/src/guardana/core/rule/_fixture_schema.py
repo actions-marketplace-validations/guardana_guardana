@@ -99,7 +99,7 @@ def _fixture(
 ) -> DeclaredFixture:
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: fixture {number} must be a mapping")
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: fixture {number} has unknown key(s) "
@@ -221,7 +221,7 @@ def _turns(  # noqa: PLR0913 — every bound the script is checked against
 def _turn(raw: object, path: Path, where: str, *, tools: Sequence[str], at: int) -> ToolCallReply:
     if not isinstance(raw, dict):
         raise RuleLoadError(f"invalid rule in {path}: {where} must be a mapping")
-    unknown = sorted(set(raw) - _ALLOWED_TURN_KEYS)
+    unknown = sorted(str(key) for key in raw if key not in _ALLOWED_TURN_KEYS)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: {where} has unknown key(s) {', '.join(unknown)}; "
@@ -274,10 +274,9 @@ def _say(raw: dict[str, Any], path: Path, where: str) -> str | None:
 def _arguments(raw: dict[str, Any], path: Path, where: str) -> str:
     r"""Render a turn's arguments the way a tool-calling API carries them.
 
-    Compact JSON, and **not ASCII-escaped**: `forbidden_argument_values` and a
-    planted canary are matched as substrings of this string, so escaping `ü` to
-    `ü` would make a marker containing it unfindable and let a `clean` sample
-    pass for a reason nobody wrote.
+    Compact JSON, and **not ASCII-escaped**: a planted canary is matched as a
+    substring of this string, so escaping `ü` would make a marker containing it
+    unfindable by that match and let a `clean` sample pass for a reason nobody wrote.
     """
     if "arguments" not in raw:
         return "{}"

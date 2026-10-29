@@ -1,0 +1,99 @@
+header:
+  schema-version: 2.2.0
+  last-updated: '2026-10-12'
+  last-reviewed: '2026-10-12'
+  url: https://raw.githubusercontent.com/guardana/guardana/main/security-insights.yml
+  comment: |
+    Single-repository file: project and repository sections in one document.
+    Facts mirror SECURITY.md (reporting), .github/workflows/release.yml
+    (artifacts) and the package metadata (license). On any disagreement,
+    those sources are authoritative.
+
+project:
+  name: Guardana
+  homepage: https://guardana.dev
+  administrators:
+    - name: Konrad Karauda
+      primary: true
+      social: https://github.com/karauda
+  documentation:
+    code-of-conduct: https://github.com/guardana/guardana/blob/main/CODE_OF_CONDUCT.md
+    release-process: https://github.com/guardana/guardana/blob/main/.github/workflows/release.yml
+    signature-verification: https://github.com/guardana/guardana/blob/main/SECURITY.md#what-a-release-publishes-and-how-to-check-it-yourself
+    support-policy: https://github.com/guardana/guardana/blob/main/SECURITY.md#supported-versions
+  repositories:
+    - name: guardana
+      url: https://github.com/guardana/guardana
+      comment: |
+        The Guardana engine, built-in rules, CLI, report renderers and
+        optional collector server, in five PyPI distributions.
+  vulnerability-reporting:
+    reports-accepted: true
+    bug-bounty-available: false
+    contact:
+      name: Guardana security contact
+      email: contact@guardana.dev
+      primary: true
+    policy: https://github.com/guardana/guardana/blob/main/SECURITY.md
+    comment: |
+      Do not open a public issue for a suspected vulnerability: open a
+      private GitHub Security Advisory, or email contact@guardana.dev.
+      First response within 14 days; default disclosure window 90 days.
+
+repository:
+  url: https://github.com/guardana/guardana
+  status: active
+  accepts-change-request: true
+  accepts-automated-change-request: true
+  core-team:
+    - name: Guardana maintainers
+      email: contact@guardana.dev
+      primary: true
+  documentation:
+    contributing-guide: https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md
+    review-policy: https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md#commits-and-pull-requests
+    governance: https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md#commits-and-pull-requests
+    security-policy: https://github.com/guardana/guardana/blob/main/SECURITY.md
+  license:
+    url: https://github.com/guardana/guardana/blob/main/LICENSE
+    expression: Apache-2.0
+  release:
+    changelog: https://github.com/guardana/guardana/blob/main/CHANGELOG.md
+    automated-pipeline: true
+    attestations:
+      - name: Distribution SBOM
+        predicate-uri: https://cyclonedx.org/bom
+        location: https://github.com/guardana/guardana/releases
+        comment: |
+          One CycloneDX 1.5 SBOM per PyPI distribution, attached to every
+          GitHub Release as guardana-<package>-<version>.cdx.json. The SBOM
+          files themselves are not attested.
+      - name: Build provenance
+        predicate-uri: https://slsa.dev/provenance/v1
+        location: https://github.com/guardana/guardana/attestations
+        comment: |
+          Keyless-signed provenance: five packages' wheels/sdists, reference pack's
+          wheel/sdist and both images; verify with `gh attestation verify`.
+          `.sigstore.json` bundles are attached to the GitHub Release.
+    distribution-points:
+      - uri: https://github.com/guardana/guardana/releases
+        comment: GitHub Releases (SBOMs and the reference pack's wheel and sdist).
+      - uri: pkg:pypi/guardana-core
+        comment: PyPI distribution (engine).
+      - uri: pkg:pypi/guardana-rules
+        comment: PyPI distribution (built-in rules).
+      - uri: pkg:pypi/guardana-report
+        comment: PyPI distribution (report renderers).
+      - uri: pkg:pypi/guardana-cli
+        comment: PyPI distribution (command line).
+      - uri: pkg:pypi/guardana-server
+        comment: PyPI distribution (collector server).
+      - uri: ghcr.io/guardana/guardana
+        comment: Container image (CLI plus engine).
+      - uri: ghcr.io/guardana/guardana-collector
+        comment: Container image (collector server).
+  security:
+    assessments:
+      self:
+        comment: |
+          Self assessment has not yet been completed.

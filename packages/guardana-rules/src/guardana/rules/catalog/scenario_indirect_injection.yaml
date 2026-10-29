@@ -4,6 +4,7 @@ severity: high
 target_kind: endpoint
 taxonomy: [LLM01:2025, LLM01:2026, LLM08:2025, LLM09:2026, ASI01:2026, AML.T0051, AML.T0080]
 requires: [chat, plant_system_prompt]
+detection: invariant
 stateful: false
 steps:
   - send: |

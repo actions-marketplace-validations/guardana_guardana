@@ -12,14 +12,16 @@ said, does any key make no difference, and does the store give back what came in
 """
 
 import json
+from dataclasses import replace
 from typing import Any
 
 import pytest
 from _documents import run_manifest, scan_result
 from _roundtrip import key_paths, render, unread_keys
 from conftest import Scoped, _clock
+from guardana.core.report import SkippedRule, SkipReason
 from guardana.core.reporter import _serialize
-from guardana.server.envelope import Submission
+from guardana.server.envelope import SkippedIn, Submission
 from guardana.server.store import InMemoryStore
 from guardana.server.tenancy import TenantScope
 from pydantic import ValidationError
@@ -134,3 +136,27 @@ def test_an_emptied_channel_is_stored_as_empty_and_not_as_absent(channel: str) -
 
     assert stored != full
     assert getattr(stored, channel) == []
+
+
+def test_a_rule_the_target_did_not_offer_comes_back_as_not_offered(scoped: Scoped) -> None:
+    """A run-time skip reason the collector models as any string arrives and is stored as sent."""
+    skipped = SkippedRule(
+        "guardana.mcp.task_identity", SkipReason.NOT_OFFERED, ("tasks",), "no tasks offered"
+    )
+    payload = json.loads(
+        _serialize(
+            replace(scan_result(), rules_skipped=(skipped,)),
+            source="ci",
+            deployment=None,
+            run=run_manifest(),
+        )
+    )
+    scoped.store.add(scoped.scope, Submission.model_validate(payload))
+
+    (stored,) = scoped.store.submissions(scoped.scope)
+
+    if stored.summary is None:
+        raise AssertionError("the collector dropped the summary")
+    assert stored.summary.rules_skipped == [
+        SkippedIn(rule_id="guardana.mcp.task_identity", reason="not_offered", missing=["tasks"])
+    ]

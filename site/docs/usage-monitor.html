@@ -6,58 +6,78 @@
 <title>guardana monitor — Guardana documentation</title>
 <meta name="description" content="guardana monitor: scheduled re-verification">
 <link rel="canonical" href="https://guardana.dev/docs/usage-monitor">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html" aria-current="page">guardana monitor</a></li>
+<li><a href="usage-monitor.html" aria-current="page">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,65 +98,113 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana monitor</code> — a long-running sampling observer</h1><p class="lede"><code>guardana monitor</code>: scheduled re-verification</p><p>Runs the same endpoint rules as <code>probe</code>, but repeatedly, on an interval,
-next to a served model — and alerts when something changes. It is
-explicitly a <strong>sampling observer</strong>, not an inline production sidecar: it
-polls, it doesn't intercept traffic.</p>
+<details class="mnav">
+<summary>Menu · <b>guardana monitor</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html" aria-current="page">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana monitor</code> — a long-running sampling observer<span class="status beta">beta</span></h1><p class="lede"><code>guardana monitor</code>: scheduled re-verification</p><p><code>guardana monitor</code> runs the same endpoint rules as <code>probe</code> on an interval next to a served model when you need to detect changes. It alerts when something changes. As a <strong>sampling observer</strong>, it polls outside the request path; it does not intercept traffic.</p>
 <pre><code class="language-bash">guardana monitor (--url &lt;base-url&gt; --model &lt;name&gt; | --target &lt;scheme://locator&gt;) [OPTIONS]
 </code></pre>
 <h2 id="flags">Flags</h2>
@@ -171,17 +240,22 @@ polls, it doesn't intercept traffic.</p>
 <tr>
 <td><code>--api-key-env TEXT</code></td>
 <td>none</td>
-<td>Env var holding the bearer API key</td>
+<td>Env var holding the bearer API key. Unset or empty is refused (exit <code>3</code>) before the first cycle</td>
 </tr>
 <tr>
 <td><code>--provider [openai|ollama|tgi]</code></td>
 <td><code>openai</code></td>
-<td>Endpoint wire protocol — same meaning as on <code>probe</code></td>
+<td>Endpoint wire protocol — same meaning as on <code>probe</code>; any other name is refused (exit <code>3</code>)</td>
+</tr>
+<tr>
+<td><code>--adapter PATH</code></td>
+<td>none</td>
+<td>Adapter file for a guarded endpoint — same file and same refusals as on <a href="usage-probe.html#probing-a-guarded-endpoint"><code>probe</code></a>; cannot be combined with <code>--provider</code> or <code>--api-key-env</code></td>
 </tr>
 <tr>
 <td><code>--system-prompt-file PATH</code></td>
 <td>none</td>
-<td>File containing the system prompt already deployed in front of the model — same meaning as on <code>probe</code></td>
+<td>File containing the system prompt already deployed in front of the model — same meaning as on <code>probe</code>; a file that cannot be read is refused (exit <code>3</code>)</td>
 </tr>
 <tr>
 <td><code>--interval FLOAT</code></td>
@@ -209,7 +283,7 @@ polls, it doesn't intercept traffic.</p>
 <td>Path to a <code>guardana.yaml</code> policy file</td>
 </tr>
 <tr>
-<td><code>--preset [ci|pre-training|monitor]</code></td>
+<td><code>--preset [ci|pre-training|monitor|release]</code></td>
 <td>none</td>
 <td>Named policy preset (mutually exclusive with <code>--profile</code>); <code>--preset monitor</code> fails on HIGH <strong>and</strong> on inconclusive — see <a href="profiles.html#named-presets---preset"><code>profiles.md</code></a></td>
 </tr>
@@ -221,12 +295,27 @@ polls, it doesn't intercept traffic.</p>
 <tr>
 <td><code>--reporter TEXT</code></td>
 <td>none</td>
-<td>Forward each <strong>alert's</strong> findings to a collector, e.g. <code>server://https://collector.example.com</code></td>
+<td>Forward each <strong>alert's</strong> findings to a collector, e.g. <code>server://https://collector.example.com</code>; an <a href="outputs.html">installed reporter</a> needs a saved run, so <code>&lt;name&gt;://</code> is refused with exit <code>3</code></td>
+</tr>
+<tr>
+<td><code>--ai-system TEXT</code></td>
+<td>none</td>
+<td>Which AI system this watch verifies, e.g. <code>support-agent</code>, sent with each forwarded alert. Never guessed.</td>
+</tr>
+<tr>
+<td><code>--environment TEXT</code></td>
+<td>none</td>
+<td>Where it runs, e.g. <code>production</code>. Never guessed from a branch name.</td>
+</tr>
+<tr>
+<td><code>--deployment-id TEXT</code></td>
+<td>none</td>
+<td>Which version of it, if you have an identifier.</td>
 </tr>
 <tr>
 <td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
-<td><code>all</code></td>
-<td>Which installed plugins to load — same meaning as on <code>probe</code>. Added in 0.7.1; before that <code>monitor</code> was the one command with no way to restrict what it imported.</td>
+<td><code>builtins</code>, or the profile's <code>plugins:</code></td>
+<td>Which installed plugins to load — same meaning as on <code>probe</code>.</td>
 </tr>
 <tr>
 <td><code>--allow-plugin TEXT</code></td>
@@ -238,9 +327,16 @@ polls, it doesn't intercept traffic.</p>
 <p>Each custom-target cycle builds a fresh target from the locator, so per-cycle
 budgets and usage have the same lifetime as the built-in connection. The target
 flags are mutually exclusive with the built-in connection flags.</p>
+<p><code>monitor</code> takes no budget flags: every cycle is held to the profile's <code>budgets:</code>, each on a
+meter of its own. <code>max_requests_per_minute</code> paces a cycle's requests, retries included, and
+each judge's calls on the judge's own meter; a cycle whose next slot lies past
+<code>max_duration</code> stops as budget-stopped. The pace starts again with each cycle's meter, so
+keep <code>--interval</code> at least <code>60 / N</code> seconds for the rate to hold between cycles too.</p>
 <p>Note: <code>monitor</code> has no <code>--format</code> flag — alerts are always printed as human
 text (findings inside an alert use the <code>human</code> renderer); forward to a
-collector for machine-readable persistence.</p>
+collector for machine-readable persistence. The alert renders with the gate its cycle
+recorded, so a cycle refused only for a skip (<code>fail_on_skipped</code>, as in <code>--preset release</code>)
+says so instead of printing <code>✓ No findings.</code></p>
 <h2 id="evidence-leaves-this-command-twice-and-both-are-redacted">Evidence leaves this command twice, and both are redacted</h2>
 <p>An alert is printed <em>and</em> — with <code>--reporter</code> — sent to a collector, so the
 profile's <a href="privacy.html"><code>privacy:</code></a> block governs both. <strong>In 0.7.0 it governed
@@ -281,14 +377,48 @@ going blind as an improvement.</li>
 exits on its own (unless <code>--max-cycles</code> is set) — it's meant to run as a
 long-lived process (e.g. a systemd unit or sidecar container) next to your
 served model.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<p>A run bounded by <code>--max-cycles</code> ends with the worst outcome any of its cycles earned.
+Each cycle is judged twice: as <code>probe</code> judges a run, and against the first cycle as
+<a href="usage-diff.html#exit-codes"><code>guardana diff</code></a> judges a comparison. So a cycle that fails
+the policy exits <code>1</code> even when a later cycle is clean, a cycle that verified nothing
+or could not be compared with the first is <code>2</code>, and a budget-stopped cycle is <code>6</code>. A
+policy failure outranks a stop: each cycle is a complete run, so what one cycle proved
+stays proven whatever cut a later one short. An alert raised only by a change the
+policy's bar does not reach — a regression <code>diff</code> would also exit <code>0</code> for — leaves the
+exit code at <code>0</code>. A cycle a transient endpoint failure prevented, or one its target
+stopped part-way (<a href="usage-probe.html#when-the-target-fails-part-way">as <code>probe</code> decides it</a>),
+is not sampled: it is reported as a warning naming the cause, is never the cycle the
+others are compared with, and proves no coverage. A finding a stopped cycle produced
+before the stop is still proven, so when it fails the policy the cycle alerts (printed
+and forwarded to <code>--reporter</code>) and the run exits <code>1</code>. Otherwise such a cycle earns no
+exit code of its own; if no sampled cycle earned anything worse, the run exits <code>4</code>.
+When the first cycle is such a cycle, the watch ends there with exit <code>4</code> and the cause
+after <code>error:</code>, after alerting any failure that cycle proved. <code>--max-cycles 0</code> samples
+nothing and exits <code>2</code>.</p>
+<p>A profile that sets <a href="profiles.html#delivery"><code>delivery.required</code></a> adds one more: each alert
+the collector did not acknowledge — it rejected it, could not be reached, or answered without
+its own acknowledgement — is printed as an <code>error:</code> line and counted, and the watch goes on.
+When the watch ends, <code>monitor: &lt;n&gt; alert deliveries not acknowledged</code> follows the cycle count,
+and a final <code>0</code>, <code>1</code> or <code>2</code> becomes <code>8</code>; <code>4</code>, <code>6</code> and <code>7</code> stay. Without the key a failed
+alert delivery is a warning and changes no code.</p>
+<p>An unbounded run never ends on its own. Ctrl-C exits <code>7</code> whatever the cycles before
+it found — the alerts already printed are the record of those cycles, and the code
+says the watch did not finish. See <a href="exit-codes.html"><code>exit-codes.md</code></a>.</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-console">$ guardana monitor --url http://localhost:11434 --model llama3 --interval 300 --max-cycles 3
---- ALERT (cycle 1): worse than the first cycle: appeared ---
+--- ALERT (cycle 1): gate failed ---
 ✖ [HIGH] guardana.prompt.jailbreak.dan_style — Jailbreak via persona override and encoding smuggling
     No refusal marker found; response likely complied.  (http://localhost:11434#llama3)
 
-1 finding(s); 8 rule(s) run, 0 skipped.
+1 finding(s); 14 rule(s) run, 16 skipped.
 </code></pre>
+<p>Against a plain chat endpoint 16 rules are counted as skipped: the 11 MCP
+rules and the 3 A2A rules (the target offers neither surface), and the two
+rules that need seeded data — <code>guardana.tenancy.cross_tenant_answer</code> and
+<code>guardana.retrieval.poisoned_document</code>, which <code>--fixtures</code> enables. A rule
+that needs <code>plant_system_prompt</code> is not among them:
+<code>guardana.prompt.system_prompt_leak.canary</code> plants its own canary and runs.</p>
 <h2 id="forwarding-alerts-to-a-collector">Forwarding alerts to a collector</h2>
 <pre><code class="language-bash">guardana monitor --url http://localhost:11434 --model llama3 --reporter server://https://collector.example.com
 </code></pre>
@@ -308,8 +438,10 @@ with <code>&lt;url&gt;#&lt;model&gt;</code> as the source.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-monitor.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

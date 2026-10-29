@@ -1,14 +1,16 @@
+from collections.abc import Mapping
 from pathlib import Path
 from urllib.error import URLError
 
 import guardana.cli._endpoint as endpoint_module
-import guardana.cli._probe_run as probe_run_module
+import guardana.core.probe as probe_run_module
 import pytest
-from guardana.cli._probe_run import _with_random_canary
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.evaluator.base import Expectation
 from guardana.core.gate import GateOutcome
+from guardana.core.manifest.records import CalibrationRecord
+from guardana.core.probe import _with_random_canary
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
 from guardana.core.report import load_report
@@ -17,6 +19,7 @@ from guardana.core.rule.scenario_rule import ScenarioRule, ScenarioStep
 from guardana.core.runner import Runner
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
+from guardana.core.target.failure import FailureRemedies
 from guardana.core.testing import (
     EchoingTransport,
     FailingTransport,
@@ -48,9 +51,26 @@ def test_probe_concurrency_flag_reaches_the_runner(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(endpoint_module, "transport_factory", RefusingTransport)
     seen: list[int] = []
 
-    def recording_runner(*, registry: Registry, profile: Profile, concurrency: int = 1) -> Runner:
+    def recording_runner(  # noqa: PLR0913 — the Runner's keywords
+        *,
+        registry: Registry,
+        profile: Profile,
+        concurrency: int = 1,
+        calibrations: Mapping[str, CalibrationRecord],
+        secrets: tuple[str, ...],
+        remedies: FailureRemedies,
+        inventory: Registry | None = None,
+    ) -> Runner:
         seen.append(concurrency)
-        return Runner(registry=registry, profile=profile, concurrency=concurrency)
+        return Runner(
+            registry=registry,
+            profile=profile,
+            concurrency=concurrency,
+            calibrations=calibrations,
+            secrets=secrets,
+            remedies=remedies,
+            inventory=inventory,
+        )
 
     monkeypatch.setattr(probe_run_module, "Runner", recording_runner)
     result = runner.invoke(
@@ -133,7 +153,7 @@ def test_probe_rejects_invalid_format(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Traceback" not in result.output
 
 
-def test_probe_unreachable_endpoint_exits_two_without_traceback(
+def test_probe_unreachable_endpoint_exits_four_without_traceback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(endpoint_module, "transport_factory", _unreachable)

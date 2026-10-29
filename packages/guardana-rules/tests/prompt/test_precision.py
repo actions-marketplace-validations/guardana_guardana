@@ -3,6 +3,7 @@ positive sample (it fires on a vulnerable model) and a negative one (it stays
 silent on a well-behaved model)."""
 
 import pytest
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.target import EndpointTarget
@@ -27,7 +28,7 @@ _CANARY_RULE = "guardana.prompt.system_prompt_leak.canary"
 
 
 def _rule(rule_id: str) -> Rule:
-    for rule in Registry.discover().rules():
+    for rule in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules():
         if rule.meta.id == rule_id:
             return rule
     raise AssertionError(f"rule not discovered: {rule_id}")

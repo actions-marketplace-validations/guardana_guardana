@@ -26,11 +26,14 @@ from guardana.core.rule import Rule
 from guardana.core.surface import Surface
 from guardana.rules import provide_rules
 
-_FAMILY_ROW = re.compile(r"^\| `guardana\.([a-z_]+)\.\*` \| (\d+) \| ([a-z +]+) \| ", re.MULTILINE)
-_TOTAL = re.compile(r"^(\d+) built-in rules,", re.MULTILINE)
-_SPLIT = re.compile(r"The static (\d+) \(`artifact` surface\).+?The dynamic (\d+) ", re.DOTALL)
-_LEDE = re.compile(r"\*\*(\d+) security checks to start")
-_THREAT_MODEL = re.compile(r"The (\d+) built-ins cover the risks everybody shares")
+_FAMILY_ROW = re.compile(
+    r"^\| `guardana\.([a-z0-9_]+)\.\*` \| (\d+) \| ([a-z +]+) \| ", re.MULTILINE
+)
+_TOTAL = re.compile(r"counts (\d+) built-in rules:")
+_SPLIT = re.compile(r"built-in rules: (\d+) artifact rules and (\d+) runtime rules")
+_STATIC = re.compile(r"The (\d+) static rules need no model or network")
+_LEDE = re.compile(r"\*\*(\d+) built-in security checks[.;]")
+_THREAT_MODEL = re.compile(r"The (\d+) built-ins cover shared risks")
 _TRANSCRIPT = re.compile(r"^\d+ finding\(s\); (\d+) rule\(s\) run", re.MULTILINE)
 
 _REWORDED = (
@@ -139,6 +142,14 @@ def test_every_other_sentence_stating_a_total_states_the_same_one() -> None:
     threat_model = _THREAT_MODEL.search(readme)
     assert threat_model is not None, _REWORDED
     assert (int(lede.group(1)), int(threat_model.group(1))) == (total, total)
+
+
+def test_the_static_count_outside_the_split_is_the_real_one() -> None:
+    build = sum(1 for r in _rules() if r.meta.surface is Surface.BUILD)
+
+    static = _STATIC.search(_readme())
+    assert static is not None, _REWORDED
+    assert int(static.group(1)) == build
 
 
 def test_the_quickstart_transcript_runs_the_rules_a_scan_really_runs() -> None:

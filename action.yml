@@ -21,10 +21,10 @@ inputs:
   version:
     description: >-
       guardana-cli version to run. Defaults to the version this Action tag ships,
-      so a workflow pinned to `guardana/guardana@v0.27` keeps running the CLI that
+      so a workflow pinned to `guardana/guardana@v1.0` keeps running the CLI that
       tag was released with. Pass `latest` to always take the newest release.
     required: false
-    default: "0.27.0"
+    default: "1.0.0"
   sarif-file:
     description: "Where to write the SARIF report."
     required: false
@@ -46,7 +46,27 @@ runs:
       # this one calls is a moving tag inside every workflow that calls *this* one:
       # a compromised `v7` would run in other people's pipelines under Guardana's
       # name, which is the supply-chain risk this project scans for.
-      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+
+    - name: Install Guardana
+      id: install
+      shell: bash
+      env:
+        GUARDANA_VERSION: ${{ inputs.version }}
+      # A CLI that cannot be installed fails here, on its own, so its exit status is
+      # never read as the scan's.
+      run: |
+        # `latest` is opt-in, and the default is this Action tag's own version, so a
+        # workflow pinned to a tag keeps running the CLI that tag was released with.
+        spec="guardana-cli"
+        if [ "$GUARDANA_VERSION" != "latest" ] && [ -n "$GUARDANA_VERSION" ]; then
+          spec="guardana-cli==$GUARDANA_VERSION"
+        fi
+        if ! uvx --from "$spec" guardana --version; then
+          echo "::error::guardana: could not install $spec"
+          exit 2
+        fi
+        echo "spec=$spec" >> "$GITHUB_OUTPUT"
 
     - name: Run Guardana scan
       id: scan
@@ -57,18 +77,10 @@ runs:
         GUARDANA_PATH: ${{ inputs.path }}
         GUARDANA_ARGS: ${{ inputs.args }}
         GUARDANA_SARIF: ${{ inputs.sarif-file }}
-        GUARDANA_VERSION: ${{ inputs.version }}
+        GUARDANA_SPEC: ${{ steps.install.outputs.spec }}
       run: |
         set +e
-        # `latest` is opt-in, and the default is this Action tag's own version.
-        # It used to be the other way round: an empty default meant `uvx` resolved
-        # whatever was newest, so `guardana/guardana@v0.27` would quietly start
-        # running the 0.22 CLI — a pinned workflow whose behaviour changed without
-        # anyone editing it, which is the opposite of what a pin is for.
-        spec="guardana-cli"
-        if [ "$GUARDANA_VERSION" != "latest" ] && [ -n "$GUARDANA_VERSION" ]; then
-          spec="guardana-cli==$GUARDANA_VERSION"
-        fi
+        spec="$GUARDANA_SPEC"
         # `xargs` splits like a shell does — honouring quotes — and expands no
         # globs, so a path with a space survives and a `*` reaches the CLI as a
         # literal. Unquoted `$GUARDANA_ARGS` did neither: it split on whitespace
@@ -84,19 +96,62 @@ runs:
             [ -n "$arg" ] && scan_args+=("$arg")
           done <<< "$parsed"
         fi
-        uvx --from "$spec" guardana scan "$GUARDANA_PATH" --format sarif "${scan_args[@]}" \
-          > "$GUARDANA_SARIF"
-        echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+        # `--output`, not a shell redirection: the CLI refuses a destination it reads
+        # or cannot create, where a redirection empties the file before the scan.
+        started="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/guardana-scan-started.$$"
+        : > "$started"
+        sleep 1
+        uvx --from "$spec" guardana scan "$GUARDANA_PATH" --format sarif \
+          --output "$GUARDANA_SARIF" "${scan_args[@]}"
+        code=$?
+        echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+        # Exit 0 or 1 stands for a verdict only beside the report this scan wrote; a
+        # report older than the scan, or none, means the command did something else.
+        if [ -s "$GUARDANA_SARIF" ] && [ "$GUARDANA_SARIF" -nt "$started" ]; then
+          echo "reported=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "reported=false" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Upload SARIF to code scanning
       if: ${{ inputs.upload-sarif == 'true' && always() }}
-      uses: github/codeql-action/upload-sarif@b96794f015dfd88f77b49b1c93e0fa7110f94c63 # v4
+      uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
       with:
         sarif_file: ${{ inputs.sarif-file }}
 
+    # `fail-on-findings: false` waives exit 1 (the policy failed) and nothing else:
+    # every other non-zero code means the scan did not answer, which is never green.
     - name: Enforce the gate
-      if: ${{ inputs.fail-on-findings == 'true' }}
       shell: bash
       env:
         GUARDANA_EXIT: ${{ steps.scan.outputs.exit_code }}
-      run: exit "$GUARDANA_EXIT"
+        GUARDANA_REPORTED: ${{ steps.scan.outputs.reported }}
+        GUARDANA_FAIL_ON_FINDINGS: ${{ inputs.fail-on-findings }}
+      run: |
+        case "$GUARDANA_FAIL_ON_FINDINGS" in
+          true|false) ;;
+          *)
+            echo "::error::guardana: fail-on-findings must be true or false, got '$GUARDANA_FAIL_ON_FINDINGS'"
+            exit 2
+            ;;
+        esac
+        if { [ "$GUARDANA_EXIT" = "0" ] || [ "$GUARDANA_EXIT" = "1" ]; } && [ "$GUARDANA_REPORTED" != "true" ]; then
+          echo "::error::guardana: the scan exited $GUARDANA_EXIT without writing its report, so no scan verdict was reached"
+          exit 1
+        fi
+        case "$GUARDANA_EXIT" in
+          0)
+            exit 0
+            ;;
+          1)
+            if [ "$GUARDANA_FAIL_ON_FINDINGS" = "true" ]; then
+              exit 1
+            fi
+            echo "::warning::guardana: the scan gate tripped; fail-on-findings is false, so the job continues."
+            exit 0
+            ;;
+          *)
+            echo "::error::guardana: the scan did not complete (exit ${GUARDANA_EXIT:-none}); see https://guardana.dev/docs/exit-codes.html"
+            exit 1
+            ;;
+        esac

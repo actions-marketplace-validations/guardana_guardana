@@ -11,7 +11,14 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from guardana.server.audit import actor_from_environment, add_actor_argument
-from guardana.server.auth import Scope, generate_key, list_keys, revoke_key, store_key
+from guardana.server.auth import (
+    KeyRecord,
+    Scope,
+    generate_key,
+    list_keys,
+    revoke_key,
+    store_key,
+)
 from guardana.server.cli.codes import EXIT_INVALID_USAGE, EXIT_OK
 from guardana.server.tenancy import TenantScope, check_slug, resolve_project
 
@@ -47,7 +54,9 @@ def add_arguments(commands: "argparse._SubParsersAction[argparse.ArgumentParser]
             "deploys to three environments needs one key, not three."
         ),
     )
-    create.add_argument("--expires-in-days", type=int, help="Optional lifetime, in days.")
+    create.add_argument(
+        "--expires-in-days", type=int, help="Optional lifetime, in days; 1 or more."
+    )
     add_actor_argument(create)
 
     listing = group.add_parser("list", help="Every key, with its prefix. Never the secrets.")
@@ -73,17 +82,32 @@ def _list(arguments: argparse.Namespace, connection: "Connection[tuple[object, .
         where = f" for {arguments.project}" if arguments.project else ""
         print(f"no API keys{where} — nothing can write to this collector until you create one")
         return EXIT_OK
+    now = datetime.now(UTC)
     for record in records:
-        state = "revoked" if record.revoked_at else "active"
+        state = _state(record, now)
         used = record.last_used_at.date() if record.last_used_at else "never used"
         # The pin is shown, because a credential whose reach is narrower than its
         # neighbours' is a fact an operator has to see without reading a database.
         where = record.project_ref + (f" [{record.environment}]" if record.environment else "")
         print(
             f"{record.prefix}  {state:8} {','.join(str(s) for s in record.scopes):13} "
-            f"{used}  {where:32} {record.name}"
+            f"{_lifetime(record, now):18} {used}  {where:32} {record.name}"
         )
     return EXIT_OK
+
+
+def _state(record: KeyRecord, now: datetime) -> str:
+    """`revoked`, `expired` or `active`, judged by the predicate authentication applies."""
+    if record.revoked_at is not None:
+        return "revoked"
+    return "active" if record.is_usable(now) else "expired"
+
+
+def _lifetime(record: KeyRecord, now: datetime) -> str:
+    if record.expires_at is None:
+        return "no expiry"
+    verb = "expires" if record.expires_at > now else "expired"
+    return f"{verb} {record.expires_at.date()}"
 
 
 def _revoke(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
@@ -99,6 +123,13 @@ def _revoke(arguments: argparse.Namespace, connection: "Connection[tuple[object,
 
 
 def _create(arguments: argparse.Namespace, connection: "Connection[tuple[object, ...]]") -> int:
+    if arguments.expires_in_days is not None and arguments.expires_in_days < 1:
+        print(
+            f"error: --expires-in-days must be 1 or more, not {arguments.expires_in_days}; "
+            "leave it out for a key that lives until it is revoked",
+            file=sys.stderr,
+        )
+        return EXIT_INVALID_USAGE
     project = resolve_project(connection, arguments.project)
     # Checked and folded once, so the line printed to the operator names the same
     # environment the pin actually holds. A human typed this one, so a name that is
@@ -109,7 +140,7 @@ def _create(arguments: argparse.Namespace, connection: "Connection[tuple[object,
     scopes = tuple(Scope(s) for s in (arguments.scope or [str(Scope.INGEST)]))
     expires_at = (
         datetime.now(UTC) + timedelta(days=arguments.expires_in_days)
-        if arguments.expires_in_days
+        if arguments.expires_in_days is not None
         else None
     )
     issued, secret_hash = generate_key(arguments.name, scopes)

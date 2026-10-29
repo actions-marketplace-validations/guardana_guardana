@@ -6,58 +6,78 @@
 <title>Evidence and redaction — Guardana documentation</title>
 <meta name="description" content="evidence redaction, modes, and what Guardana keeps">
 <link rel="canonical" href="https://guardana.dev/docs/privacy">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html" aria-current="page">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,68 +98,125 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>Evidence and redaction</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html" aria-current="page">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>Evidence, redaction and what Guardana keeps</h1><p class="lede">evidence redaction, modes, and what Guardana keeps</p><p>Guardana's evidence is by construction the most sensitive text in a deployment:
 the prompt that worked, the reply that leaked, the tool argument that carried a
 key. Since 0.7 that text passes through <strong>one redactor at one seam</strong>, and every
 way a finding leaves the process goes through it.</p>
 <h2 id="defaults">Defaults</h2>
-<p>Every command defaults to <code>redacted</code>. Nothing is sent anywhere: there is no
-telemetry, no account, and the collector is opt-in in both directions.</p>
+<p>Every command defaults to <code>redacted</code>; artifact scans send nothing unless <code>--reporter</code> names a
+destination, and Guardana sends no
+telemetry and needs no account. Probes contact the named target and send graded exchanges
+to judges or guards under <code>evaluators:</code>; when an MCP target requires authorization, they
+also read its advertised protected-resource metadata and the metadata of the authorization
+server it names, possibly on other hosts. Guardana itself contacts nothing else; a package admitted with <code>--plugins</code> runs with your privileges and can open its own connections (<a href="threat-model.html#t3--a-malicious-plugin-or-rule-pack">threat model, T3</a>). The collector, or a reporter
+an installed package adds, receives results only when <code>--reporter</code> names it, and a reporter never
+receives kept exchanges (<a href="outputs.html#what-an-output-receives">installed outputs</a>). Before storing a submission, the collector also <a href="usage-collector.html#what-the-collector-refuses-and-redacts-on-ingest">redacts</a> recognisable secrets in its evidence text using the engine's patterns. Those secrets stay out of the database even when a third-party sender or an older agent does not redact them. The collector's pages load no third-party browser assets. It serves its OpenAPI document at <code>/openapi.json</code> and bundles no interactive API viewer.</p>
 <pre><code class="language-yaml">privacy:
   evidence_mode: redacted     # metadata_only | redacted | full
   redact_secrets: true        # the only value; `false` is refused, see below
@@ -147,6 +225,7 @@ telemetry, no account, and the collector is opt-in in both directions.</p>
   hash_identifiers: true
   custom_patterns: []
   max_evidence_bytes: 16384
+  keep_exchanges: false       # true: probe keeps every chat exchange beside the run
 </code></pre>
 <div class="table-wrap"><table>
 <thead>
@@ -173,15 +252,22 @@ telemetry, no account, and the collector is opt-in in both directions.</p>
 <p><strong><code>full</code> does not mean &quot;store a live key&quot;.</strong> Secrets are removed at every mode,
 including this one. There is no useful reading of &quot;keep the credential&quot;: the
 finding is that a secret appeared, not what it was.</p>
+<p><strong><code>custom_patterns</code> run in a separate process, within bounds.</strong> Each pattern gets at most
+2 seconds per text; texts over 16 Mi characters are not searched. A pattern that misses either bound
+fails the redaction without releasing the text. When the run's results are redacted, nothing
+is written or sent and the command exits <code>5</code>, or the stop's code when the run had already
+stopped (<a href="exit-codes.html">exit codes</a>). The error names the entry by position, such as
+<code>custom_patterns[0]</code>, never by its text, and states which bound it missed. A pattern that
+backtracks without end, such as <code>(a+)+$</code>, triggers this failure on a long enough run of <code>a</code>.</p>
 <p><code>redact_secrets: false</code> is <strong>refused at load time</strong>, with a message saying why.
 Until 0.7.1 the switch existed and took effect only at <code>full</code> — so its single
 reachable outcome was writing a working credential into a report, while this page
 said the opposite. The key is still accepted so that a profile stating the default
 keeps working, and so that anyone who set it gets told rather than ignored.</p>
 <h2 id="every-channel-not-just-the-findings">Every channel, not just the findings</h2>
-<p>A result has four channels, and the policy covers all of them: <code>findings</code>,
-<code>unverified</code>, <code>waived</code> — and <strong><code>errors</code></strong>, where a check that could not run records
-why. That last one carries an exception message, and an exception message is
+<p>The policy covers every channel of a result: <code>findings</code>, <code>unverified</code>, <code>waived</code>,
+<code>assessments</code>, <code>observations</code>, <code>coverage_shortfall</code>, <code>suites</code> — and <strong><code>errors</code></strong>,
+where a check that could not run records why. That last one carries an exception message, and an exception message is
 written by whoever raised it: a third-party rule, a provider, a parser handed the
 model's own reply. An unparseable response puts 120 bytes of it in there, and a
 gateway refusing a request routinely quotes the credential it refused.</p>
@@ -190,6 +276,41 @@ policy, so it reached the JSON report, the SARIF file and the collector envelope
 untouched. Under <code>metadata_only</code> the reason is replaced by a note rather than
 emptied, because an error with a blank reason reads as a check that failed for no
 reason instead of one whose reason this run declined to keep.</p>
+<p>The same holds for every string inside a result, not only evidence: a finding's
+title, its location and its verdict's rationale, every assessment, every
+observation's name, ref and attributes, coverage shortfalls and suite summaries. A
+judge's reply becomes a rationale, and an imported claim supplies a title and a
+ref, so each is the same untrusted text the evidence is. The redactor walks the
+result's fields rather than a list of them, so a field added later is covered
+without anyone naming it. Two kinds of string are treated differently:</p>
+<ul>
+<li><strong>Narrative text</strong> — evidence, an error's reason, a shortfall's detail, a
+rationale — gets the whole policy: bounded in size, and under <code>metadata_only</code>
+replaced by a note. An evidence summary's note carries a 12-character digest of
+the summary as <code>redacted</code> would show it, because a baseline waiver matches on the
+summary; without it, waiving one finding waived every finding of that rule in that
+file.</li>
+<li><strong>Names and locations</strong> — a title, a <code>target_ref</code>, an observation's ref — lose
+only the matched spans and are never emptied or truncated, so a reader can still
+find the file: <code>configs/[redacted:openai-key:…]/settings.py:12</code>.</li>
+</ul>
+<p>An error message about a <code>--target</code> locator prints it without userinfo, without a
+fragment and with its query replaced by a placeholder, whatever the scheme.</p>
+<p>A run also withholds the values its target sends to authenticate, which no pattern may
+recognise: the API key, an adapter's values read from <code>${VAR}</code>, the value of each
+adapter header named for a credential (<code>Authorization</code>, <code>Proxy-Authorization</code>, <code>Cookie</code>,
+<code>*-Key</code>, <code>*-Token</code>, <code>*-Secret</code>, <code>*ApiKey</code>, compared case-insensitively with <code>_</code> read as <code>-</code>) with the token after a scheme word such as <code>Bearer</code>, the
+MCP bearer token from <code>--mcp-token-env</code>, what an installed target declares with <a href="extending.html#adding-a-target"><code>sent_secrets()</code></a>, and
+what the command resolved or the Python API's <code>secrets</code> name. Each value of four
+characters or more is shown as <code>[redacted:credential]</code> in findings, rationales, every
+other text the redactor walks, recorded failures and kept exchanges, in every evidence
+mode and before the policy's own patterns run. A literal header such as <code>Content-Type: application/json</code> is not withheld.</p>
+<p>When an endpoint answers with an error status, the message quotes the start of its
+body under the run's own policy, with those values withheld. Under <code>metadata_only</code> it
+gives the status and the body's size only, and so does a target whose declaration of
+what it sends fails. A reply Guardana cannot use, an unreachable endpoint and a judge's
+failure are quoted the same way; under <code>metadata_only</code> the message names the failure and
+gives its size only.</p>
 <h2 id="redaction-is-never-silent">Redaction is never silent</h2>
 <p>A finding whose evidence was changed says so, in the text a reader sees:</p>
 <pre><code class="language-text">▲ [HIGH] guardana.supply_chain.hardcoded_secret
@@ -197,7 +318,7 @@ reason instead of one whose reason this run declined to keep.</p>
 </code></pre>
 <p>Truncation announces itself the same way. A report that quietly dropped the half
 of the evidence that mattered would look complete and would not be — the same
-dishonesty the <code>unverified</code> channel exists to prevent.</p>
+dishonesty the <code>unverified</code> channel exists to prevent. A truncated evidence summary ends <code>… [truncated: evidence exceeded N bytes; &lt;12 hex digest of the whole redacted text&gt;]</code>, so findings differing only past the bound keep distinct fingerprints.</p>
 <h2 id="why-placeholders-are-hashed">Why placeholders are hashed</h2>
 <p><code>hash_identifiers</code> replaces a redacted value with a short digest of that value, so
 two occurrences of the same secret stay comparable across runs without the value
@@ -205,6 +326,9 @@ being stored. That matters more than it looks: a finding's <strong>fingerprint</
 computed from its evidence summary, and a baseline waiver matches on that
 fingerprint. A placeholder that changed between runs would silently expire every
 waiver you had.</p>
+<p><strong>A digest can confirm a guess.</strong> Placeholder digests and <code>case_id</code> are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. <code>hash_identifiers: false</code> writes a bare label instead of a digest in each redaction placeholder; it does not change case ids, which keep their digest because runs are paired on it. With this setting,
+a finding whose location holds a bare placeholder gets a collector identity tied to
+its run, so it never merges across runs and a waiver on it covers only that run.</p>
 <p>The <strong>label</strong> is the other half, and it is what tells you which key to rotate:</p>
 <pre><code class="language-text">[redacted:github-token:1a2b3c4d5e6f]
 </code></pre>
@@ -213,15 +337,23 @@ one. Until 0.7.1 they were applied one at a time, each reading the previous one'
 output, so the generic &quot;token = value&quot; pattern matched the <em>label</em> of the
 placeholder that had just replaced the secret and produced
 <code>[redacted:github-[redacted:credential-assignment:…]]</code>. Matches are now collected
-against the original text and spliced in once.</p>
+against the original text and spliced in once. A generic match around a specific
+key leaves the key's placeholder as it is: <code>password=</code> followed by a GitHub token
+becomes <code>password=</code> and the token's placeholder. When the value reaches past the key,
+as in a GitHub token with more characters after it, the key and the rest of the value
+become one placeholder under the more specific label, so no part of a longer
+credential is left in the clear. A private-key header with no matching END line
+redacts the rest of that field.</p>
 <p><strong>A placeholder is recognised narrowly, and that narrowness is load-bearing.</strong> A
 second pass skips spans this redactor already wrote — that is what makes redacting
 twice idempotent — and the redactor's input is the model's reply, which is
 attacker-influenced by definition. Recognising <code>[redacted:</code> <em>anything</em> <code>]</code> would
 mean that anything able to make a model emit <code>[redacted:</code> around a credential
 carried it through untouched: the output format turned into a smuggling envelope.
-Only a lower-case label with an optional twelve-hex digest is skipped, and nothing
-that fits that shape is a secret, an address or an IP.</p>
+Only a label Guardana itself writes, with an optional twelve-hex digest, is skipped;
+any other bracketed text is read by the patterns like the rest of the reply. A value
+that is itself twelve lower-case hex characters still fits the digest slot of a real
+label, so a custom pattern for such values cannot rely on catching it there.</p>
 <h2 id="one-seam-and-why-that-is-the-whole-design">One seam, and why that is the whole design</h2>
 <pre><code>rules → findings → [EvidenceRedactor] → renderers / reporter / baseline
 </code></pre>
@@ -231,8 +363,8 @@ there is no way to obtain a renderer that skips it. A policy applied in thirty
 places has thirty exceptions, and the one that matters is the one somebody forgot.</p>
 <p><code>scan</code>, <code>probe</code> and <code>monitor</code> also redact once, early — before a baseline is
 written or matched — because a fingerprint is computed from the evidence summary.
-Redaction is idempotent: a placeholder claims its own span before any pattern is
-offered the text, so a second pass cannot read the first pass's label as content.</p>
+Redaction is idempotent: a pattern match that lies inside an existing placeholder is
+ignored, so a second pass cannot read the first pass's label as content.</p>
 <p><strong><code>monitor</code> was the exception until 0.7.1</strong>, and it was the worst one to have: it
 printed through a renderer built with no policy — so the library default, <code>full</code> —
 and forwarded alerts to the collector without redacting at all. It is the mode
@@ -266,6 +398,26 @@ history answerable while protecting nothing.</p>
 <p>If any of those names is itself sensitive in your organisation, do not pass it.
 Every field is optional and absent means &quot;not known&quot; — a run that declares nothing
 still reports its findings.</p>
+<h2 id="kept-exchanges">Kept exchanges</h2>
+<p><code>keep_exchanges: true</code>, or <code>probe --keep-exchanges</code>, writes every chat exchange of a
+probe's plain pass beside the saved run (<code>run.json</code> → <code>run.exchanges.jsonl</code>), so
+<a href="usage-grade.html"><code>guardana grade</code></a> can grade the same replies again. It is off by default
+because that file holds every reply, passes included, and widens what a leaked run
+exposes; whether to keep them is the operator's decision for their data.</p>
+<ul>
+<li>Every input and reply passes this policy's redactor before it is written: matched
+spans are replaced, with no size bound, because a truncated reply would be graded
+wrongly later. Secrets are removed at every mode, <code>full</code> included, and so is every
+value the target sends to authenticate, from replies and metadata alike; a metadata
+value that held one is left out.</li>
+<li>A reply the redactor changed is marked <code>altered</code>, and <code>grade</code> never grades it: a reply
+that leaked a secret cannot be regraded into a pass.</li>
+<li><code>keep_exchanges: true</code> with <code>evidence_mode: metadata_only</code> is refused at load time:
+the two settings contradict each other.</li>
+<li>The system prompt, canary passes and tool offers are never kept. The collector never
+receives the file, and the saved run records only its digest, its line count and how
+many replies were altered.</li>
+</ul>
 <h2 id="what-is-not-solved-yet">What is not solved yet</h2>
 <p>The redactor is not an extension point, and that is deliberate: a pluggable
 redactor is also a pluggable <em>un</em>-redactor, and a third-party implementation that
@@ -281,8 +433,10 @@ still one setting — separating them lands with the collector work.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/privacy.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

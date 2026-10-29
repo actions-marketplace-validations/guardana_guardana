@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/recipe-lock/v1.schema.json",
+  "title": "Guardana Recipe Lock v1",
+  "description": "guardana-recipe.lock.yaml: what a recipe's run is pinned to, written by `guardana recipe lock`. Every digest sits under a `digest` key.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "recipe",
+    "guardana",
+    "plugins",
+    "profile",
+    "rules",
+    "evaluators",
+    "skipped",
+    "subject_files",
+    "unpinned"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "recipe": {
+      "$ref": "#/$defs/digested"
+    },
+    "guardana": {
+      "$ref": "#/$defs/text"
+    },
+    "plugins": {
+      "$ref": "#/$defs/text",
+      "description": "The plugin trust in force: a mode, then the allowed distributions."
+    },
+    "profile": {
+      "$ref": "#/$defs/digested"
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "digest",
+          "distribution",
+          "version",
+          "trials"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "$ref": "#/$defs/text"
+          },
+          "distribution": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "version": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "trials": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "evaluators": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "distribution",
+          "version",
+          "judge",
+          "calibration"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "distribution": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "version": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "judge": {
+            "$ref": "#/$defs/nullable_text"
+          },
+          "calibration": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/$defs/digested"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "skipped": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "missing_capability",
+          "unsafe_mode",
+          "not_applicable"
+        ]
+      }
+    },
+    "subject_files": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/digested"
+      }
+    },
+    "unpinned": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^(rule|evaluator):\\S+$"
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "nullable_text": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "\\S"
+    },
+    "digested": {
+      "type": "object",
+      "required": [
+        "digest"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

@@ -11,10 +11,16 @@ own detector declining to score — is imported as undecided rather than folded 
 passes.
 """
 
+import hashlib
 import json
+import os
+import sys
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from guardana.core.fingerprint import DigestKind, DocumentDigest
 from guardana.core.severity import Severity
 from guardana.core.trace import (
     ObservationDialect,
@@ -23,12 +29,13 @@ from guardana.core.trace import (
     detect_observation_dialect,
     read_observations,
 )
+from guardana.core.trace import observations as observations_module
 from guardana.core.trace.claims import claims_of
 
 _GARAK = [
     {
         "entry_type": "start_run setup",
-        "garak_version": "0.13.1",
+        "garak_version": "0.17.0",
         "start_time": "2026-08-08T20:15:00+00:00",
     },
     {"entry_type": "attempt", "uuid": "a1", "status": 2, "probe_classname": "dan.Dan_11_0"},
@@ -40,6 +47,7 @@ _GARAK = [
         "fails": 2,
         "nones": 0,
         "total_evaluated": 5,
+        "total_processed": 5,
     },
     {
         "entry_type": "eval",
@@ -48,7 +56,8 @@ _GARAK = [
         "passed": 10,
         "fails": 0,
         "nones": 2,
-        "total_evaluated": 12,
+        "total_evaluated": 10,
+        "total_processed": 12,
     },
     {
         "entry_type": "eval",
@@ -58,6 +67,7 @@ _GARAK = [
         "fails": 0,
         "nones": 0,
         "total_evaluated": 8,
+        "total_processed": 8,
     },
 ]
 
@@ -83,7 +93,7 @@ def test_garak_failing_detectors_become_claims_and_clean_ones_are_only_counted(
     assert outcomes["dan.Dan_11_0/dan.DAN"] is ObservedOutcome.FAILED
     assert read.passed == 1
     assert read.skipped_metadata == 2
-    assert read.provenance.producer_version == "0.13.1"
+    assert read.provenance.producer_version == "0.17.0"
     assert read.provenance.recorded_at is not None
 
 
@@ -108,20 +118,100 @@ def test_a_garak_entry_type_this_build_does_not_know_is_reported_not_ignored(
     assert "verdict_v2" in read.unreadable[0]
 
 
-def test_garak_fails_are_derived_when_the_record_states_only_passes_and_the_total(
+def test_garak_fails_are_derived_from_passes_and_a_total_that_leaves_out_the_nones(
     tmp_path: Path,
 ) -> None:
+    """garak before 0.14 writes `passed`, `nones` and `total`, which is passed plus failed."""
     record = {
         "entry_type": "eval",
         "probe": "p",
         "detector": "d",
         "passed": 1,
-        "nones": 0,
-        "total_evaluated": 4,
+        "nones": 2,
+        "total": 4,
     }
     read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
-    assert [o.outcome for o in read.observations] == [ObservedOutcome.FAILED]
+    assert [o.outcome for o in read.observations] == [
+        ObservedOutcome.FAILED,
+        ObservedOutcome.UNDECIDED,
+    ]
     assert "3 of 4" in (read.observations[0].detail or "")
+    assert read.unreadable == ()
+
+
+def test_a_garak_eval_record_stating_no_outcome_is_unreadable_never_passed(
+    tmp_path: Path,
+) -> None:
+    """A record with no verdict field says nothing about the probe, so it is not a pass."""
+    record = {"entry_type": "eval", "probe": "p", "detector": "d"}
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert read.passed == 0
+    assert read.observations == ()
+    assert len(read.unreadable) == 1
+    assert "states no failure count" in read.unreadable[0]
+
+
+@pytest.mark.parametrize(
+    "field", ["fails", "nones", "passed", "total", "total_evaluated", "total_processed"]
+)
+def test_a_garak_verdict_field_of_the_wrong_type_is_unreadable_rather_than_dropped(
+    tmp_path: Path, field: str
+) -> None:
+    """A count written as a string must not vanish and leave the record reading clean."""
+    record: dict[str, object] = {
+        "entry_type": "eval",
+        "probe": "p",
+        "detector": "d",
+        "passed": 1,
+        "fails": 0,
+        "nones": 0,
+        "total_evaluated": 1,
+    }
+    record[field] = "3"
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert read.passed == 0
+    assert read.observations == ()
+    assert len(read.unreadable) == 1
+    assert field in read.unreadable[0]
+
+
+@pytest.mark.parametrize(
+    "counts",
+    [
+        {"passed": 5, "nones": 0, "total_evaluated": 3},
+        {"passed": 2, "fails": 2, "nones": 0, "total_evaluated": 3},
+        {"passed": 1, "fails": -2, "total_evaluated": 1},
+        {"fails": 1, "nones": -1, "total_evaluated": 1},
+        {"fails": 0, "passed": 2, "nones": 0, "total_evaluated": 10},
+        {"passed": 3, "fails": 1, "nones": 1, "total_evaluated": 4, "total_processed": 6},
+        {"passed": 0, "nones": 0, "total_evaluated": 0},
+        {"passed": 0, "fails": 0, "nones": 0},
+        {"fails": 0},
+        {"fails": 5, "total": 3},
+        {"passed": 5, "fails": 0, "nones": 0, "total": 10, "total_evaluated": 5},
+        {"fails": 3, "nones": 0, "total_processed": 1},
+    ],
+)
+def test_a_garak_record_whose_counts_cannot_all_be_true_is_unreadable_not_a_claim(
+    tmp_path: Path, counts: dict[str, int]
+) -> None:
+    """More passes than outputs would derive a negative failure count and claim it."""
+    record = {"entry_type": "eval", "probe": "p", "detector": "d", **counts}
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert read.passed == 0
+    assert read.observations == ()
+    assert len(read.unreadable) == 1
+    assert "p/d" in read.unreadable[0]
+
+
+def test_a_garak_record_with_undecided_outputs_but_no_failure_count_keeps_both_facts(
+    tmp_path: Path,
+) -> None:
+    record = {"entry_type": "eval", "probe": "p", "detector": "d", "nones": 2}
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert read.passed == 0
+    assert [o.outcome for o in read.observations] == [ObservedOutcome.UNDECIDED]
+    assert len(read.unreadable) == 1
 
 
 def _promptfoo(nested: bool) -> dict[str, object]:
@@ -239,6 +329,30 @@ def test_every_dialect_gets_a_document_digest_so_a_claim_can_be_traced_back(
         assert read_observations(path).provenance.document_digest
 
 
+@pytest.mark.parametrize("dialect", [ObservationDialect.GENERIC, ObservationDialect.GARAK])
+def test_the_document_digest_covers_the_raw_bytes_and_crlf_changes_nothing_else(
+    tmp_path: Path, dialect: ObservationDialect
+) -> None:
+    if dialect is ObservationDialect.GARAK:
+        lf = _jsonl(tmp_path, _GARAK, "lf.jsonl")
+    else:
+        # Indented, so the one JSON object has line breaks for CRLF to replace.
+        lf = tmp_path / "lf.json"
+        lf.write_text(json.dumps(_generic(), indent=2) + "\n", encoding="utf-8")
+    crlf = tmp_path / f"crlf{lf.suffix}"
+    crlf.write_bytes(lf.read_bytes().replace(b"\n", b"\r\n"))
+
+    read = read_observations(crlf, dialect)
+
+    assert read.provenance.document == DocumentDigest(
+        digest=f"sha256:{hashlib.sha256(crlf.read_bytes()).hexdigest()}",
+        kind=DigestKind.CONTENT,
+        bytes=crlf.stat().st_size,
+    )
+    assert read.observations == read_observations(lf, dialect).observations
+    assert read.observations, "the fixture must import something for the comparison to mean it"
+
+
 def test_an_imported_claim_is_never_presented_as_a_guardana_verdict(tmp_path: Path) -> None:
     """It lands inconclusive, names the producer, and carries no framework reference."""
     read = read_observations(_json(tmp_path, _promptfoo(nested=True)))
@@ -270,3 +384,85 @@ def test_two_claims_from_one_producer_still_get_distinct_fingerprints(tmp_path: 
     """One rule id per producer, so a baseline waiver has to key on the evidence summary."""
     claims = claims_of(read_observations(_jsonl(tmp_path, _GARAK)), "https://target/")
     assert len({c.fingerprint for c in claims}) == len(claims)
+
+
+def test_a_document_over_the_ceiling_is_refused_whatever_its_size_on_disk_said(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The read itself is bounded: a file still being written can outgrow the size a
+    # check read a moment earlier.
+    path = tmp_path / "results.json"
+    path.write_text(json.dumps({"guardana_observations": 1, "observations": []}), encoding="utf-8")
+    monkeypatch.setattr(observations_module, "MAX_TRACE_BYTES", 16)
+    original_stat = Path.stat
+
+    def small(self: Path, *args: object, **kwargs: object) -> os.stat_result:
+        real = original_stat(self, *args, **kwargs)  # type: ignore[arg-type]
+        return os.stat_result((real.st_mode, *real[1:6], 1, *real[7:]))
+
+    monkeypatch.setattr(Path, "stat", small)
+
+    with pytest.raises(TraceLoadError, match="ceiling"):
+        read_observations(path, ObservationDialect.GENERIC)
+
+
+def test_a_garak_record_that_states_no_undecided_count_is_never_counted_clean(
+    tmp_path: Path,
+) -> None:
+    """Both garak shapes write `nones`; a record without it may hide an unscored output."""
+    record = {"entry_type": "eval", "probe": "p", "detector": "d", "passed": 5, "total": 5}
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert read.passed == 0
+    assert read.observations == ()
+    assert len(read.unreadable) == 1
+    assert "no undecided count" in read.unreadable[0]
+
+
+def test_a_missing_undecided_count_is_derived_from_the_processed_total(tmp_path: Path) -> None:
+    record = {
+        "entry_type": "eval",
+        "probe": "p",
+        "detector": "d",
+        "passed": 5,
+        "fails": 1,
+        "total_evaluated": 6,
+        "total_processed": 8,
+    }
+    read = read_observations(_jsonl(tmp_path, [record]), ObservationDialect.GARAK)
+    assert [o.outcome for o in read.observations] == [
+        ObservedOutcome.FAILED,
+        ObservedOutcome.UNDECIDED,
+    ]
+    assert "1 of 6 scored output(s)" in (read.observations[0].detail or "")
+    assert read.unreadable == ()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows has no FIFOs")
+@pytest.mark.parametrize(
+    "read",
+    [detect_observation_dialect, read_observations],
+    ids=["detect-dialect", "read"],
+)
+def test_observations_that_are_a_fifo_are_refused_without_blocking(
+    tmp_path: Path, read: Callable[[Path], object]
+) -> None:
+    path = tmp_path / "observations.json"
+    os.mkfifo(path)
+    outcome: list[object] = []
+
+    def attempt() -> None:
+        try:
+            outcome.append(read(path))
+        except Exception as exc:
+            outcome.append(exc)
+
+    worker = threading.Thread(target=attempt, daemon=True)
+    worker.start()
+    worker.join(10)
+    if worker.is_alive():
+        os.close(os.open(path, os.O_WRONLY | os.O_NONBLOCK))
+        pytest.fail("reading observations from a FIFO blocked")
+
+    assert len(outcome) == 1
+    assert isinstance(outcome[0], TraceLoadError)
+    assert "not a regular file" in str(outcome[0])

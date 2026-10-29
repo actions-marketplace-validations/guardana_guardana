@@ -1,51 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://guardana.dev/docs/adopt-guardana</loc></url>
   <url><loc>https://guardana.dev/docs/architecture</loc></url>
+  <url><loc>https://guardana.dev/docs/community</loc></url>
+  <url><loc>https://guardana.dev/docs/compatibility</loc></url>
+  <url><loc>https://guardana.dev/docs/conformance-kit</loc></url>
   <url><loc>https://guardana.dev/docs/deployment</loc></url>
-  <url><loc>https://guardana.dev/docs/design/README</loc></url>
-  <url><loc>https://guardana.dev/docs/design/ai-systems-and-deployments</loc></url>
-  <url><loc>https://guardana.dev/docs/design/anytime-valid-monitoring</loc></url>
-  <url><loc>https://guardana.dev/docs/design/assessment-channel</loc></url>
-  <url><loc>https://guardana.dev/docs/design/attack-techniques</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-0.21</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-0.22</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-0.23-market</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-0.25-market</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-0.26-measurement</loc></url>
-  <url><loc>https://guardana.dev/docs/design/audit-retention-and-deletion</loc></url>
-  <url><loc>https://guardana.dev/docs/design/capability-protocols</loc></url>
-  <url><loc>https://guardana.dev/docs/design/collector-domain-model</loc></url>
-  <url><loc>https://guardana.dev/docs/design/collector-persistence</loc></url>
-  <url><loc>https://guardana.dev/docs/design/collector-runs-and-findings</loc></url>
-  <url><loc>https://guardana.dev/docs/design/collector-tenancy</loc></url>
-  <url><loc>https://guardana.dev/docs/design/declarative-fixtures</loc></url>
-  <url><loc>https://guardana.dev/docs/design/documentation-site</loc></url>
-  <url><loc>https://guardana.dev/docs/design/exit-codes</loc></url>
-  <url><loc>https://guardana.dev/docs/design/extension-author-tooling</loc></url>
-  <url><loc>https://guardana.dev/docs/design/finding-lifecycle-and-waivers</loc></url>
-  <url><loc>https://guardana.dev/docs/design/framework-adapters</loc></url>
-  <url><loc>https://guardana.dev/docs/design/judge-error-correction</loc></url>
-  <url><loc>https://guardana.dev/docs/design/mcp-authorization-depth</loc></url>
-  <url><loc>https://guardana.dev/docs/design/mcp-protocol-eras</loc></url>
-  <url><loc>https://guardana.dev/docs/design/namespaced-extension-ids</loc></url>
-  <url><loc>https://guardana.dev/docs/design/output-plugins</loc></url>
-  <url><loc>https://guardana.dev/docs/design/pack-scaffolding</loc></url>
-  <url><loc>https://guardana.dev/docs/design/paired-regression-statistics</loc></url>
-  <url><loc>https://guardana.dev/docs/design/panel-sessions</loc></url>
-  <url><loc>https://guardana.dev/docs/design/privacy-and-redaction</loc></url>
-  <url><loc>https://guardana.dev/docs/design/production-intake</loc></url>
-  <url><loc>https://guardana.dev/docs/design/quality-suites</loc></url>
-  <url><loc>https://guardana.dev/docs/design/regrading-stored-exchanges</loc></url>
-  <url><loc>https://guardana.dev/docs/design/repeated-trials</loc></url>
-  <url><loc>https://guardana.dev/docs/design/run-manifest-v2</loc></url>
-  <url><loc>https://guardana.dev/docs/design/security-contracts</loc></url>
-  <url><loc>https://guardana.dev/docs/design/target-locators</loc></url>
-  <url><loc>https://guardana.dev/docs/design/taxonomy-editions</loc></url>
-  <url><loc>https://guardana.dev/docs/design/trace-domain-model</loc></url>
-  <url><loc>https://guardana.dev/docs/design/trace-producer</loc></url>
   <url><loc>https://guardana.dev/docs/exit-codes</loc></url>
   <url><loc>https://guardana.dev/docs/extending</loc></url>
+  <url><loc>https://guardana.dev/docs/generated/application-measures</loc></url>
+  <url><loc>https://guardana.dev/docs/generated/compatibility-matrix</loc></url>
+  <url><loc>https://guardana.dev/docs/generated/detection-limits</loc></url>
   <url><loc>https://guardana.dev/docs/generated/evaluator-catalog</loc></url>
+  <url><loc>https://guardana.dev/docs/generated/first-run</loc></url>
   <url><loc>https://guardana.dev/docs/generated/rule-catalog</loc></url>
   <url><loc>https://guardana.dev/docs/generated/rule-summary</loc></url>
   <url><loc>https://guardana.dev/docs/generated/taxonomy-coverage</loc></url>
@@ -53,22 +20,31 @@
   <url><loc>https://guardana.dev/docs/</loc></url>
   <url><loc>https://guardana.dev/docs/install</loc></url>
   <url><loc>https://guardana.dev/docs/integrations</loc></url>
-  <url><loc>https://guardana.dev/docs/maintainers/github-setup</loc></url>
-  <url><loc>https://guardana.dev/docs/maintainers/lessons</loc></url>
-  <url><loc>https://guardana.dev/docs/maintainers/ops-catalogue</loc></url>
   <url><loc>https://guardana.dev/docs/model-formats</loc></url>
+  <url><loc>https://guardana.dev/docs/outputs</loc></url>
   <url><loc>https://guardana.dev/docs/privacy</loc></url>
   <url><loc>https://guardana.dev/docs/product-status</loc></url>
   <url><loc>https://guardana.dev/docs/profiles</loc></url>
+  <url><loc>https://guardana.dev/docs/providers</loc></url>
+  <url><loc>https://guardana.dev/docs/python-api</loc></url>
+  <url><loc>https://guardana.dev/docs/reading-results</loc></url>
+  <url><loc>https://guardana.dev/docs/recipe-local-scan</loc></url>
+  <url><loc>https://guardana.dev/docs/recipe-real-application</loc></url>
+  <url><loc>https://guardana.dev/docs/recipe-recorded-answers</loc></url>
+  <url><loc>https://guardana.dev/docs/reproducible-builds</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/cost-1-4</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/cost-5-plus</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/cost-undeclared</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/cost-zero</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/family-a2a</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-agent</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-mcp</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-output</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-prompt</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/family-retrieval</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-scenario</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-supply_chain</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/family-tenancy</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-trace</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/family-training</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/framework-MITRE-ATLAS</loc></url>
@@ -127,6 +103,7 @@
   <url><loc>https://guardana.dev/docs/rules/by/reference-MCP04-2025</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-MCP06-2025</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-MCP07-2025</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/by/reference-MCP09-2025</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-MCP10-2025</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-ML02-2023</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/reference-ML06-2023</loc></url>
@@ -137,6 +114,9 @@
   <url><loc>https://guardana.dev/docs/rules/by/severity-MEDIUM</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/surface-build</loc></url>
   <url><loc>https://guardana.dev/docs/rules/by/surface-runtime</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.a2a.agent_card</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.a2a.caller_identity</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.a2a.task_visibility</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.credential_exfiltration</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.excessive_tool_use</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.agent.hidden_context.tool_schema</loc></url>
@@ -148,8 +128,10 @@
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.cache_scope</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.discovery_target</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.issuer_identification</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.mcp.registry_entry</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.scope_breadth</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.session_binding</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.mcp.task_identity</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.token_audience</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.mcp.unauthenticated_access</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.output.secrets</loc></url>
@@ -160,6 +142,7 @@
   <url><loc>https://guardana.dev/docs/rules/guardana.prompt.mcp_tool_poisoning</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.prompt.system_prompt_leak.canary</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.prompt.unbounded_consumption</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.retrieval.poisoned_document</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.scenario.gradual_jailbreak</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.scenario.indirect_injection</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.supply_chain.chat_template</loc></url>
@@ -178,6 +161,7 @@
   <url><loc>https://guardana.dev/docs/rules/guardana.supply_chain.remote_code</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.supply_chain.remote_code_config</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.supply_chain.saved_model_ops</loc></url>
+  <url><loc>https://guardana.dev/docs/rules/guardana.tenancy.cross_tenant_answer</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.trace.consent_scope_exceeded</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.trace.credential_passthrough</loc></url>
   <url><loc>https://guardana.dev/docs/rules/guardana.trace.cross_tenant_retrieval</loc></url>
@@ -190,24 +174,33 @@
   <url><loc>https://guardana.dev/docs/rules/guardana.training.dataset_integrity</loc></url>
   <url><loc>https://guardana.dev/docs/rules/</loc></url>
   <url><loc>https://guardana.dev/docs/safe-testing</loc></url>
+  <url><loc>https://guardana.dev/docs/studies/adopter-study</loc></url>
+  <url><loc>https://guardana.dev/docs/studies/first-run-study</loc></url>
   <url><loc>https://guardana.dev/docs/threat-model</loc></url>
   <url><loc>https://guardana.dev/docs/usage-analyze-trace</loc></url>
   <url><loc>https://guardana.dev/docs/usage-baseline</loc></url>
   <url><loc>https://guardana.dev/docs/usage-calibrate</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-case</loc></url>
   <url><loc>https://guardana.dev/docs/usage-collector</loc></url>
   <url><loc>https://guardana.dev/docs/usage-contracts</loc></url>
   <url><loc>https://guardana.dev/docs/usage-diff</loc></url>
   <url><loc>https://guardana.dev/docs/usage-doctor</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-doubles</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-fixtures</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-grade</loc></url>
   <url><loc>https://guardana.dev/docs/usage-import-observations</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-init</loc></url>
   <url><loc>https://guardana.dev/docs/usage-monitor</loc></url>
   <url><loc>https://guardana.dev/docs/usage-new-pack</loc></url>
   <url><loc>https://guardana.dev/docs/usage-pack</loc></url>
   <url><loc>https://guardana.dev/docs/usage-plan</loc></url>
   <url><loc>https://guardana.dev/docs/usage-probe</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-recipe</loc></url>
   <url><loc>https://guardana.dev/docs/usage-rule-test</loc></url>
   <url><loc>https://guardana.dev/docs/usage-rules</loc></url>
   <url><loc>https://guardana.dev/docs/usage-run</loc></url>
   <url><loc>https://guardana.dev/docs/usage-scan</loc></url>
+  <url><loc>https://guardana.dev/docs/usage-suites</loc></url>
   <url><loc>https://guardana.dev/docs/usage-target</loc></url>
   <url><loc>https://guardana.dev/docs/usage-taxonomy</loc></url>
   <url><loc>https://guardana.dev/docs/usage-testing</loc></url>
@@ -215,4 +208,13 @@
   <url><loc>https://guardana.dev/docs/writing-an-integrator</loc></url>
   <url><loc>https://guardana.dev/docs/writing-rules</loc></url>
   <url><loc>https://guardana.dev/</loc></url>
+  <url><loc>https://guardana.dev/notes/clean-install-offline-first-run</loc></url>
+  <url><loc>https://guardana.dev/notes/collector-recovery-runbooks</loc></url>
+  <url><loc>https://guardana.dev/notes/customization-through-published-extension-points</loc></url>
+  <url><loc>https://guardana.dev/notes/</loc></url>
+  <url><loc>https://guardana.dev/notes/regression-loop-with-a-redacted-regression</loc></url>
+  <url><loc>https://guardana.dev/notes/release-gate-evidence-1-0-0</loc></url>
+  <url><loc>https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter</loc></url>
+  <url><loc>https://guardana.dev/notes/security-runbook-drill</loc></url>
+  <url><loc>https://guardana.dev/notes/tenant-leaks-and-poisoned-documents</loc></url>
 </urlset>

@@ -11,6 +11,8 @@ from guardana.core.formats import (
 )
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -22,18 +24,24 @@ from guardana.core.taxonomy import (
     OWASP_LLM05_2025,
     OWASP_LLM10_2026,
 )
+from guardana.core.testing import build_onnx
 from guardana.rules._base import ArtifactRule
 from guardana.rules.prompt._injection_markers import has_smuggled_char
-from guardana.rules.supply_chain._leads import lead_verdict, unscanned_verdict
+from guardana.rules.supply_chain import _samples
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
+from guardana.rules.supply_chain._reading import read_model
 
 _RULE_ID = "guardana.supply_chain.onnx_graph"
 _UNSCANNED_TITLE = "ONNX model not scanned"
 
-# A large transformer export runs to tens of thousands of nodes, each with several
-# fields, so the shared default budget would make honest models report as "not
-# fully scanned". The walk only seeks and reads field headers, so a budget this
-# size still bounds a crafted file to about a second.
+# The default field budget is one field per two bytes of the file, between a floor and
+# a cap. Every protobuf field takes at least two bytes on the wire (a tag, then a value
+# or a length) and the walk reads each field once, so below the cap no file runs out.
 _MAX_GRAPH_FIELDS = 1_000_000
+# Honest graphs spend fields on structure and weights are single large fields, so this
+# is far beyond any honest graph while bounding what a crafted file can cost.
+_GRAPH_FIELDS_CAP = 8_000_000
+_MIN_FIELD_BYTES = 2
 
 # `external_data` names a file the loader opens relative to the model. A path
 # that climbs out of that directory, or names an absolute one, is a read
@@ -72,30 +80,75 @@ class OnnxGraphRule(ArtifactRule):
             OWASP_ASI05_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
 
-    def __init__(self, *, max_entries: int = _MAX_GRAPH_FIELDS) -> None:
-        self._limits = Limits(max_entries=max_entries)
+    def __init__(self, *, max_entries: int | None = None) -> None:
+        """Use a fixed field budget of `max_entries`; by default it grows with each file."""
+        self._max_entries = max_entries
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample external data outside the model, a standard graph and a model cut short."""
+        return materialise(
+            (
+                _samples.sample(
+                    "external_data climbing out of the model directory",
+                    FixtureOutcome.FINDING,
+                    {
+                        "model.onnx": build_onnx(
+                            nodes=(("Conv", ""),), external_paths=("../../etc/passwd",)
+                        )
+                    },
+                ),
+                _samples.sample(
+                    "a graph of standard operators with its data inline",
+                    FixtureOutcome.CLEAN,
+                    {
+                        "model.onnx": build_onnx(
+                            nodes=(("Conv", ""), ("Relu", "")), producer="pytorch"
+                        )
+                    },
+                ),
+                _samples.sample(
+                    "a model cut off inside its graph",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {"model.onnx": build_onnx(nodes=(("Conv", ""),), producer="pytorch")[:-3]},
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Walk every `.onnx` graph's structure without loading its weights."""
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".onnx",)):
-            yield from self._scan(path)
+            yield from self._scan(path, ctx)
+            ctx.examined(path)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
+    def _scan(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         try:
-            summary = read_onnx_summary(path, limits=self._limits)
+            summary = read_model(
+                read_onnx_summary, path, limits=Limits(max_entries=self._budget(path))
+            )
         except FormatError as exc:
-            yield self._unscanned(path, str(exc))
+            yield self._unscanned(path, str(exc), ctx)
             return
-        findings = list(self._graded(path, summary))
-        yield from findings
-        # A partial walk that found nothing has not cleared the model — it ran
-        # out of budget before it finished looking.
-        if summary.truncated and not findings:
-            yield self._unscanned(path, "the graph was too large to walk within the field budget")
+        yield from self._graded(path, summary)
+        # A partial walk has not cleared the model, whatever it found: a lead in the
+        # fields it reached says nothing about a worse one past the budget.
+        if summary.truncated:
+            yield self._unscanned(
+                path, "the model was too large or nested too deeply to walk in full", ctx
+            )
+
+    def _budget(self, path: Path) -> int:
+        if self._max_entries is not None:
+            return self._max_entries
+        try:
+            size = path.stat().st_size
+        except OSError:
+            return _MAX_GRAPH_FIELDS
+        return max(_MAX_GRAPH_FIELDS, min(size // _MIN_FIELD_BYTES, _GRAPH_FIELDS_CAP))
 
     def _graded(self, path: Path, summary: OnnxSummary) -> Iterator[Finding]:
         custom = sorted(
@@ -149,7 +202,8 @@ class OnnxGraphRule(ArtifactRule):
             verdict=lead_verdict(summary) if lead else None,
         )
 
-    def _unscanned(self, path: Path, reason: str) -> Finding:
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(_RULE_ID, path, reason))
         return Finding(
             rule_id=_RULE_ID,
             severity=Severity.LOW,

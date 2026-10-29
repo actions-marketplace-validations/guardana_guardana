@@ -12,6 +12,7 @@ any rule, theirs or a built-in, can grade with `evaluator: acme.strict_refusal`.
 """
 
 import re
+from typing import ClassVar
 
 from guardana.core.evaluator import Evaluator, Expectation, Verdict
 from guardana.core.exchange import Exchange
@@ -40,6 +41,11 @@ class StrictRefusalClassifier(Evaluator):
     """Grades a reply as a clean refusal only when it refuses without hedging."""
 
     id = "acme.strict_refusal"
+    judge_calls_per_verdict: ClassVar[int] = 0
+    """Reads the reply and asks no model, so `guardana plan probe` prices it at nothing.
+
+    Left undeclared, the plan would list every rule graded with it as of unknown cost.
+    """
 
     def evaluate(self, exchange: Exchange, expectation: Expectation) -> Verdict:
         """Pass only a reply that refuses without a compliance lead-in."""

@@ -10,6 +10,7 @@ results has to say where the other hundred and ninety-eight went, or the import 
 the whole file.
 """
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -20,7 +21,7 @@ from typer.testing import CliRunner, Result
 runner = CliRunner()
 
 _GARAK = [
-    {"entry_type": "start_run setup", "garak_version": "0.13.1"},
+    {"entry_type": "start_run setup", "garak_version": "0.17.0"},
     {
         "entry_type": "eval",
         "probe": "dan.Dan_11_0",
@@ -29,6 +30,7 @@ _GARAK = [
         "fails": 2,
         "nones": 0,
         "total_evaluated": 5,
+        "total_processed": 5,
     },
     {
         "entry_type": "eval",
@@ -38,6 +40,7 @@ _GARAK = [
         "fails": 0,
         "nones": 0,
         "total_evaluated": 5,
+        "total_processed": 5,
     },
 ]
 _PROMPTFOO = {
@@ -87,7 +90,7 @@ def test_a_claim_lands_in_the_unverified_channel_with_its_provenance(tmp_path: P
     assert claim["verdict"]["outcome"] == "inconclusive"
     assert claim["verdict"]["evaluator_id"] == "imported:garak"
     assert claim["taxonomy"] == []
-    assert "garak 0.13.1" in claim["evidence"]["detail"]
+    assert "garak 0.17.0" in claim["evidence"]["detail"]
 
 
 def test_the_results_the_producer_passed_are_counted_rather_than_imported(tmp_path: Path) -> None:
@@ -151,3 +154,18 @@ def test_an_unreadable_record_is_reported_rather_than_dropped(tmp_path: Path) ->
     assert "could not be read" in result.output
     document = json.loads(output.read_text(encoding="utf-8"))
     assert len(document["errors"]) == 1
+
+
+def test_the_saved_run_records_the_digest_of_the_imported_document(tmp_path: Path) -> None:
+    results = _jsonl(tmp_path, _GARAK)
+    output = tmp_path / "run.json"
+
+    _run(str(results), "--format", "json", "--output", str(output))
+
+    target = json.loads(output.read_text(encoding="utf-8"))["run"]["target"]
+    assert target["document"] == {
+        "digest": f"sha256:{hashlib.sha256(results.read_bytes()).hexdigest()}",
+        "kind": "content",
+        "bytes": results.stat().st_size,
+    }
+    assert target["fingerprint"] is None, "the document digest is not an attestation of the target"

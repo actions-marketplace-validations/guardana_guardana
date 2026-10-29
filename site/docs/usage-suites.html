@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quality suites — Guardana documentation</title>
+<meta name="description" content="quality suites: gate a deployed endpoint against a versioned golden dataset before release or in CI">
+<link rel="canonical" href="https://guardana.dev/docs/usage-suites">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html" aria-current="page">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Quality suites</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html" aria-current="page">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Quality suites<span class="status beta">beta</span></h1><p class="lede">quality suites: gate a deployed endpoint against a versioned golden dataset before release or in CI</p><p>A quality suite checks whether a deployed support bot or RAG endpoint still answers a golden set before release or in CI. It is a declarative rule graded against a versioned dataset. It does not read production traffic; production traffic monitoring belongs to Guardana Control, a separate product.</p>
+<h2 id="dataset-and-rule">Dataset and rule</h2>
+<p>The first nonblank line of the JSONL dataset is this header:</p>
+<pre><code class="language-json">{&quot;guardana_dataset&quot;: 2, &quot;name&quot;: &quot;support-golden&quot;, &quot;version&quot;: &quot;2026.09&quot;}
+</code></pre>
+<p>Each later nonblank line is a case. The case fields are:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>input</code></td>
+<td>Required. A nonempty string or a messages object whose last message is from the user.</td>
+</tr>
+<tr>
+<td><code>expect</code></td>
+<td>Optional evaluator fields for that case, overlaid on the rule's default expectation.</td>
+</tr>
+<tr>
+<td><code>tags</code></td>
+<td>Optional list of strings. A tag starting with <code>sample:</code> is refused.</td>
+</tr>
+<tr>
+<td><code>observed</code></td>
+<td>Optional, with <code>accepted</code>: the reply a regression case was promoted from, which its expectation must grade <code>fail</code>.</td>
+</tr>
+<tr>
+<td><code>accepted</code></td>
+<td>Optional, with <code>observed</code>: a correct reply, which its expectation must grade <code>pass</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>observed</code> and <code>accepted</code> come together or not at all, and only in the suite's own dataset,
+never in a fixture dataset. A run never sends them or grades them as the target's reply. They are not part of a
+case's identity: <a href="usage-case.html"><code>guardana case add</code></a> writes them, and <code>guardana rule test</code>,
+every <code>guardana recipe</code> command and every run that selects the suite regrade them. A format-1 dataset
+(<code>&quot;guardana_dataset&quot;: 1</code>) is still read, without <code>observed</code> and <code>accepted</code>. The formats are
+<a href="https://guardana.dev/schemas/dataset/v2.schema.json"><code>dataset-v2.schema.json</code></a> and
+<a href="https://guardana.dev/schemas/dataset/v1.schema.json"><code>dataset-v1.schema.json</code></a>.</p>
+<p><strong>A regression dataset is a gate every case must pass.</strong> A dataset holding any
+<code>observed</code>/<code>accepted</code> pair refuses, when the suite is loaded, a suite that declares <code>sample:</code>
+or whose <code>gate.min_pass_rate</code> is below 1, since a case that may not run, or that other cases
+can outvote, prevents nothing. Set <code>gate.min_sample</code> to at most the number of cases. A case
+tagged <code>regression</code> without a pair is a label only and changes no gate.</p>
+<p>This rule grades the dataset and gates its pass rate:</p>
+<pre><code class="language-yaml">id: acme.quality.support_answers
+title: The support bot still answers the golden set
+severity: high
+target_kind: endpoint
+taxonomy: [LLM09:2025]
+evaluator: contains
+requires: [chat]
+dataset: ./support-golden.jsonl
+expect:
+  contains_any: [&quot;Settings &gt; Security&quot;]   # what every good answer names
+sample:
+  size: 100
+  seed: 7
+gate:
+  min_pass_rate: 0.90
+  min_sample: 30
+fixtures:
+  - name: every answer names the setting
+    dataset: ./fixtures/answers-pass.jsonl
+    outcome: clean
+  - name: a third of the answers miss it
+    dataset: ./fixtures/answers-mixed.jsonl
+    outcome: finding
+  - name: the model says nothing
+    reply: &quot;&quot;
+    outcome: inconclusive
+</code></pre>
+<p>Replace <code>Settings &gt; Security</code> with what your good answers must contain. <code>contains</code> returns <code>inconclusive</code> when every substring list is empty, so an expectation left blank grades nothing. See <a href="writing-rules.html">writing rules</a> for the rule shape.</p>
+<h2 id="run-and-read-the-suite">Run and read the suite</h2>
+<p>Run the rule with <a href="usage-probe.html"><code>guardana probe</code></a>, or grade answers your application already gave with <a href="usage-grade.html"><code>guardana grade</code></a>, which sends nothing to it. The profile's <code>trials</code> or <code>probe --trials</code> sets how many times each case is sent. <code>guardana plan probe</code> prices cases × K target requests and, for a judge-graded suite, cases × K × <code>min_agreement</code> judge calls (<a href="usage-plan.html#pricing-judge-calls">pricing judge calls</a>). The saved run records what the judge spent in <code>usage.judge</code>.</p>
+<p>The human report has a Measured block. A passing line can read:</p>
+<pre><code class="language-text">Measured
+  acme.quality.support_answers  support-golden@2026.09: 100 of 100 cases measured, 3 trials each · pass rate 98.7% (95% CI 94 to 99.8%) · bar 90% · at or above the bar
+</code></pre>
+<p>A case is measured when all its planned trials were graded. Each case contributes its share of passed trials. The pass rate is the mean of those shares, so the interval is over cases rather than pooled trials. Ungraded trials stay in the denominator: <code>worst</code> counts them as failures, and <code>best</code> counts them as passes. The interval uses a 95% Wilson lower limit at <code>worst</code> and upper limit at <code>best</code>; it is conservative and does not collapse to a point when cases agree.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Gate answer</th>
+<th>Condition</th>
+<th>Exit</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pass</td>
+<td><code>worst</code> meets <code>min_pass_rate</code>.</td>
+<td><code>0</code></td>
+</tr>
+<tr>
+<td>Fail</td>
+<td><code>best</code> is below <code>min_pass_rate</code>.</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>Decline</td>
+<td>Fewer than <code>min_sample</code> cases were measured, ungraded trials could put the rate on either side of the bar, a judge's error could not be corrected (below), or the suite raised before it concluded.</td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>Stopped</td>
+<td>The run's budget ran out before every case was sent. The saved run keeps the suite's summary, declined, with how many of its cases were measured; the run stops.</td>
+<td><code>6</code></td>
+</tr>
+</tbody>
+</table></div>
+<p>A failed suite produces one finding about the rate, whatever its severity. A declined suite produces one <code>unverified</code> entry and makes the run <code>indeterminate</code>. See <a href="exit-codes.html">exit codes</a>.</p>
+<h2 id="judge-graded-suites">Judge-graded suites</h2>
+<p><code>answered</code> checks whether a reply to a benign task contains a refusal marker: a built-in English phrase or one of the rule's own <code>expect.refusal_markers</code>, each a whole phrase of at least four letters or digits (<a href="writing-rules.html#refusals-in-another-language">refusals in another language</a>); in a script written without spaces, give the phrase, not one word. <code>reference_judge</code> grades a reply against a reference answer. Both are judge assessors, so their rates need judge-error correction. A suite without a usable calibration declines with <code>uncorrected — &lt;reason&gt;</code>. Record one with <a href="usage-calibrate.html"><code>guardana calibrate --record</code></a>.</p>
+<p>Judge-graded suites and judge-error correction are experimental: their behaviour, thresholds and saved fields may change in a minor release (<a href="product-status.html#released-and-experimental">product status</a>).</p>
+<p>A usable calibration has the same assessor and judge identity, per-class counts, and no starter corpus. It needs at least 30 graded samples in each class, abstention below half in each class, Youden's J of at least 0.1, and observed failures above the calibrated false-alarm rate. Every corner of its sensitivity/specificity 95% box must have sensitivity plus specificity greater than 1. A corrected rate uses the same gate test; when raw <code>worst</code> is below the bar, a pass also needs the corrected 95% lower limit to clear it.</p>
+<h2 id="sampling-and-fixtures">Sampling and fixtures</h2>
+<p><code>sample: {size, seed}</code> selects a repeatable subset. Both values are whole numbers, and <code>seed</code> is required with <code>size</code>. The same seed selects the same cases across builds and Python versions. A size at or above the case count runs every case.</p>
+<p>A <code>reply:</code> fixture answers every case with one reply. A fixture can use its own <code>dataset:</code> to supply cases and their replies. See <a href="usage-rule-test.html">testing rules</a>.</p>
+<h2 id="saved-runs-and-limits">Saved runs and limits</h2>
+<p>The saved run includes a suite summary; see <a href="usage-run.html#suite-summaries">suite summaries</a> for its fields. Extension authors can see <a href="extending.html">extending Guardana</a>.</p>
+<ul>
+<li>Numeric measurements are recorded and rendered, but there is no gate on their aggregate.</li>
+<li>The collector receives the target's request count, not <code>usage.judge</code>.</li>
+<li><code>diff</code> pairs cases across runs but does not test a suite's rate statistically.</li>
+<li>A file holds one calibration per evaluator id.</li>
+<li><code>regex</code> grades replies up to 65,536 characters; longer replies are <code>inconclusive</code>. Each search runs in a separate worker process for at most 2 seconds. A longer search stops with <code>inconclusive</code> (&quot;regex search exceeded 2 s; not evaluated&quot;), never a pass. Like any <code>inconclusive</code> result, it makes the run <code>indeterminate</code> (exit <code>2</code>) when <code>fail_on_inconclusive</code> is on. Backtracking patterns, such as nested quantifiers or several <code>.*</code> in a row, can still exhaust this time on a crafted reply. Use possessive quantifiers or atomic groups instead.</li>
+</ul>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-suites.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

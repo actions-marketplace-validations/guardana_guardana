@@ -1,22 +1,25 @@
 """One call that runs Guardana and fails a test when the verdict is not a pass.
 
-Deliberately not a second engine. It resolves a profile, discovers rules, runs the
-same `Runner`, applies the same redactor and asks the same `gate_outcome` the
-commands ask — so a check that passes in `pytest` and fails in CI is a bug in the
-target, never a difference of opinion between two implementations of "secure".
+Deliberately not a second engine. It runs through `guardana.core.verify`, the facade the
+commands use, so a check that passes in `pytest` and fails in CI is a bug in the
+target, never a difference of opinion between two implementations of "secure" — and
+an endpoint gets its canaries planted exactly as `guardana probe` plants them.
 """
 
 from pathlib import Path
 
 from guardana.core.budget import BudgetExhausted
 from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import Profile, default_profile, load_profile
 from guardana.core.profile import preset as named_preset
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
-from guardana.core.report import ScanResult, relativize, relativize_findings
+from guardana.core.report import ScanResult
+from guardana.core.report.location import relativize, relativize_findings
 from guardana.core.runner import Runner
-from guardana.core.target import ArtifactTarget, Target
+from guardana.core.target import Target, TargetKind
+from guardana.core.verify import UnenforceableBudgetError, Verifier
 from guardana.testing.message import failure_message
 
 _HIDDEN = True
@@ -57,6 +60,7 @@ def assert_secure(
     profile: Profile | Path | None = None,
     preset: str | None = None,
     registry: Registry | None = None,
+    trust: PluginTrust | None = None,
 ) -> ScanResult:
     """Run Guardana against `target` and raise unless the run passed its policy.
 
@@ -84,9 +88,13 @@ def assert_secure(
 
     `registry` is for a test that wants to decide what is loaded — a bare
     `Registry()` for no plugins at all, or one built by hand. Left out, entry points
-    are discovered and the profile's `rules.paths` are loaded on top; passed in, it
-    is used exactly as given, because a registry somebody assembled is not one this
-    should add to behind their back.
+    are discovered under `trust` and the profile's `rules.paths` are loaded on top;
+    passed in, nothing is discovered or loaded into it, not even `rules.paths`, and
+    each run works on a copy that gets the profile's trials and configured judges.
+
+    `trust` decides which installed distributions may run code here. Left out, the
+    profile's `plugins:` decides, and without one only Guardana's own distributions
+    load — the same default every command applies.
 
     Evidence is redacted by the profile's privacy policy before the message is
     built. The message goes into a CI log, which is a file on somebody's build
@@ -95,22 +103,55 @@ def assert_secure(
     """
     __tracebackhide__ = _HIDDEN
     active = _profile_for(profile, preset)
-    under_test = _target_for(target, active)
-    result = _run(under_test, active, registry)
-    result = EvidenceRedactor(active.privacy).redact_result(relativize_findings(result, Path.cwd()))
-    outcome = gate_outcome(result, active.policy)
+    stated = trust if trust is not None else active.plugins
+    if stated is None:
+        stated = PluginTrust(mode=PluginMode.BUILTINS)
+    if isinstance(target, Target) and target.kind is TargetKind.TRACE:
+        result, outcome = _trace_result(target, active, registry, stated)
+        reference = relativize(target.ref, Path.cwd())
+    else:
+        verifier = Verifier(trust=stated, profile=active, registry=registry)
+        try:
+            if isinstance(target, Target):
+                verification = verifier.run(target, relative_to=Path.cwd())
+            else:
+                verification = verifier.scan(_existing(Path(target)), relative_to=Path.cwd())
+        except UnenforceableBudgetError as exc:
+            # A ceiling nothing here can enforce is a mistake in the test's configuration
+            # rather than a verdict about the target, so it is not a failed assertion.
+            raise ValueError(str(exc)) from exc
+        result, outcome = verification.result, verification.gate
+        reference = verification.manifest.target.ref
     if outcome is GateOutcome.PASS:
         return result
     raise SecurityAssertionError(
-        failure_message(
-            result,
-            outcome=outcome,
-            policy=active.policy,
-            target_ref=relativize(under_test.ref, Path.cwd()),
-        ),
+        failure_message(result, outcome=outcome, policy=active.policy, target_ref=reference),
         result=result,
         outcome=outcome,
     )
+
+
+def _trace_result(
+    target: Target, profile: Profile, registry: Registry | None, trust: PluginTrust
+) -> tuple[ScanResult, GateOutcome]:
+    """Run a trace's rules directly, redact the result and gate it.
+
+    The Python API refuses a trace because the contracts and unreadable records of a
+    trace file are read by `guardana analyze-trace`; a trace built in code by a
+    translator has neither, so its rules run here as they always did.
+    """
+    __tracebackhide__ = _HIDDEN
+    if registry is None:
+        registry = Registry.discover(trust)
+        registry.load_yaml_rule_dirs(Path(path) for path in profile.rule_paths)
+    try:
+        result = Runner(registry=registry, profile=profile).run(target)
+    except BudgetExhausted as exc:
+        raise ValueError(str(exc)) from exc
+    result = EvidenceRedactor(profile.privacy).redact_result(
+        relativize_findings(result, Path.cwd())
+    )
+    return result, gate_outcome(result, profile.policy)
 
 
 def _profile_for(profile: Profile | Path | None, preset: str | None) -> Profile:
@@ -126,45 +167,13 @@ def _profile_for(profile: Profile | Path | None, preset: str | None) -> Profile:
     return default_profile()
 
 
-def _target_for(target: Target | str | Path, profile: Profile) -> Target:
-    """Take the target as given, or build one over a path that is really there."""
+def _existing(path: Path) -> Path:
+    """Refuse a path that is not there: a scan of it would look at nothing and pass."""
     __tracebackhide__ = _HIDDEN
-    if isinstance(target, Target):
-        return target
-    path = Path(target)
     if not path.exists():
         raise ValueError(
             f"{path} does not exist, so there is nothing to verify. A path that is not "
             f"there yields no files, and a run that looked at nothing must not report a "
             f"pass. Pass a Target for a live model or an agent"
         )
-    return ArtifactTarget(path, excludes=profile.path_excludes)
-
-
-def _run(target: Target, profile: Profile, registry: Registry | None) -> ScanResult:
-    """Run the rules, turning an unenforceable budget into a usage error.
-
-    A token ceiling a transport cannot meter is a ceiling that can never fire, and
-    `EndpointTarget` refuses it before the first request. That refusal is a mistake
-    in the test's configuration rather than a verdict about the target, so it is a
-    `ValueError` and not a failed assertion — a red test saying "insecure" about a
-    profile typo would send somebody after the wrong thing entirely.
-    """
-    __tracebackhide__ = _HIDDEN
-    try:
-        return Runner(registry=registry or _discover(profile), profile=profile).run(target)
-    except BudgetExhausted as exc:
-        raise ValueError(str(exc)) from exc
-
-
-def _discover(profile: Profile) -> Registry:
-    """Entry-point rules plus whatever the profile points at.
-
-    The profile's own rule directories are loaded because a team that keeps rules in
-    its repository expects them here too; a file that fails to load lands in
-    `load_errors`, reaches `result.errors`, and makes the run indeterminate rather
-    than quietly running one rule fewer.
-    """
-    registry = Registry.discover()
-    registry.load_yaml_rule_dirs(Path(path) for path in profile.rule_paths)
-    return registry
+    return path

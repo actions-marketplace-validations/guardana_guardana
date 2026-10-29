@@ -1,11 +1,23 @@
+import codecs
+import io
+import sys
+from collections.abc import Sequence
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as distribution_version
+from typing import NoReturn
+
 import typer
+from guardana.cli._exit import print_debug_traceback
 from guardana.cli.analyze_trace import analyze_trace
 from guardana.cli.baseline import baseline_app
 from guardana.cli.calibrate import calibrate_command
+from guardana.cli.case import case_app
 from guardana.cli.config import config_app
 from guardana.cli.diff import diff
 from guardana.cli.doctor import doctor
 from guardana.cli.exit_codes import ExitCode
+from guardana.cli.fixtures import fixtures_app
+from guardana.cli.grade import grade
 from guardana.cli.import_observations import import_observations
 from guardana.cli.init import init
 from guardana.cli.monitor import monitor
@@ -14,6 +26,7 @@ from guardana.cli.new_rule import new_rule
 from guardana.cli.pack import pack_app
 from guardana.cli.plan import plan_app
 from guardana.cli.probe import probe
+from guardana.cli.recipe import recipe_app
 from guardana.cli.rule import rule_app
 from guardana.cli.rules import rules
 from guardana.cli.run import run_app
@@ -21,12 +34,37 @@ from guardana.cli.scan import scan
 from guardana.cli.target import target_app
 from guardana.cli.taxonomy import taxonomy
 from guardana.cli.trace import trace_app
-from guardana.core import __version__
+from guardana.core.gate import stop_exit_code
+from guardana.core.redaction import RedactionBoundError
+
+_DISTRIBUTIONS = ("guardana-cli", "guardana-core", "guardana-rules", "guardana-report")
+"""What `--version` reports: the product first, then each distribution it runs on."""
+
+
+def _installed(distribution: str) -> str:
+    try:
+        return distribution_version(distribution)
+    except PackageNotFoundError:
+        return "not installed"
+
+
+def version_lines() -> list[str]:
+    """Name the product's version, then every distribution's own.
+
+    Each one separately, because they install separately: an environment that
+    resolved a different engine than the CLI it runs has to be visible here.
+    """
+    versions = {name: _installed(name) for name in _DISTRIBUTIONS}
+    width = max(len(name) for name in _DISTRIBUTIONS)
+    return [
+        f"guardana {versions['guardana-cli']}",
+        *(f"  {name:<{width}}  {versions[name]}" for name in _DISTRIBUTIONS),
+    ]
 
 
 def _version_callback(value: bool) -> None:
     if value:
-        typer.echo(f"guardana {__version__}")
+        typer.echo("\n".join(version_lines()))
         raise typer.Exit
 
 
@@ -89,6 +127,7 @@ app.command()(init)
 app.command()(rules)
 app.command()(taxonomy)
 app.command()(probe)
+app.command()(grade)
 app.command()(diff)
 app.command()(monitor)
 app.command(name="analyze-trace")(analyze_trace)
@@ -104,4 +143,76 @@ app.add_typer(config_app, name="config")
 app.add_typer(trace_app, name="trace")
 app.add_typer(rule_app, name="rule")
 app.add_typer(pack_app, name="pack")
+app.add_typer(recipe_app, name="recipe")
+app.add_typer(case_app, name="case")
+app.add_typer(fixtures_app, name="fixtures")
 app.command()(doctor)
+
+
+_TYPER_INTERRUPT_EXIT = 130
+
+
+def _write_every_character() -> None:
+    """Switch stdout and stderr to UTF-8 when their encoding cannot carry every character.
+
+    A Windows pipe or redirect uses the ANSI code page, which has no `✖` or `✓` and no
+    character a scanned file's name or evidence may hold; writing one would end the
+    command as an internal error. UTF-8 is what Python's UTF-8 mode writes and CI logs read.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper) and codecs.lookup(stream.encoding).name != "utf-8":
+            stream.reconfigure(encoding="utf-8", errors="backslashreplace")
+
+
+def main(argv: Sequence[str] | None = None) -> None:
+    """Run the `guardana` command and end with a code from the documented exit table.
+
+    Ctrl-C becomes `INTERRUPTED` and an uncaught exception becomes `INTERNAL_ERROR`;
+    every other exit code passes through. A crash prints one line naming the
+    exception type; the traceback is printed only with `GUARDANA_DEBUG=1`, because
+    it can carry a URL or a payload from the run.
+    """
+    _write_every_character()
+    try:
+        app(args=None if argv is None else list(argv))
+    except SystemExit as stopped:
+        if stopped.code == _TYPER_INTERRUPT_EXIT:
+            _exit_interrupted()
+        raise
+    except KeyboardInterrupt:
+        _exit_interrupted()
+    except RedactionBoundError as error:
+        _exit_redaction_bound(error)
+    except Exception as error:
+        _exit_internal_error(error)
+
+
+def _exit_interrupted() -> NoReturn:
+    typer.echo("guardana: interrupted before the command finished.", err=True)
+    raise SystemExit(int(ExitCode.INTERRUPTED))
+
+
+def _exit_redaction_bound(error: RedactionBoundError) -> NoReturn:
+    """End as a failed output boundary does, saying the profile pattern that missed.
+
+    The code is `5`, unless the run had already stopped: a stop keeps its own code.
+    """
+    print_debug_traceback(error)
+    typer.echo(
+        f"error: the run's results could not be redacted: {error.pattern} {error.failure} "
+        "— nothing was written or sent",
+        err=True,
+    )
+    stopped = error.stopped_by
+    code = ExitCode.INTERNAL_ERROR if stopped is None else ExitCode(stop_exit_code(stopped))
+    raise SystemExit(int(code))
+
+
+def _exit_internal_error(error: Exception) -> NoReturn:
+    print_debug_traceback(error)
+    typer.echo(
+        f"guardana: internal error ({type(error).__name__}); this is a Guardana defect, "
+        "please report it. Set GUARDANA_DEBUG=1 to print the traceback.",
+        err=True,
+    )
+    raise SystemExit(int(ExitCode.INTERNAL_ERROR))

@@ -15,6 +15,7 @@ from guardana.core.manifest.load import manifest_from_dict
 from guardana.core.manifest.records import CalibrationRecord, EvaluatorRecord
 from guardana.core.manifest.serialize import manifest_to_dict
 from guardana.core.pack import ApiRange, PackManifest, check_pack, check_packs
+from guardana.core.pack.discover import Registered
 from guardana.core.report import ScanResult
 from guardana.core.testing import manifest_for
 
@@ -38,8 +39,8 @@ def test_a_pack_that_ships_a_target_is_not_accused_of_hiding_it() -> None:
     """
     manifest = _pack(targets=("AcmeTarget",))
 
-    assert check_pack(manifest, ["AcmeTarget"]).ok
-    assert not check_pack(manifest, []).ok, "the real missing case still has to fail"
+    assert check_pack(manifest, Registered(targets={"AcmeTarget": None})).ok
+    assert not check_pack(manifest, Registered()).ok, "the real missing case still has to fail"
 
 
 def test_two_packs_claiming_one_name_are_both_reported() -> None:
@@ -48,7 +49,10 @@ def test_two_packs_claiming_one_name_are_both_reported() -> None:
     A pack that stops being validated without saying so is the same failure the
     contract compiler refuses outright for two contracts producing one rule id.
     """
-    checks = check_packs([_pack(rules=("a.one",)), _pack(rules=("a.two",))], ["a.one", "a.two"])
+    checks = check_packs(
+        [_pack(rules=("a.one",)), _pack(rules=("a.two",))],
+        Registered(rules=dict.fromkeys(["a.one", "a.two"])),
+    )
 
     assert len(checks) == 2, "both packs are checked"
     assert all(not check.ok for check in checks)
@@ -57,7 +61,7 @@ def test_two_packs_claiming_one_name_are_both_reported() -> None:
 
 def test_one_pack_with_a_unique_name_is_not_accused_of_colliding() -> None:
     """The other direction, so the fix cannot be "report a collision always"."""
-    assert check_packs([_pack(rules=("a.one",))], ["a.one"])[0].ok
+    assert check_packs([_pack(rules=("a.one",))], Registered(rules={"a.one": None}))[0].ok
 
 
 def test_a_recorded_calibration_survives_a_write_and_a_read(tmp_path: Path) -> None:

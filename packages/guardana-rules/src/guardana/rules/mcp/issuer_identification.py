@@ -1,12 +1,14 @@
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
-from guardana.core.safety import Impact
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
-from guardana.core.target import Capability, McpAuthorizationView, TargetKind
+from guardana.core.target import Capability, McpAuthorizationView, TargetKind, display_url
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP07_2025
-from guardana.rules.mcp._base import McpAuthorizationRule
+from guardana.rules.mcp import _samples
+from guardana.rules.mcp._base import McpAuthorizationRule, further_issuers
 
 _ISS_SUPPORTED = "authorization_response_iss_parameter_supported"
 
@@ -22,7 +24,8 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
     parameter **MUST** advertise `authorization_response_iss_parameter_supported`
     in its metadata, and one that advertises nothing gives a client no way to tell
     whether an authorization response came back from the server it started the flow
-    with.
+    with. Only the first authorization server the resource names is fetched, so the rule
+    declines for every further one rather than pass what it never read.
 
     That is the mix-up attack. A client talking to two authorization servers — one
     of them attacker-influenced — can be walked into redeeming a code at the wrong
@@ -46,14 +49,55 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
         taxonomy=(OWASP_MCP01_2025, OWASP_MCP07_2025, OWASP_ASI03_2026),
         required_capabilities=frozenset({Capability.INSPECT_AUTHORIZATION}),
         impact=Impact.ACTIVE,
+        detection=Detection.INVARIANT,
     )
 
     claim = "whether its clients can detect an issuer mix-up was not established"
 
     @property
     def estimated_requests(self) -> int:
-        """The discovery probe, the anonymous pair, and the documented metadata attempts."""
-        return 9
+        """The discovery probe, the anonymous three, then six documented metadata attempts."""
+        return 10
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample metadata silent about `iss`, metadata advertising it, and two left unread."""
+        silent = {
+            key: value
+            for key, value in _samples.AUTHORIZATION_METADATA.items()
+            if key != _ISS_SUPPORTED
+        }
+        return materialise(
+            (
+                _samples.sample(
+                    "authorization server metadata not advertising the iss parameter",
+                    FixtureOutcome.FINDING,
+                    lambda: _samples.target(
+                        _samples.protected_server(authorization_metadata=silent),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "authorization server metadata advertising the iss parameter",
+                    FixtureOutcome.CLEAN,
+                    lambda: _samples.target(
+                        _samples.protected_server(), credential=_samples.CREDENTIAL
+                    ),
+                ),
+                _samples.sample(
+                    "an authorization server publishing no metadata to read",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(
+                        _samples.protected_server(authorization_metadata=None),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "a server answering an anonymous caller",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(_samples.open_server()),
+                ),
+            )
+        )
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Read the authorization server's metadata and grade what it says about `iss`."""
@@ -62,9 +106,7 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
             yield blocked
             return
         if view.anonymous.open_to_anyone:
-            # No protected resource, so no authorization server, so no flow to mix
-            # up. `guardana.mcp.unauthenticated_access` is the rule with something
-            # to say about this server.
+            yield self.metadata_not_fetched(view)
             return
         document = view.authorization_server
         if document is None or not document.readable:
@@ -78,12 +120,20 @@ class McpIssuerIdentificationRule(McpAuthorizationRule):
                 "guardana.mcp.authorization_discovery reports why the document is missing",
             )
             return
-        if (document.content or {}).get(_ISS_SUPPORTED) is True:
-            return
-        yield self.finding(
-            view,
-            f"the authorization server metadata at {document.url} does not advertise "
-            f"'{_ISS_SUPPORTED}', so a client redeeming an authorization code here cannot "
-            f"tell that the response came from the issuer it started the flow with "
-            f"(RFC 9207)",
-        )
+        if (document.content or {}).get(_ISS_SUPPORTED) is not True:
+            yield self.finding(
+                view,
+                f"the authorization server metadata at {display_url(document.url)} does not "
+                f"advertise '{_ISS_SUPPORTED}', so a client redeeming an authorization code here "
+                f"cannot tell that the response came from the issuer it started the flow with "
+                f"(RFC 9207)",
+            )
+        further = further_issuers(view)
+        if further:
+            named = ", ".join(display_url(issuer) for issuer in further)
+            yield self.unverified(
+                view,
+                f"the protected resource metadata names further authorization servers "
+                f"({named}) whose metadata this run did not fetch, so whether they "
+                f"advertise '{_ISS_SUPPORTED}' was never seen",
+            )

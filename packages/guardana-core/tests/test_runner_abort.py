@@ -1,15 +1,8 @@
 """Aborting a concurrent probe must actually end it.
 
-When the runner was sequential, a propagating `URLError` and a Ctrl-C both ended
-the run immediately — that is what `_execute_one`'s docstring promises. A thread
-pool quietly took it away: `ThreadPoolExecutor` workers are non-daemon and
-CPython joins them at interpreter exit, so the CLI printed "could not reach
-endpoint", returned, and then sat there while every in-flight rule finished its
-network work.
-
-Two things are pinned here: the process is free to exit while rules are still in
-flight, and once the endpoint is known to be down no *further* rules are started
-against it.
+A target that went away and a Ctrl-C both end the run: no further rule starts, and
+the process is free to exit while rules are still in flight, which a non-daemon
+`ThreadPoolExecutor` would not allow, since CPython joins its workers at exit.
 """
 
 import subprocess
@@ -21,7 +14,7 @@ from urllib.error import URLError
 
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
-from guardana.core.report import Finding
+from guardana.core.report import Finding, StopReason
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.runner import Runner
 from guardana.core.severity import Severity
@@ -79,13 +72,9 @@ def test_no_further_rules_start_once_the_endpoint_is_known_to_be_down() -> None:
     runner = Runner(registry=registry, profile=Profile(name="t", policy=Policy()), concurrency=2)
 
     started = time.perf_counter()
-    try:
-        runner.run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
-    except URLError:
-        pass
-    else:  # pragma: no cover — the rule above always raises
-        raise AssertionError("URLError must propagate")
+    result = runner.run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
 
+    assert result.stopped_by is StopReason.TARGET_UNAVAILABLE
     # With 8 blocking rules at concurrency 2 an un-aborted run would take ~12 s.
     assert time.perf_counter() - started < _BLOCK_SECONDS * 2
     assert len(_STARTED) <= 2
@@ -125,12 +114,9 @@ def test_the_process_exits_without_waiting_for_in_flight_rules() -> None:
         registry.register_rule(make(0, True))
         for i in range(1, 5):
             registry.register_rule(make(i, False))
-        try:
-            Runner(
-                registry=registry, profile=Profile(name="t", policy=Policy()), concurrency=4
-            ).run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
-        except URLError:
-            pass
+        Runner(
+            registry=registry, profile=Profile(name="t", policy=Policy()), concurrency=4
+        ).run(EndpointTarget("http://x", "m", transport=ScriptedTransport("ok")))
     """)
     started = time.perf_counter()
     subprocess.run([sys.executable, "-c", script], check=True, timeout=30)  # noqa: S603

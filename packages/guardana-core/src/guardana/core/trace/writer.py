@@ -4,8 +4,7 @@
 an export and wrong for a producer: a live agent cannot buffer a session that runs for
 hours, and a file that stops mid-session has to say so rather than look finished.
 
-Three refusals, each closing a measured false green rather than tidying an API. See
-`docs/design/trace-producer.md` for the four traces that located them:
+Three refusals, each closing a measured false green rather than tidying an API:
 
 - a **block for an undeclared dimension** is dropped in silence by every reader, so
   one typo in a declaration list removes a producer's whole authorization coverage;
@@ -37,7 +36,14 @@ from guardana.core.trace.sinks import SinkMap
 from guardana.core.trace.span import Span
 from guardana.core.trace.tool import ToolExecution, ToolStatus
 
-__all__ = ["SinkMap", "TraceWriteError", "TraceWriter", "open_trace", "resume_trace"]
+__all__ = [
+    "SinkMap",
+    "TraceWriteError",
+    "TraceWriter",
+    "create_trace",
+    "open_trace",
+    "resume_trace",
+]
 
 _EFFECT_STATUS = {
     ToolStatus.SUCCEEDED: EffectStatus.EXECUTED,
@@ -89,6 +95,51 @@ def open_trace(  # noqa: PLR0913 — one keyword per fact the header records
         attributes=attributes,
     )
     return TraceWriter(_opened(path, "w"), header, declared, sinks, session_scope=True)
+
+
+def create_trace(  # noqa: PLR0913 — the same keywords `open_trace` takes, by design
+    path: Path,
+    *,
+    trace_id: str,
+    producer: str,
+    instrumented: Iterable[Dimension],
+    producer_version: str | None = None,
+    sinks: SinkMap | None = None,
+    recorded_at: datetime | None = None,
+    attributes: Mapping[str, str] | None = None,
+) -> "TraceWriter":
+    """Create a trace file that must not exist yet, and write its header with the first span.
+
+    For a producer that may run without ever doing anything worth a span. The file is
+    created empty, so a stale file from an earlier run, or a second process given the
+    same path, is refused here. The header and the first span go down in one write, so
+    the file is either empty or holds a span: a header alone, declaring tools and
+    effects, would grade clean over nothing. A writer finished before any span leaves
+    the file empty, which every reader refuses.
+    """
+    declared = frozenset(instrumented)
+    _refuse_effects_without_sinks(declared, sinks)
+    header = _header(
+        declared,
+        trace_id=trace_id,
+        producer=producer,
+        producer_version=producer_version,
+        recorded_at=recorded_at,
+        attributes=attributes,
+    )
+    try:
+        handle = path.open("x", encoding="utf-8")
+    except FileExistsError:
+        raise TraceWriteError(
+            f"{path} already exists; a trace is created fresh for every run, so a file left by "
+            f"an earlier run, or one another process is writing, is never continued. Remove it "
+            f"or name another path"
+        ) from None
+    except OSError as exc:
+        raise TraceWriteError(f"{path} could not be created: {exc}") from exc
+    return TraceWriter(
+        handle, header, declared, sinks, session_scope=True, header_with_first_span=True
+    )
 
 
 def resume_trace(  # noqa: PLR0913 — the same keywords `open_trace` takes, by design
@@ -290,6 +341,7 @@ class TraceWriter:
         *,
         spans: int = 0,
         session_scope: bool = False,
+        header_with_first_span: bool = False,
     ) -> None:
         """Take an opened file, and write the header before anything else can happen.
 
@@ -300,6 +352,9 @@ class TraceWriter:
         `session_scope` says whether leaving a `with` block ends the *session* or only
         this writer's use of the file. It is the one real difference between a producer
         that holds the file for hours and one whose every event is a separate process.
+
+        `header_with_first_span` holds the header back until the first span and writes
+        the two in one write, as `create_trace` promises.
         """
         self._handle = handle
         self._instrumented = instrumented
@@ -308,7 +363,10 @@ class TraceWriter:
         self._session_scope = session_scope
         self._unmapped: set[str] = set()
         self._closed = False
-        if header is not None:
+        self._pending: tuple[Mapping[str, object], ...] = ()
+        if header is not None and header_with_first_span:
+            self._pending = (header,)
+        elif header is not None:
             self._append(header)
 
     @property
@@ -330,7 +388,8 @@ class TraceWriter:
         self._refuse_undeclared(span)
         record = span_of(self._with_effects(span))
         self._refuse_unreadable(record)
-        self._append(record)
+        self._append(*self._pending, record)
+        self._pending = ()
         self._spans += 1
 
     def finish(self) -> None:
@@ -343,7 +402,8 @@ class TraceWriter:
         """
         if self._closed:
             return
-        self._append({_native.FOOTER_KEY: TRACE_SCHEMA_VERSION, "spans": self._spans})
+        if not self._pending:
+            self._append({_native.FOOTER_KEY: TRACE_SCHEMA_VERSION, "spans": self._spans})
         self.close()
 
     def close(self) -> None:
@@ -406,6 +466,13 @@ class TraceWriter:
         tool = span.tool
         if Dimension.EFFECTS not in self._instrumented or tool is None or span.effects:
             return span
+        if self._sinks is not None and tool.name in self._sinks.read_only:
+            if tool.mutates is True:
+                raise TraceWriteError(
+                    f"tool {tool.name!r} is mapped as read-only and this call says it changed "
+                    f"something; an effect nobody records is one no rule can grade"
+                )
+            return span
         return _replace_effects(span, (self._effect_of(tool),))
 
     def _effect_of(self, tool: ToolExecution) -> SideEffect:
@@ -447,10 +514,10 @@ class TraceWriter:
                 f"this span is not one this build could read back: {exc}"
             ) from exc
 
-    def _append(self, record: Mapping[str, object]) -> None:
-        """Append one record and push it to the file, so a crash keeps what came before."""
+    def _append(self, *records: Mapping[str, object]) -> None:
+        """Append records in one write and flush them, so a crash keeps what came before."""
         try:
-            self._handle.write(json.dumps(record, sort_keys=True) + "\n")
+            self._handle.write("".join(json.dumps(r, sort_keys=True) + "\n" for r in records))
             self._handle.flush()
         except OSError as exc:
             raise TraceWriteError(f"this trace could not be written to: {exc}") from exc

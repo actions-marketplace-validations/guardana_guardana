@@ -37,6 +37,11 @@ class TenantBoundaryRule(ContractRule[TenantBoundary]):
         A store glob is free text — nothing at load time can tell `kb://*` from a
         typo — and an assertion scoped to a store this execution never touched
         verified nothing, however green it looks.
+
+        A query or a document that names no tenant is unattributed: one named tenant
+        elsewhere says nothing about which tenant it served, so it declines by name. A
+        retrieval that names no source cannot be held against a `sources:` selector at
+        all, so it declines too rather than falling outside the assertion.
         """
         sources = self.assertion.sources
         selected = [
@@ -44,6 +49,18 @@ class TenantBoundaryRule(ContractRule[TenantBoundary]):
             for span in trace.spans
             if span.retrieval is not None and matches_any(span.retrieval.source or "", sources)
         ]
+        sourceless = [
+            span.span_id
+            for span in trace.spans
+            if span.retrieval is not None and span.retrieval.source is None
+        ]
+        if sources and sourceless:
+            yield self.unverified(
+                trace,
+                f"{len(sourceless)} retrieval(s) record no source (span(s) "
+                f"{', '.join(sourceless)}), so whether they came from a store matching "
+                f"{', '.join(sources)} is not established and {self.claim} for them",
+            )
         if sources and not selected:
             yield self.unverified(
                 trace,
@@ -64,6 +81,14 @@ class TenantBoundaryRule(ContractRule[TenantBoundary]):
             )
             return
         yield from self._crossings(trace, tenants)
+        unnamed = [span.span_id for span, retrieval in selected if retrieval.tenant is None]
+        if unnamed:
+            yield self.unverified(
+                trace,
+                f"{len(unnamed)} retrieval(s) record no tenant on its query (span(s) "
+                f"{', '.join(unnamed)}), so whether those queries were made for this "
+                f"execution's tenant is not established",
+            )
         unattributed = sum(
             1 for _span, retrieval in selected for d in retrieval.documents if d.tenant is None
         )

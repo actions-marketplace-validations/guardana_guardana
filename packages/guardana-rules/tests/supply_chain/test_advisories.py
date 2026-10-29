@@ -174,3 +174,130 @@ def test_a_dataset_we_cannot_fully_understand_is_refused(
 def test_an_unparseable_comparator_bound_never_matches() -> None:
     assert version_matches("<not.a.version", "1.0.0") is False
     assert version_matches("~=1.0", "1.0") is False
+
+
+@pytest.mark.parametrize(
+    ("spec", "version"),
+    [
+        ("8.3.41", "8.3.041"),
+        ("8.3.41", "8.3.41.0"),
+        ("8.3.41", "8.3.41.0.0"),
+        ("8.3.41", "08.03.41"),
+        ("8.3.41", "v8.3.41"),
+        ("8.3.41", "V8.3.41"),
+        ("8.3.41", "0!8.3.41"),
+        ("8.3.41", " 8.3.41 "),
+        ("1.0rc1", "1.0.0-rc.1"),
+        ("1.0rc1", "1.0c1"),
+        ("1.0rc1", "1.0.0pre1"),
+        ("1.0rc1", "1.0preview1"),
+        ("1.0a0", "1.0alpha"),
+        ("1.0b2", "1.0-beta-2"),
+        ("1.0.post1", "1.0-1"),
+        ("1.0.post1", "1.0.rev1"),
+        ("1.0.post0", "1.0.post"),
+        ("1.0.dev0", "1.0dev"),
+        ("1.0.dev3", "1.0-DEV-3"),
+        ("1!2.0", "1!2.0.0"),
+    ],
+)
+def test_an_exact_advisory_version_matches_every_spelling_pip_treats_as_equal(
+    spec: str, version: str
+) -> None:
+    assert version_matches(spec, version) is True
+
+
+@pytest.mark.parametrize(
+    ("spec", "version"),
+    [
+        ("8.3.41", "8.3.4"),
+        ("8.3.41", "8.3.410"),
+        ("8.3.41", "8.3.41.1"),
+        ("8.3.41", "8.3.41rc1"),
+        ("8.3.41", "8.3.41.post1"),
+        ("8.3.41", "8.3.41.dev0"),
+        ("8.3.41", "1!8.3.41"),
+        ("1.0rc1", "1.0rc2"),
+        ("1.0rc1", "1.0b1"),
+        ("8.3.41", "8.3.41-foo"),
+        ("8.3.41", ""),
+    ],
+)
+def test_an_exact_advisory_version_does_not_match_a_different_release(
+    spec: str, version: str
+) -> None:
+    assert version_matches(spec, version) is False
+
+
+def test_a_local_label_on_the_pin_is_the_same_public_release_and_is_reported() -> None:
+    # A locally built `8.3.41+cpu` carries the source of the compromised public release.
+    assert version_matches("8.3.41", "8.3.41+cpu") is True
+    assert version_matches("8.3.41", "8.3.41+ubuntu.1") is True
+
+
+def test_a_local_label_on_the_advisory_matches_only_that_build() -> None:
+    assert version_matches("8.3.41+cpu", "8.3.41+CPU") is True
+    assert version_matches("8.3.41+ubuntu.1", "8.3.41+ubuntu-01") is True
+    assert version_matches("8.3.41+cpu", "8.3.41") is False
+    assert version_matches("8.3.41+cpu", "8.3.41+cu121") is False
+
+
+@pytest.mark.parametrize(
+    ("spec", "version", "expected"),
+    [
+        ("8.3.41", "8.3.41", True),
+        ("1.0rc1", "1.0RC1", True),
+        ("8.3.41", "8.3.041", False),
+        ("8.3.41", "8.3.41.0", False),
+        ("8.3.41", "v8.3.41", False),
+        ("<9.0", "8.3.41", True),
+        ("<9.0", "9.0.0", False),
+        ("<9.0", "not-a-version", False),
+    ],
+)
+def test_arbitrary_equality_compares_the_literal_string(
+    spec: str, version: str, expected: bool
+) -> None:
+    assert version_matches(spec, version, arbitrary=True) is expected
+
+
+@pytest.mark.parametrize(
+    ("spec", "version", "expected"),
+    [
+        ("<0.2.72", "0.2.071", True),
+        ("<0.2.72", "0.2.072", False),
+        ("<0.2.72", "0.2.72.0", False),
+        ("<=0.2.72", "0.2.72.0", True),
+        (">=3.0.0,<3.11.3", "3", True),
+        (">=3.0.0,<3.11.3", "v3.11.2", True),
+        ("<2.6.0", "0!2.5.1", True),
+        ("<2.6.0", "1!1.0", False),
+        ("<2.6.0", "2.5.1+cpu", True),
+        ("<2.6.0", "2.5.0rc1", True),
+        ("<2.6.0", "2.5.1.post3", True),
+        ("<2.6.0", "2.6.0.dev1", False),
+        ("<=2.6.0", "2.6.0rc1", True),
+        ("<=2.6.0", "2.6.0.post1", False),
+        (">=2.6.0", "2.6.0rc1", False),
+        (">=2.6.0", "2.6.0.post1", True),
+        (">2.6.0", "2.6.0.post1", False),
+        (">2.6.0", "2.6.1a1", True),
+        ("<2.6.0rc1", "2.5.0", True),
+        ("<2.6.0rc1", "2.6.0a1", True),
+        ("<2.6.0rc2", "2.6.0rc1", True),
+        (">1.0.post1", "1.0.post2", True),
+        ("<2.6.0.post2", "2.6.0rc1", True),
+        (">1.0a1", "1.0a1.post1", False),
+        ("<=2.6.0rc1", "2.6.0a1", True),
+        ("<2.6.0+cpu", "2.5.0", False),
+    ],
+)
+def test_comparators_order_versions_as_pep_440_does(
+    spec: str, version: str, expected: bool
+) -> None:
+    assert version_matches(spec, version) is expected
+
+
+def test_an_exact_version_pep_440_cannot_read_matches_only_the_same_text() -> None:
+    assert version_matches("1.0.0-custom", "1.0.0-CUSTOM")
+    assert not version_matches("1.0.0-custom", "1.0.0-other")

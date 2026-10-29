@@ -75,6 +75,10 @@ def test_a_request_ceiling_is_accepted_because_reading_a_file_sends_nothing() ->
     TraceTarget(_trace()).apply_budgets(Budgets(max_requests=5, max_input_tokens=10))
 
 
+def test_a_request_rate_is_accepted_because_reading_a_file_sends_nothing() -> None:
+    TraceTarget(_trace()).apply_budgets(Budgets(max_requests_per_minute=6))
+
+
 def test_a_duration_ceiling_is_refused_because_this_target_does_not_interrupt_itself() -> None:
     with pytest.raises(BudgetExhausted, match="duration"):
         TraceTarget(_trace()).apply_budgets(Budgets(max_duration_seconds=1.0))

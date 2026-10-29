@@ -12,6 +12,9 @@ added to the docs appears here for free, a page removed disappears, and a
 hand-written second list — which is what every stale claim in this repository has
 been — never exists.
 
+Published notes follow the documentation sections, listed from their own front
+matter at the URL the site serves them on; with no note, the section is absent.
+
     python scripts/generate_llms_txt.py            # write it
     python scripts/generate_llms_txt.py --check    # exit 1 if stale, write nothing
 
@@ -20,6 +23,7 @@ the same pair of guards `sync_site.py` and `generate_docs.py` already have.
 """
 
 import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -27,9 +31,18 @@ from pathlib import Path
 _REPO = Path(__file__).resolve().parent.parent
 _INDEX = _REPO / "docs" / "index.md"
 _OUT = _REPO / "site" / "llms.txt"
+_NOTES = _REPO / "notes"
 
 _RAW = "https://raw.githubusercontent.com/guardana/guardana/refs/heads/main"
+_SCHEMAS = _REPO / "schemas"
+_SCHEMA_FILE = re.compile(r"^(?P<kind>[a-z][a-z0-9-]*)-v(?P<version>[1-9][0-9]*)\.schema\.json$")
+_CONTROL_README = "https://raw.githubusercontent.com/guardana/control/refs/heads/main/README.md"
+_CONTROL_SUMMARY = (
+    "Watch, decide, enforce and record the tool calls your AI agents make. Status: alpha."
+)
+"""Quoted from Control's README, which owns how Control describes itself."""
 
+sys.path.insert(0, str(_REPO / "scripts"))
 sys.path.insert(0, str(_REPO / "packages" / "guardana-core" / "src"))
 sys.path.insert(0, str(_REPO / "packages" / "guardana-rules" / "src"))
 
@@ -37,13 +50,17 @@ from guardana.core import __version__  # noqa: E402
 from guardana.core.surface import Surface  # noqa: E402
 from guardana.rules import provide_rules  # noqa: E402
 
+from sitegen import SiteBuildError  # noqa: E402
+from sitegen.notes import read_notes  # noqa: E402
+from sitegen.render import inline_text  # noqa: E402
+
 _HEADING = re.compile(r"^## (.+)$")
 _ENTRY = re.compile(r"^- \[`?([^\]`]+)`?\]\(([^)]+)\)\s*(?:—|-)?\s*(.*)$")
 
-_OPTIONAL_SECTIONS = frozenset({"Design documents", "Maintainers", "Governance"})
+_OPTIONAL_SECTIONS = frozenset({"Studies", "Maintainers", "Governance"})
 """Sections a model may skip when its context is short, per the llms.txt spec.
 
-Design documents argue about rejected alternatives, and governance is about people.
+Studies say how the published measures are collected, and governance is about people.
 Both are worth having on the site and neither is what somebody asking "how do I gate
 a build on this" needs first.
 """
@@ -107,15 +124,52 @@ def _sections() -> list[tuple[str, list[tuple[str, str, str]]]]:
     return sections
 
 
+def _current_schemas() -> list[tuple[str, str, str]]:
+    """Return the newest schema of each document kind as (title, `$id`, first sentence)."""
+    newest: dict[str, tuple[int, Path]] = {}
+    for path in _SCHEMAS.glob("*.schema.json"):
+        match = _SCHEMA_FILE.match(path.name)
+        if match is None:
+            sys.exit(f"error: schemas/{path.name} is not named <kind>-v<N>.schema.json")
+        version = int(match["version"])
+        if version > newest.get(match["kind"], (0, path))[0]:
+            newest[match["kind"]] = (version, path)
+    entries = []
+    for _version, path in sorted(newest.values(), key=lambda item: item[1].name):
+        schema = json.loads(path.read_text(encoding="utf-8"))
+        sentence = str(schema.get("description", "")).split(". ", 1)[0].rstrip(".")
+        entries.append((str(schema["title"]), str(schema["$id"]), f"{sentence}."))
+    if not entries:
+        sys.exit("error: schemas/ holds no *.schema.json to list")
+    return entries
+
+
+def _notes(notes: Path) -> list[tuple[str, str, str]]:
+    """List every published note, newest first, as (title, served URL, summary).
+
+    A note that would not build stops this script too, rather than being left out
+    of a list that then disagrees with the site.
+    """
+    try:
+        return [(note.title, note.url, inline_text(note.summary)) for note in read_notes(notes)]
+    except SiteBuildError as exc:
+        raise SystemExit(f"error: {exc}") from exc
+
+
 def _render() -> str:
     counts = _counts()
     out = [
         "# Guardana",
         "",
-        "> Open-source AI security verification. One rule engine scans model artifacts, "
-        + "probes live endpoints and MCP servers, and grades agent executions that already "
-        + "happened — on a laptop, in CI, and next to a served model. It runs offline, needs "
-        + "no account, and sends nothing anywhere except to the target you name.",
+        "> Guardana is open-source AI security verification. Its rule engine scans model "
+        + "artifacts, probes live endpoints and MCP servers, and grades completed agent "
+        + "runs. Use it on a laptop, in CI, or beside a served model. "
+        + "Artifact scans run offline and send nothing unless `--reporter` names a "
+        + "destination; Guardana needs no account and "
+        + "sends no telemetry. A probe contacts the named target, the judges or guards "
+        + "configured under `evaluators:`, and, for an MCP target requiring "
+        + "authorization, the authorization metadata it advertises, possibly on other "
+        + "hosts; results go to a collector or reporter only when `--reporter` names it.",
         "",
         f"Version {__version__}, Apache-2.0. {counts['total']} built-in rules: "
         + f"{counts['build']} static ones that need no model and no network, and "
@@ -123,11 +177,12 @@ def _render() -> str:
         + "to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, "
         + "OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).",
         "",
-        "The distinguishing property is what happens when a check cannot reach a verdict. "
-        + "Guardana reports four separate outcomes — a finding, an unverified check, a check "
-        + "that errored, and evidence that was demanded and not available — and none of them "
-        + "is silently a pass. A run that could not establish something says so and exits "
-        + "non-zero.",
+        "Guardana reports four separate outcomes: a finding, an unverified check, a check "
+        + "that errored, and required evidence that was unavailable. None of the four "
+        + "outcomes is reported as a pass; by default, an error or a coverage shortfall "
+        + "makes the run indeterminate (exit 2). An unverified (inconclusive) check is "
+        + "always listed but fails the run only under `fail_on_inconclusive`, which is on"
+        + " in `--preset release` and in `monitor`.",
         "",
         "This file is generated from the documentation map; do not edit it by hand.",
         "",
@@ -141,6 +196,20 @@ def _render() -> str:
         out.append("")
         out.extend(_bullet(entry) for entry in entries)
         out.append("")
+    notes = _notes(_NOTES)
+    if notes:
+        out.append("## Notes")
+        out.append("")
+        out.extend(_bullet(entry) for entry in notes)
+        out.append("")
+    out.append("## Schemas")
+    out.append("")
+    out.extend(_bullet(entry) for entry in _current_schemas())
+    out.append("")
+    out.append("## Related project")
+    out.append("")
+    out.append(_bullet(("Guardana Control", _CONTROL_README, _CONTROL_SUMMARY)))
+    out.append("")
     if optional:
         out.append("## Optional")
         out.append("")

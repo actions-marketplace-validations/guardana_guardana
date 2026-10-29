@@ -2,14 +2,16 @@
 
 Exit codes match the CLI's table, because one product with two tables is a product
 whose exit status means nothing. `0` did what was asked, `1` the database said no,
-`3` the command was pointed at nothing.
+`3` the command was pointed at nothing, `4` the database could not be reached.
 """
+
+from datetime import UTC, datetime, timedelta
 
 import psycopg
 import pytest
 from conftest import DbConnection
-from guardana.server.auth import Scope, list_keys
-from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, main
+from guardana.server.auth import Scope, generate_key, list_keys, store_key
+from guardana.server.cli import EXIT_FAILED, EXIT_INVALID_USAGE, EXIT_OK, EXIT_UNAVAILABLE, main
 from guardana.server.db.migrations import apply_pending, read_state
 from guardana.server.envelope import DeploymentIn, EvidenceIn, FindingIn, RunIn, Submission
 from guardana.server.inventory import _query
@@ -119,14 +121,72 @@ def test_the_memory_store_has_no_schema_to_migrate(monkeypatch: pytest.MonkeyPat
     assert main(["migrate"]) == EXIT_INVALID_USAGE
 
 
-def test_an_unreachable_database_is_a_failure_not_a_usage_error(
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize(
+    "argv", [["status"], ["migrate"], ["key", "list"], ["run", "list"]], ids=" ".join
+)
+def test_an_unreachable_database_is_unavailable_not_a_failure(
+    argv: list[str], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # The distinction the exit-code table exists for: the command was right and the
-    # environment was not.
+    # The command was right and the environment was not: a pipeline retries a `4`
+    # and investigates a `1`.
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", "postgresql://nobody:hunter2@127.0.0.1:1/nothing")
+
+    assert main(argv) == EXIT_UNAVAILABLE
+    message = capsys.readouterr().err
+    assert "could not reach the database" in message
+    assert "hunter2" not in message
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://nobody:hunter2@[::1/nothing",
+        "postgresql://nobody:hunter%32@[::1/nothing",
+        "host=127.0.0.1 password=hunter2 port=1 dbname='nothing",
+    ],
+)
+def test_a_connection_string_libpq_cannot_parse_is_never_echoed_with_its_password(
+    url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # libpq quotes a malformed URI back in its error, password included.
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", url)
+
+    assert main(["status"]) == EXIT_UNAVAILABLE
+    message = capsys.readouterr().err
+    assert "could not reach the database" in message
+    assert "hunter2" not in message
+    assert "hunter%32" not in message
+
+
+class _ConnectedButBroken:
+    """A connection that opened, and fails at the first thing a command asks of it."""
+
+    def __enter__(self) -> "_ConnectedButBroken":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def execute(self, *_: object, **__: object) -> object:
+        raise RuntimeError("server closed the connection during execute")
+
+    def cursor(self, *_: object, **__: object) -> object:
+        raise RuntimeError("server closed the connection during cursor")
+
+    def transaction(self, *_: object, **__: object) -> object:
+        raise RuntimeError("server closed the connection during transaction")
+
+
+def test_a_failure_after_connecting_is_a_failure_not_unavailable(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.setenv("GUARDANA_DATABASE_URL", "postgresql://nobody@127.0.0.1:1/nothing")
+    monkeypatch.setattr(psycopg, "connect", lambda *_, **__: _ConnectedButBroken())
 
     assert main(["status"]) == EXIT_FAILED
+    message = capsys.readouterr().err
+    assert "server closed the connection" in message
+    assert "could not reach the database" not in message
 
 
 def test_key_create_prints_the_key_once(
@@ -802,3 +862,99 @@ def test_finding_list_reports_the_worst_severity_not_the_alphabetical_one(
     main(["finding", "list"])
 
     assert "CRITICAL" in capsys.readouterr().out
+
+
+def _listed_line(capsys: pytest.CaptureFixture[str], name: str) -> str:
+    capsys.readouterr()
+    main(["key", "list", "--project", "acme/web"])
+    (line,) = [row for row in capsys.readouterr().out.splitlines() if row.endswith(f" {name}")]
+    return line
+
+
+def test_key_create_without_a_lifetime_lists_as_never_expiring(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    assert main(["key", "create", "--project", "acme/web", "--name", "forever"]) == EXIT_OK
+
+    line = _listed_line(capsys, "forever")
+
+    assert line.split()[1] == "active"
+    assert "no expiry" in line
+
+
+def test_key_create_with_a_lifetime_lists_its_expiry_date(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    main(["key", "create", "--project", "acme/web", "--name", "ci", "--expires-in-days", "30"])
+    with psycopg.connect(database_url) as connection:
+        (key,) = [k for k in list_keys(connection, project="acme/web") if k.name == "ci"]
+
+    line = _listed_line(capsys, "ci")
+
+    assert key.expires_at is not None
+    assert line.split()[1] == "active"
+    assert f"expires {key.expires_at.date()}" in line
+
+
+def test_key_create_refuses_a_zero_lifetime_before_it_resolves_the_project(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    main(["migrate"])
+    capsys.readouterr()
+
+    code = main(
+        ["key", "create", "--project", "acme/missing", "--name", "x", "--expires-in-days", "0"]
+    )
+
+    assert code == EXIT_INVALID_USAGE
+    assert "--expires-in-days must be 1 or more" in capsys.readouterr().err
+
+
+def test_an_expired_key_lists_as_expired_with_its_date(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web").id
+        issued, digest = generate_key("lapsed", (Scope.INGEST,))
+        expired_at = datetime.now(UTC) - timedelta(days=2)
+        store_key(
+            connection,
+            issued,
+            digest,
+            scope=TenantScope.for_project(project),
+            expires_at=expired_at,
+        )
+        connection.commit()
+
+    line = _listed_line(capsys, "lapsed")
+
+    assert line.split()[1] == "expired"
+    assert f"expired {expired_at.date()}" in line
+
+
+def test_a_revoked_key_lists_as_revoked_even_when_it_has_also_expired(
+    database_url: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    _tenanted(database_url)
+    with psycopg.connect(database_url) as connection:
+        project = resolve_project(connection, "acme/web").id
+        issued, digest = generate_key("gone", (Scope.INGEST,))
+        store_key(
+            connection,
+            issued,
+            digest,
+            scope=TenantScope.for_project(project),
+            expires_at=datetime.now(UTC) - timedelta(days=2),
+        )
+        connection.commit()
+    main(["key", "revoke", issued.prefix])
+
+    assert _listed_line(capsys, "gone").split()[1] == "revoked"

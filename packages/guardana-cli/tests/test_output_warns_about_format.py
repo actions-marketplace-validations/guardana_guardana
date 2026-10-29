@@ -26,6 +26,12 @@ from typer.testing import CliRunner
 runner = CliRunner()
 
 
+@pytest.fixture(autouse=True)
+def _a_file_to_scan(tmp_path: Path) -> None:
+    """Give the scanned directory a file, so the scan has something to read."""
+    (tmp_path / "notes.txt").write_text("nothing to see\n", encoding="utf-8")
+
+
 @pytest.mark.parametrize("output_format", ["human", "sarif", "junit"])
 def test_saving_a_format_diff_cannot_read_says_so(tmp_path: Path, output_format: str) -> None:
     out = tmp_path / "run.out"

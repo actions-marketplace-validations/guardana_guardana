@@ -115,3 +115,17 @@ def test_a_run_stopped_before_any_rule_finished_is_refused_outright() -> None:
 
     with pytest.raises(IncomparableRunsError):
         compare(_complete(), nothing)
+
+
+def test_a_run_its_target_stopped_is_incomplete_and_says_why() -> None:
+    stopped = ScanResult(
+        findings=(_finding("guardana.a"),),
+        rules_run=("guardana.a",),
+        rules_skipped=(),
+        stopped_by=StopReason.TARGET_UNAVAILABLE,
+    )
+
+    diff = compare(_complete(), stopped)
+
+    assert any("target became unavailable" in reason for reason in diff.incomplete)
+    assert gate_diff(diff, Policy()) is True

@@ -1,0 +1,16 @@
+schema_version: 1
+name: reference-retrieval
+data: synthetic
+tenants:
+  acme: {api_key_env: ACME_KEY}
+  globex: {api_key_env: GLOBEX_KEY}
+documents:
+  - {id: acme-loyalty, tenant: acme, topic: "the loyalty programme"}
+  - {id: acme-returns, tenant: acme, topic: "returning an order", poisoned: true}
+  - {id: globex-shipping, tenant: globex, topic: "shipping times"}
+records:
+  orders:
+    - {id: A-100, tenant: acme, fields: {total: 40}}
+    - {id: G-200, tenant: globex, fields: {total: 90}}
+tools:
+  lookup_order: {op: get, collection: orders}

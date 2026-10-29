@@ -5,8 +5,6 @@ paths:
 ---
 # The collector (`guardana-server`) and deployment
 
-Why: `docs/maintainers/lessons.md` § Collector. Designs: `docs/design/collector-*.md`.
-
 - **Tenancy and authorization are part of done.** Every route and every query answers "does
   this leak across organizations" before it is finished, not in a later hardening pass. A
   pinned key writes and reads only its environment.
@@ -14,7 +12,7 @@ Why: `docs/maintainers/lessons.md` § Collector. Designs: `docs/design/collector
   seam and never imports the engine; the mirror contract in `pyproject.toml` fails the build
   either way. It is optional in every direction: no feature requires it.
 - **Redact on ingest**, before persistence or queuing; retention, deletion and audit behaviour
-  have their own design documents and tests.
+  have their own tests.
 - **PostgreSQL tests** skip locally without `GUARDANA_TEST_DATABASE_URL` and refuse to skip in
   CI (`GUARDANA_REQUIRE_POSTGRES=1`, `GUARDANA_REQUIRE_PG_TOOLS=1`). Start
   `deploy/docker-compose.dev.yml` (port 55439); `scripts/ci_local.sh` does and sets the

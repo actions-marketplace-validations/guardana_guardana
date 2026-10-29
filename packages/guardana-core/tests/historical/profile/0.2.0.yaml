@@ -1,0 +1,6 @@
+name: default
+rules:
+  include: ["guardana.*"]
+fail_on:
+  severity: high
+  min_confidence: 0.0

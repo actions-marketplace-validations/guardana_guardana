@@ -187,3 +187,15 @@ def test_totalling_keeps_the_missing_token_count() -> None:
     assert combined is not None
     assert combined.input_tokens == 16
     assert combined.requests_missing_token_counts == 2
+
+
+def test_a_request_reporting_only_one_of_its_counts_is_still_missing_a_count() -> None:
+    """A cached Ollama prompt reports output tokens and no input tokens."""
+    meter = UsageMeter()
+    meter.record(TokenUsage(input_tokens=50, output_tokens=7))
+    meter.record(TokenUsage(input_tokens=None, output_tokens=7))
+
+    usage = meter.snapshot()
+
+    assert (usage.input_tokens, usage.output_tokens) == (50, 14)
+    assert usage.requests_missing_token_counts == 1

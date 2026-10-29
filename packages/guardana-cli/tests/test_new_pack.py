@@ -6,13 +6,17 @@ would agree by construction, and a catalogue file that never reached the tree
 would still be a test that passes.
 """
 
+import importlib
+import sys
+import tomllib
 from pathlib import Path
 
 import pytest
 import yaml
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
-from guardana.core.pack import EXTENSION_API_VERSION, PACK_SCHEMA_VERSION, load_manifest
+from guardana.core import __version__, taxonomy
+from guardana.core.pack import EXTENSION_API_VERSION, load_manifest
 from typer.testing import CliRunner
 
 runner = CliRunner()
@@ -69,7 +73,7 @@ def test_the_manifest_claims_exactly_the_ids_the_catalogue_files_on_disk_declare
     assert _declared_ids(tmp_path) == catalogue
 
 
-def test_the_manifest_declares_the_generated_target_and_the_schema_this_build_writes(
+def test_the_manifest_declares_the_generated_target_and_a_schema_older_builds_read(
     tmp_path: Path,
 ) -> None:
     runner.invoke(app, ["new-pack", "acme-rules", "--dir", str(tmp_path)])
@@ -77,7 +81,9 @@ def test_the_manifest_declares_the_generated_target_and_the_schema_this_build_wr
     manifest = yaml.safe_load((tmp_path / MANIFEST).read_text())
 
     assert manifest["provides"]["targets"] == ["AcmeRulesTarget"]
-    assert manifest["schema_version"] == PACK_SCHEMA_VERSION
+    # Schema 2, not this build's newest: a scaffold declares no output, and a
+    # schema 2 manifest also loads on builds that predate outputs.
+    assert manifest["schema_version"] == 2
     assert "class AcmeRulesTarget(Target)" in (tmp_path / PACKAGE / "target.py").read_text()
 
 
@@ -182,3 +188,40 @@ def test_the_usage_page_states_the_counts_a_real_run_produces(tmp_path: Path) ->
     assert f"Wrote {files} files" in page
     assert f"{len(catalog)} rule(s); {samples} fixture(s) passed" in page
     assert f"{generated_tests} passed" in page
+
+
+def test_a_rule_citing_the_packs_own_taxonomy_loads_once_its_taxonomies_are_registered(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Discovery registers taxonomies before rules; the generated tests do the same by hand."""
+    runner.invoke(app, ["new-pack", "zeta-rules", "--dir", str(tmp_path)])
+    package = tmp_path / "src" / "zeta_rules"
+    init = package / "__init__.py"
+    init.write_text(
+        init.read_text() + "\n\ndef provide_taxonomies() -> list[TaxonomyRef]:\n"
+        "    return [TaxonomyRef(scheme='ZETA-RMF', id='ZH-02', title='own hazard')]\n"
+    )
+    rule = package / "catalog" / "prompt_secret_disclosure.yaml"
+    rule.write_text(rule.read_text().replace("taxonomy: [", "taxonomy: [ZH-02, ", 1))
+    monkeypatch.syspath_prepend(str(tmp_path / "src"))
+    for name in [m for m in sys.modules if m == "zeta_rules" or m.startswith("zeta_rules.")]:
+        monkeypatch.delitem(sys.modules, name)
+
+    try:
+        pack = importlib.import_module("zeta_rules")
+        taxonomy.register_all(pack.provide_taxonomies())
+        rules = pack.provide_rules()
+        cited = {ref.reference for r in rules for ref in r.meta.taxonomy}
+    finally:
+        taxonomy.unregister("ZH-02")
+
+    assert "ZH-02" in cited
+
+
+def test_the_pack_pins_the_core_minor_it_was_made_with(tmp_path: Path) -> None:
+    """The target reads sources through a name outside the surface, so a minor may move it."""
+    runner.invoke(app, ["new-pack", "acme-rules", "--dir", str(tmp_path)])
+    project = tomllib.loads((tmp_path / "pyproject.toml").read_text())["project"]
+    major, minor = (int(part) for part in __version__.split(".")[:2])
+
+    assert project["dependencies"] == [f"guardana-core>={__version__},<{major}.{minor + 1}"]

@@ -46,7 +46,8 @@ def test_plan_probe_prints_the_endpoint_sentence_never_the_file_one(
     and free the same way a file scan is. The bug this covers: `_render_human` named
     the run's kind from the numbers alone, so a probe with nothing to run printed the
     artifact branch's sentence, worded for a scan, about a run that never touched a
-    file at all.
+    file at all. Selecting nothing also refuses the plan, which must not change the
+    sentence.
     """
     monkeypatch.setattr(endpoint_module, "transport_factory", _RefusesToBeCalled)
 
@@ -55,6 +56,6 @@ def test_plan_probe_prints_the_endpoint_sentence_never_the_file_one(
         ["plan", "probe", "--url", "http://fake", "--model", "m", "--safety", "passive"],
     )
 
-    assert result.exit_code == 0, result.output
+    assert result.exit_code == 3, result.output
     assert "requests: 0 — no selected rule sends a request" in result.output
     assert "file scan" not in result.output

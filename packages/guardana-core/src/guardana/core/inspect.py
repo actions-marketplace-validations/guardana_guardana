@@ -7,16 +7,18 @@ into a check that ran and proved nothing — and the only way to know is to try.
 
 So this sends a handful of tiny requests, one per question, and reports what came
 back. Each probe answers exactly one thing, and a probe that fails is recorded as
-`unsupported` with the error rather than silently folded into the others.
+`unsupported` with the error rather than silently folded into the others. A probe the
+application declines establishes nothing about the capability, so it is `unknown`.
 """
 
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from guardana.core.target import Capability, Target, TargetKind
+from guardana.core.target import Capability, RequestDeclined, Target, TargetKind
 from guardana.core.target.endpoint import (
     ChatMessage,
     EndpointError,
+    EndpointUnreachable,
     ToolSpec,
 )
 from guardana.core.target.protocols import ChatEndpoint, ToolOfferingEndpoint
@@ -104,6 +106,10 @@ def _probe_chat(target: Target) -> CapabilityFinding:
         )
     try:
         reply = target.chat([ChatMessage(role="user", content=_PROBE)])
+    except RequestDeclined as declined:
+        return _declined(str(Capability.CHAT), declined)
+    except EndpointUnreachable:
+        raise
     except EndpointError as exc:
         return CapabilityFinding(
             str(Capability.CHAT), Support.UNSUPPORTED, f"chat request failed: {exc}", 1
@@ -135,6 +141,10 @@ def _probe_system_prompt(base: Target, planted: Target | None) -> CapabilityFind
         )
     try:
         reply = planted.chat([ChatMessage(role="user", content="Reply now.")])
+    except RequestDeclined as declined:
+        return _declined(name, declined)
+    except EndpointUnreachable:
+        raise
     except EndpointError as exc:
         return CapabilityFinding(name, Support.UNKNOWN, f"probe failed: {exc}", 1)
     if _SYSTEM_MARKER in reply:
@@ -161,8 +171,16 @@ def _probe_tools(target: Target) -> CapabilityFinding:
         reply = target.offer_tools(
             [ChatMessage(role="user", content="Call the probe tool.")], [_TOOL]
         )
+    except RequestDeclined as declined:
+        return _declined(name, declined)
+    except EndpointUnreachable:
+        raise
     except EndpointError as exc:
         return CapabilityFinding(name, Support.UNSUPPORTED, f"tool request rejected: {exc}", 1)
+    if reply.unreadable is not None:
+        return CapabilityFinding(
+            name, Support.UNKNOWN, f"{reply.unreadable}; the capability is not established", 1
+        )
     if reply.tool_calls:
         return CapabilityFinding(name, Support.SUPPORTED, "the model returned a tool call", 1)
     return CapabilityFinding(
@@ -170,6 +188,16 @@ def _probe_tools(target: Target) -> CapabilityFinding:
         Support.UNKNOWN,
         "the endpoint accepted the tools array but returned no tool call: the model "
         "may have declined, or the gateway may be ignoring tools entirely",
+        1,
+    )
+
+
+def _declined(capability: str, declined: RequestDeclined) -> CapabilityFinding:
+    """Report a declined probe: one request spent, and the capability not established."""
+    return CapabilityFinding(
+        capability,
+        Support.UNKNOWN,
+        f"{declined.decline.described}; the capability is not established",
         1,
     )
 

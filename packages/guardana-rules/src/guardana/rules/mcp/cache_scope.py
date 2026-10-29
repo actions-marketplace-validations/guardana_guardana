@@ -2,9 +2,11 @@ from collections.abc import Iterable, Iterator
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleContext, RuleMeta
-from guardana.core.safety import Impact
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import (
+    MAX_LISTING_PAGES,
     Capability,
     Era,
     McpAuthorizationView,
@@ -14,6 +16,7 @@ from guardana.core.target import (
 )
 from guardana.core.target.protocols import AuthorizationInspector
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP07_2025, OWASP_MCP10_2025
+from guardana.rules.mcp import _samples
 from guardana.rules.mcp._base import McpReporting
 
 _PUBLIC = "public"
@@ -63,14 +66,54 @@ class McpCacheScopeRule(McpReporting):
         taxonomy=(OWASP_MCP10_2025, OWASP_MCP07_2025, OWASP_ASI03_2026),
         required_capabilities=frozenset({Capability.LIST_TOOLS, Capability.INSPECT_AUTHORIZATION}),
         impact=Impact.ACTIVE,
+        detection=Detection.INVARIANT,
     )
 
     claim = "what it declares about caching its tool listing was not established"
 
     @property
     def estimated_requests(self) -> int:
-        """The discovery probe, the anonymous pair, and the conversation the manifest needs."""
-        return 5
+        """The discovery probe, the anonymous three, the handshake, its notification, every page.
+
+        The listing is read to its last page, and a server may name up to
+        `MAX_LISTING_PAGES` of them; one that names more is refused rather than read. A
+        session that expires is opened again once per run: a handshake, its notification
+        and the request again.
+        """
+        return 6 + MAX_LISTING_PAGES + 3
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a gated listing declared public, one declared private, and an unread server."""
+
+        def gated(scope: str) -> Target:
+            return _samples.target(
+                _samples.gated_server(
+                    protocol_versions=(_samples.MODERN_REVISION,),
+                    cache_scope=scope,
+                    ttl_ms=300_000,
+                ),
+                credential=_samples.CREDENTIAL,
+            )
+
+        return materialise(
+            (
+                _samples.sample(
+                    "a gated tool listing declared shareable by any cache",
+                    FixtureOutcome.FINDING,
+                    lambda: gated(_PUBLIC),
+                ),
+                _samples.sample(
+                    "a gated tool listing declared private",
+                    FixtureOutcome.CLEAN,
+                    lambda: gated("private"),
+                ),
+                _samples.sample(
+                    "a server speaking only a revision guardana does not",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(_samples.unspoken_server()),
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Read both halves — the declaration and who the server refuses — and grade the pair.

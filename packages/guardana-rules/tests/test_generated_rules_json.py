@@ -20,7 +20,7 @@ from typing import cast
 from guardana.core.surface import Surface
 from guardana.rules import provide_rules
 
-_ROW = re.compile(r"^\| `([^`]+)` \| (\w+) \| (\w+) \| (.+) \|$", re.MULTILINE)
+_ROW = re.compile(r"^\| `([^`]+)` \| (\w+) \| (\w+) \| (\w+) \| (\w+) \| (.+) \|$", re.MULTILINE)
 
 
 def _generated(name: str) -> str:
@@ -31,10 +31,13 @@ def _generated(name: str) -> str:
     raise AssertionError(f"could not locate docs/generated/{name}")
 
 
-def _catalog_rows() -> dict[str, tuple[str, str, str]]:
+def _catalog_rows() -> dict[str, tuple[str, str, str, str, str]]:
     rows = _ROW.findall(_generated("rule-catalog.md"))
     assert rows, "rule-catalog.md no longer has rows in the form this test reads"
-    return {rule_id: (severity, surface, maps_to) for rule_id, severity, surface, maps_to in rows}
+    return {
+        rule_id: (severity, surface, target, maturity, maps_to)
+        for rule_id, severity, surface, target, maturity, maps_to in rows
+    }
 
 
 def _rules_json() -> dict[str, dict[str, object]]:
@@ -52,18 +55,20 @@ def test_both_generated_files_describe_the_same_set_of_rules() -> None:
     )
 
 
-def test_severity_surface_and_framework_mapping_agree_between_the_two() -> None:
+def test_severity_surface_target_maturity_and_mapping_agree_between_the_two() -> None:
     rows = _catalog_rows()
     disagreements = []
     for rule_id, entry in _rules_json().items():
-        severity, surface, maps_to = rows[rule_id]
+        severity, surface, target, maturity, maps_to = rows[rule_id]
         listed = {reference.strip(" `") for reference in maps_to.split(",")}
         taxonomy = cast("list[dict[str, object]]", entry["taxonomy"])
         stated = {str(ref["reference"]) for ref in taxonomy}
-        if (severity, surface) != (entry["severity"], entry["surface"]) or listed != stated:
+        tabled = (severity, surface, target, maturity)
+        stored = (entry["severity"], entry["surface"], entry["target_kind"], entry["maturity"])
+        if tabled != stored or listed != stated:
             disagreements.append(
-                f"{rule_id}: table says {severity}/{surface}/{sorted(listed)}, "
-                f"json says {entry['severity']}/{entry['surface']}/{sorted(stated)}"
+                f"{rule_id}: table says {'/'.join(tabled)}/{sorted(listed)}, "
+                f"json says {'/'.join(map(str, stored))}/{sorted(stated)}"
             )
 
     assert not disagreements, "\n  ".join(disagreements)
@@ -86,6 +91,7 @@ def test_the_json_describes_the_registry_that_is_installed() -> None:
         assert entry["impact"] == str(rule.meta.impact)
         assert entry["destructive"] == rule.meta.destructive
         assert entry["maturity"] == str(rule.meta.maturity)
+        assert entry["detection"] == str(rule.meta.detection)
         assert entry["evaluator"] == rule.meta.evaluator
         assert entry["estimated_requests"] == rule.estimated_requests
         assert entry["requires"] == sorted(str(c) for c in rule.meta.required_capabilities)

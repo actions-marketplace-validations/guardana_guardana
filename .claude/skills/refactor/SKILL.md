@@ -17,9 +17,9 @@ record the evidence, because "looks unused" has been wrong here before:
 | claim | evidence that settles it |
 |---|---|
 | code is dead | no import or call (`git grep`), not reached through an entry-point group, the registry, a YAML `evaluator:` / `requires:` string, a CLI command table, a schema `$ref` or a fixture; a test alone does not make it live |
-| a script is finished | one-off by its own docstring AND not named in CI, `.pre-commit-config.yaml`, `RELEASING.md`, a skill, or `docs/maintainers/ops-catalogue.md` |
+| a script is finished | one-off by its own docstring AND not named in CI, `.pre-commit-config.yaml`, `scripts/release.py`, a skill or another script |
 | a flag or option is dead | no producer anywhere (CLI, profile schema, `guardana.yaml` examples, Action inputs, CI templates) |
-| a document is consumed | its findings are closed or live elsewhere; no LIVE file cites its path; it is not a design record (`docs/design/` keeps accepted and superseded decisions on purpose) |
+| a document is consumed | its findings are closed or live elsewhere; no LIVE file cites its path |
 
 Low reference count on a recent file means "new", not "dead" — check `git log -1` first.
 
@@ -37,8 +37,7 @@ Low reference count on a recent file means "new", not "dead" — check `git log 
 - One theme per commit: "split `x.py` by concept" and "delete finished scripts" are two.
 - Deleting is cheap because git keeps it — but fix every inbound reference in the SAME commit:
   `docs/index.md` (the nav refuses a missing page), `docs/` links (a test refuses a dead one),
-  `site/llms.txt` and `site/docs/` (regenerate), `docs/maintainers/ops-catalogue.md`,
-  `CLAUDE.md`, `.claude/rules/`, the skills.
+  `site/llms.txt` and `site/docs/` (regenerate), `CLAUDE.md`, `.claude/rules/`, the skills.
 - Leave alone: `docs/generated/` (regenerate it), `schemas/` (versioned contracts — a change is a
   migration, not a cleanup), `examples/vulnerable-model/` (deliberately malicious fixture),
   anything a user's persisted document depends on.
@@ -47,10 +46,10 @@ Low reference count on a recent file means "new", not "dead" — check `git log 
 
 ## 4. Prove nothing moved
 
-Full gate green; the before/after artifact diff empty; `guardana scan packages` still at zero
-findings. Then `/review`.
+Full gate green; the before/after artifact diff empty;
+`guardana scan packages --profile scripts/dogfood.yaml` still at zero findings. Then `/review`.
 
 ## 5. Report
 
-What was removed or moved and the evidence for each, what was kept and why, what is left for
-`docs/work/BACKLOG.md`.
+What was removed or moved and the evidence for each, what was kept and why, what is left as
+an issue.

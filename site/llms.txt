@@ -1,26 +1,36 @@
 # Guardana
 
-> Open-source AI security verification. One rule engine scans model artifacts, probes live endpoints and MCP servers, and grades agent executions that already happened — on a laptop, in CI, and next to a served model. It runs offline, needs no account, and sends nothing anywhere except to the target you name.
+> Guardana is open-source AI security verification. Its rule engine scans model artifacts, probes live endpoints and MCP servers, and grades completed agent runs. Use it on a laptop, in CI, or beside a served model. Artifact scans run offline and send nothing unless `--reporter` names a destination; Guardana needs no account and sends no telemetry. A probe contacts the named target, the judges or guards configured under `evaluators:`, and, for an MCP target requiring authorization, the authorization metadata it advertises, possibly on other hosts; results go to a collector or reporter only when `--reporter` names it.
 
-Version 0.27.0, Apache-2.0. 51 built-in rules: 19 static ones that need no model and no network, and 32 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
+Version 1.0.0, Apache-2.0. 58 built-in rules: 19 static ones that need no model and no network, and 39 that grade a live system or a recorded run. Every rule maps to a public framework (OWASP LLM Top 10 in both editions, OWASP ASI, OWASP MCP, OWASP ML, MITRE ATLAS, NIST AI 100-2e2025).
 
-The distinguishing property is what happens when a check cannot reach a verdict. Guardana reports four separate outcomes — a finding, an unverified check, a check that errored, and evidence that was demanded and not available — and none of them is silently a pass. A run that could not establish something says so and exits non-zero.
+Guardana reports four separate outcomes: a finding, an unverified check, a check that errored, and required evidence that was unavailable. None of the four outcomes is reported as a pass; by default, an error or a coverage shortfall makes the run indeterminate (exit 2). An unverified (inconclusive) check is always listed but fails the run only under `fail_on_inconclusive`, which is on in `--preset release` and in `monitor`.
 
 This file is generated from the documentation map; do not edit it by hand.
 
-## First run
+## Guides for a first run
 
 - [install.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/install.md): install the CLI or a container
+- [usage-init.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-init.md): a first-run project that fails, is fixed and keeps its evidence, offline
+- [recipe-local-scan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-local-scan.md): scan your own project and save the run
+- [recipe-recorded-answers.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-recorded-answers.md): check a run your application already recorded
+- [recipe-real-application.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/recipe-real-application.md): probe the application your users talk to
+- [adopt-guardana.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/adopt-guardana.md): add Guardana to your repository and CI
 - [usage-scan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-scan.md): scan artifacts offline
-- [usage-probe.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-probe.md): probe a live endpoint, agent, or MCP server
+- [usage-probe.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-probe.md): probe a live endpoint, agent, MCP server or A2A agent
 - [usage-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-testing.md): run the same checks from pytest
+- [python-api.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/python-api.md): run scans and probes from Python and read every outcome as data
 - [how-it-works.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/how-it-works.md): understand targets, rules, evaluators, and evidence
 
 ## Run and policy
 
 - [profiles.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/profiles.md): configure rules, gates, budgets, trust, and redaction
+- [usage-recipe.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-recipe.md): pin a team's checks in a recipe and run them in CI
+- [usage-fixtures.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-fixtures.md): declare the synthetic data your application runs with, render what you seed, and check a tenant boundary and a poisoned document through your own index
+- [usage-doubles.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-doubles.md): serve your application's tools from stateful doubles that enforce tenancy, and keep their trace
 - [usage-plan.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-plan.md): estimate a run before sending requests
 - [usage-target.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-target.md): verify endpoint capabilities
+- [providers.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/providers.md): what each provider and adapter carries, and which failures it retries
 - [usage-doctor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-doctor.md): validate and explain effective configuration
 - [safe-testing.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/safe-testing.md): bound active checks and side effects
 - [exit-codes.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/exit-codes.md): interpret command outcomes
@@ -28,15 +38,19 @@ This file is generated from the documentation map; do not edit it by hand.
 ## Evidence and regression
 
 - [usage-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-run.md): inspect and migrate saved runs
+- [reading-results.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reading-results.md): read a saved run, SARIF or JUnit from your own tool
 - [usage-diff.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-diff.md): compare runs without hiding coverage changes
 - [usage-baseline.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-baseline.md): accept risk with an expiry
 - [usage-monitor.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-monitor.md): schedule active re-verification
 - [usage-calibrate.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-calibrate.md): measure evaluator confidence
+- [usage-suites.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-suites.md): gate a deployed endpoint against a golden set
+- [usage-case.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-case.md): promote a reviewed failure into a regression case proven on both sides
 - [privacy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/privacy.md): control redaction and retained evidence
 
 ## Recorded applications
 
 - [usage-analyze-trace.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-analyze-trace.md): grade a recorded execution
+- [usage-grade.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-grade.md): grade answers your application already gave, without calling it
 - [usage-trace-inspect.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-trace-inspect.md): inspect available evidence dimensions
 - [usage-contracts.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-contracts.md): express application-specific invariants
 - [usage-import-observations.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-import-observations.md): import external tool claims
@@ -50,6 +64,9 @@ This file is generated from the documentation map; do not edit it by hand.
 - [extending.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/extending.md): provide rules, evaluators, targets, or taxonomies
 - [usage-new-pack.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-new-pack.md): scaffold an installable pack that already passes
 - [usage-pack.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-pack.md): validate and lock extension packs
+- [outputs.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/outputs.md): add an export or a webhook from an installed package
+- [conformance-kit.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/conformance-kit.md): prove a rule, target, format or reporter keeps its contract
+- [compatibility.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/compatibility.md): the supported surface, what 1.x keeps stable, feature and field availability, and deprecation
 - [usage-taxonomy.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/usage-taxonomy.md): resolve framework editions and crosswalks
 - [model-formats.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/model-formats.md): use the bounded artifact readers
 
@@ -65,6 +82,7 @@ This file is generated from the documentation map; do not edit it by hand.
 
 - [architecture.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/architecture.md): understand package and trust boundaries
 - [threat-model.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/threat-model.md): see what Guardana does and does not defend
+- [reproducible-builds.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/reproducible-builds.md): rebuild a release from its tag and compare it with PyPI byte for byte
 - [product-status.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/product-status.md): check maturity and known limitations
 
 ## Reference
@@ -73,23 +91,53 @@ This file is generated from the documentation map; do not edit it by hand.
 - [generated/rule-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/rule-catalog.md): every built-in rule
 - [generated/evaluator-catalog.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/evaluator-catalog.md): every evaluator
 - [generated/taxonomy-coverage.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/taxonomy-coverage.md): framework coverage
+- [generated/detection-limits.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/detection-limits.md): what a finding states, per rule family
+- [generated/first-run.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/first-run.md): whether new users reach a first result in ten minutes, from the study sheet
+- [generated/application-measures.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/application-measures.md): coverage of the real application and the share of checks that reached a verdict, from consented team runs
+- [generated/compatibility-matrix.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/generated/compatibility-matrix.md): which schema and API versions each release carried
 
 ## Project direction
 
+- [community.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/community.md): try Guardana, join a pilot, contribute a fix or share coverage
 - [../FEATURES.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/FEATURES.md): concise shipped capability overview
-- [../ROADMAP.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/ROADMAP.md): ordered next work and exit criteria
-- [design/audit-0.23-market.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-0.23-market.md): repository audit, market evidence, and the rationale for the current order
-- [design/audit-0.25-market.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-0.25-market.md): whether that order still follows from evidence, and the validation plan that replaces the one it could not run
-- [design/audit-0.26-measurement.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/audit-0.26-measurement.md): what a clean result rests on, and why rows 1 and 2 widened and a re-grading row was added
 - [../CHANGELOG.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/CHANGELOG.md): release history
+
+## Notes
+
+- [1.0.0 release gate evidence for engineering criteria (#144)](https://guardana.dev/notes/release-gate-evidence-1-0-0): The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.
+- [Security runbook drill (#142)](https://guardana.dev/notes/security-runbook-drill): The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.
+- [Retrieval pilot: poisoned document and tenant filter (#139)](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter): The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.
+- [Regression loop with a redacted regression (#140)](https://guardana.dev/notes/regression-loop-with-a-redacted-regression): A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.
+- [Collector recovery runbooks (#143)](https://guardana.dev/notes/collector-recovery-runbooks): The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.
+- [Customization through published extension points (#141)](https://guardana.dev/notes/customization-through-published-extension-points): The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.
+- [Clean-install offline first run (#138)](https://guardana.dev/notes/clean-install-offline-first-run): The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps.
+- [Catching tenant leaks and poisoned documents before release](https://guardana.dev/notes/tenant-leaks-and-poisoned-documents): A reference retrieval app shows how to check tenant answers and document instructions, save the result, and rerun it with clear coverage limits.
+
+## Schemas
+
+- [Guardana Artifact Index v1](https://guardana.dev/schemas/artifact/v1.schema.json): guardana-artifact.json in a recipe's output directory: which files a run wrote there.
+- [Guardana Collector Envelope v8](https://guardana.dev/schemas/collector-envelope/v8.schema.json): What `--reporter server://<url>` POSTs to `/findings`: one run's finding channels, what ran, and, when the run declared them, its deployment and its identity.
+- [Guardana Dataset v2](https://guardana.dev/schemas/dataset/v2.schema.json): One record of a Guardana quality suite's dataset, format 2, which adds a regression case's `observed` and `accepted`; format 1 is still read.
+- [Guardana Run Comparison v3](https://guardana.dev/schemas/diff/v3.schema.json): What changed between two saved runs.
+- [Guardana Fixtures v1](https://guardana.dev/schemas/fixtures/v1.schema.json): guardana-fixtures.yaml: the synthetic data an application runs with in CI.
+- [Guardana Pack Lock v3](https://guardana.dev/schemas/pack-lock/v3.schema.json): guardana-lock.yaml: every installed extension pinned by what it is, written by `guardana pack lock` and compared by `guardana pack lock --check`.
+- [Guardana Pack Manifest v3](https://guardana.dev/schemas/pack-manifest/v3.schema.json): guardana-pack.yaml: what an extension package provides and which contracts it was written against, shipped inside the package directory and checked by `guardana pack validate`.
+- [Guardana Run Plan v4](https://guardana.dev/schemas/plan/v4.schema.json): What a run would cost, worked out without sending a request.
+- [Guardana Profile v1](https://guardana.dev/schemas/profile/v1.schema.json): guardana.yaml: which rules a run uses, what fails it, what it may spend and keep, and whether its deliveries must be acknowledged.
+- [Guardana Recipe Lock v2](https://guardana.dev/schemas/recipe-lock/v2.schema.json): guardana-recipe.lock.yaml: what a recipe's run is pinned to, written by `guardana recipe lock`.
+- [Guardana Recipe v3](https://guardana.dev/schemas/recipe/v3.schema.json): guardana-recipe.yaml: the profile a team's checks come from, what answers them, and where the artifact goes.
+- [Guardana Recording v3](https://guardana.dev/schemas/recording/v3.schema.json): One record of a Guardana recording: what an application answered, graded later without calling it.
+- [Guardana Saved Run v18](https://guardana.dev/schemas/run/v18.schema.json): One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels.
+- [Guardana Trace v3](https://guardana.dev/schemas/trace/v3.schema.json): One record of a Guardana native trace file.
+
+## Related project
+
+- [Guardana Control](https://raw.githubusercontent.com/guardana/control/refs/heads/main/README.md): Watch, decide, enforce and record the tool calls your AI agents make. Status: alpha.
 
 ## Optional
 
-- [design/README.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/design/README.md): accepted decisions, proposals, and status conventions
+- [studies/first-run-study.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/studies/first-run-study.md): how the first-run sessions are run, consented and recorded
+- [studies/adopter-study.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/studies/adopter-study.md): how two independent teams' runs are recorded, with consent, for the application measures
 - [../CONTRIBUTING.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/CONTRIBUTING.md): setup, quality gates, and review rules
-- [../RELEASING.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/RELEASING.md): versioning and publishing
-- [maintainers/github-setup.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/maintainers/github-setup.md): repository settings
-- [maintainers/ops-catalogue.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/maintainers/ops-catalogue.md): which script, is it safe, what it needs
-- [maintainers/lessons.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/docs/maintainers/lessons.md): why the rules are what they are
 - [../SECURITY.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/SECURITY.md): report vulnerabilities and understand support
 - [../CODE_OF_CONDUCT.md](https://raw.githubusercontent.com/guardana/guardana/refs/heads/main/CODE_OF_CONDUCT.md): community expectations

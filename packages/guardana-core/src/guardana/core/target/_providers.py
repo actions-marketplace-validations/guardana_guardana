@@ -11,22 +11,35 @@ still ships a `Target` through `guardana.targets`.
 from collections.abc import Callable, Sequence
 
 from guardana.core.target.endpoint import (
+    REQUEST_TIMEOUT_SECONDS,
     ChatMessage,
+    ChatReply,
     ChatTransport,
     EndpointError,
     UrllibTransport,
+    endpoint_ref,
     post_json,
 )
+from guardana.core.usage import TokenUsage
 
 
 class OllamaTransport:
-    """POSTs to Ollama's native `/api/chat` (non-streaming)."""
+    """POSTs to Ollama's native `/api/chat` (non-streaming), reading its token counts."""
+
+    def __init__(self, *, timeout: float = REQUEST_TIMEOUT_SECONDS) -> None:
+        self._timeout = timeout
 
     def send(
         self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
     ) -> str:
         """POST an Ollama chat request and return the reply text."""
-        ref = f"{base_url}#{model}"
+        return self.send_reporting_usage(base_url, model, messages, api_key).text
+
+    def send_reporting_usage(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> ChatReply:
+        """POST an Ollama chat request and return the reply with the token counts it sent."""
+        ref = endpoint_ref(base_url, model)
         payload = post_json(
             f"{base_url}/api/chat",
             {
@@ -36,27 +49,48 @@ class OllamaTransport:
             },
             api_key,
             ref,
+            timeout=self._timeout,
         )
         if isinstance(payload, dict):
             message = payload.get("message")
             if isinstance(message, dict):
                 content = message.get("content")
                 if isinstance(content, str):
-                    return content
+                    return ChatReply(text=content, usage=_ollama_usage(payload))
         raise EndpointError(f"unexpected Ollama response from {ref}: {payload!r}")
+
+
+def _ollama_usage(payload: dict[str, object]) -> TokenUsage | None:
+    """Read Ollama's top-level counts; either may be absent (a cached prompt has no count)."""
+    prompt = _count(payload.get("prompt_eval_count"))
+    completion = _count(payload.get("eval_count"))
+    if prompt is None and completion is None:
+        return None
+    return TokenUsage(input_tokens=prompt, output_tokens=completion)
+
+
+def _count(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 class TgiTransport:
     """POSTs to Hugging Face TGI `/generate` with the conversation flattened to a prompt."""
 
+    def __init__(self, *, timeout: float = REQUEST_TIMEOUT_SECONDS) -> None:
+        self._timeout = timeout
+
     def send(
         self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
     ) -> str:
         """POST a TGI generate request and return the generated text."""
-        ref = f"{base_url}#{model}"
+        ref = endpoint_ref(base_url, model)
         prompt = "\n".join(f"{m.role}: {m.content}" for m in messages)
         payload = post_json(
-            f"{base_url}/generate", {"inputs": prompt, "parameters": {}}, api_key, ref
+            f"{base_url}/generate",
+            {"inputs": prompt, "parameters": {}},
+            api_key,
+            ref,
+            timeout=self._timeout,
         )
         if isinstance(payload, list) and payload:
             payload = payload[0]

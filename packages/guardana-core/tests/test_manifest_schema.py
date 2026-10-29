@@ -1,4 +1,4 @@
-"""`schemas/run-v7.schema.json` is a published contract, so it is tested.
+"""`schemas/run-v18.schema.json` is a published contract, so it is tested.
 
 A schema nothing validates against is a promise. This asserts the two directions
 that matter: what the engine writes satisfies the schema, and the schema refuses
@@ -12,15 +12,19 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from guardana.core.fingerprint import DigestKind, DocumentDigest
 from guardana.core.gate import GateOutcome
 from guardana.core.manifest import (
     MANIFEST_SCHEMA_VERSION,
     CalibrationRecord,
     ConfigurationRef,
+    CorrectionStatus,
     DeploymentRef,
     EvaluatorRecord,
     EvidenceMode,
     ExecutionSettings,
+    JudgeCorrection,
+    JudgeUsage,
     PrivacyRecord,
     ResultSummary,
     RuleRecord,
@@ -28,6 +32,9 @@ from guardana.core.manifest import (
     RunSource,
     RunUsage,
     SourceKind,
+    SuiteCorrection,
+    SuiteOutcome,
+    SuiteSummary,
     TargetIdentity,
     ToolInfo,
     TrialSummary,
@@ -40,7 +47,7 @@ from guardana.core.severity import Severity
 from guardana.core.target import TargetKind
 from jsonschema import Draft202012Validator
 
-_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v7.schema.json"
+_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "run-v18.schema.json"
 _NOW = datetime(2026, 8, 2, 10, 0, tzinfo=UTC)
 
 
@@ -108,6 +115,9 @@ def _fully_populated() -> RunManifest:
             fingerprint=digest_of("http://x", "m"),
             fingerprint_inputs=("base_url", "model"),
             capabilities=("chat", "plant_system_prompt"),
+            document=DocumentDigest(
+                digest="sha256:" + "0" * 64, kind=DigestKind.CONTENT, bytes=1024
+            ),
         ),
         deployment=DeploymentRef(
             ai_system="support-bot",
@@ -141,6 +151,12 @@ def _fully_populated() -> RunManifest:
             output_tokens=9_000,
             requests_missing_token_counts=0,
             wall_time_seconds=41.5,
+            judge={
+                "llm_judge": JudgeUsage(
+                    requests=40, input_tokens=12_000, output_tokens=800, budget_exhausted=True
+                ),
+                "guard": JudgeUsage(requests=40, requests_missing_token_counts=40),
+            },
         ),
         rules=(
             RuleRecord(
@@ -156,6 +172,52 @@ def _fully_populated() -> RunManifest:
                     cases_incomplete=0,
                     bound=None,
                     mean_success_rate=0.1,
+                    correction=JudgeCorrection(
+                        status=CorrectionStatus.CORRECTED,
+                        assessor="llm_judge@2025.1",
+                        rate=0.2,
+                        low=0.01,
+                        high=0.7,
+                        sensitivity=0.9,
+                        specificity=0.95,
+                        dataset_digest=digest_of("corpus"),
+                        positives=120,
+                        negatives=130,
+                    ),
+                ),
+            ),
+            RuleRecord(
+                id="guardana.suite",
+                digest="abc124",
+                suite=SuiteSummary(
+                    dataset="answers@1",
+                    dataset_digest=digest_of("answers"),
+                    sample_size=40,
+                    sample_seed=3,
+                    trials_per_case=3,
+                    cases=40,
+                    measured=40,
+                    ungraded=0,
+                    worst=0.7,
+                    best=0.7,
+                    low=0.55,
+                    high=0.82,
+                    min_pass_rate=0.9,
+                    min_sample=30,
+                    outcome=SuiteOutcome.FAIL,
+                    correction=SuiteCorrection(
+                        status=CorrectionStatus.CORRECTED,
+                        assessor="llm_judge@2025.1",
+                        worst=0.72,
+                        best=0.72,
+                        low=0.55,
+                        high=0.86,
+                        sensitivity=0.9,
+                        specificity=0.95,
+                        dataset_digest=digest_of("corpus"),
+                        positives=120,
+                        negatives=130,
+                    ),
                 ),
             ),
         ),
@@ -165,7 +227,19 @@ def _fully_populated() -> RunManifest:
                 version="1",
                 digest=digest_of("judge"),
                 calibration=CalibrationRecord(
-                    dataset_digest=digest_of("corpus"), measured_at=_NOW, brier=0.12, ece=0.05
+                    dataset_digest=digest_of("corpus"),
+                    measured_at=_NOW,
+                    brier=0.12,
+                    ece=0.05,
+                    assessor="llm_judge@2025.1",
+                    judge_identity="model=m;endpoint=sha256:acac;samples=1",
+                    starter_corpus=False,
+                    positives=30,
+                    negatives=30,
+                    positives_inconclusive=0,
+                    negatives_inconclusive=1,
+                    sensitivity=0.9,
+                    specificity=0.95,
                 ),
             ),
         ),
@@ -283,7 +357,9 @@ def test_the_schema_requires_usage_keys_even_when_unknown() -> None:
     assert list(_validator().iter_errors(document))
 
 
-@pytest.mark.parametrize("version", [1, 2, 3, 4, 5, 6, 8, "7"])
+@pytest.mark.parametrize(
+    "version", [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 19, "18"]
+)
 def test_the_schema_refuses_any_version_but_the_current_one(version: object) -> None:
     document = _document(_minimal())
     document["schema_version"] = version

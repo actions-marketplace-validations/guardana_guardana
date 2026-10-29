@@ -49,7 +49,10 @@ class ExitCode(IntEnum):
     """
 
     INTERNAL_ERROR = 5
-    """Guardana itself failed. This one is a bug report."""
+    """Guardana failed, or under `calibrate` an evaluator's own code did.
+
+    A bug report to whoever the message names; `GUARDANA_DEBUG=1` prints the traceback.
+    """
 
     BUDGET_EXHAUSTED = 6
     """A budget ran out and the run stopped early.
@@ -61,15 +64,26 @@ class ExitCode(IntEnum):
     """
 
     INTERRUPTED = 7
-    """The run was cut short and partial evidence was written."""
+    """The command was interrupted before it finished; nothing it had not yet written exists."""
+
+    OUTPUT_FAILED = 8
+    """An installed output failed, or a delivery the profile required was not acknowledged.
+
+    A format raised or returned no text, a reporter failed, or `delivery.required` is set
+    and the collector or an installed reporter did not acknowledge the run.
+
+    Kept apart from `INTERNAL_ERROR` because the defect belongs to the distribution that
+    shipped the output, not to Guardana. It replaces `0`, `1` and `2`; a run that stopped
+    keeps its stop's code. The verdict is printed beside it.
+    """
 
 
 def code_for(outcome: GateOutcome, stopped_by: StopReason | None = None) -> ExitCode:
     """Map a run's verdict to its exit code.
 
-    Delegates to the engine, which owns the codes that describe a *result*, so the
-    two cannot drift. The codes for situations with no result at all — invalid
-    usage, an unreachable target, an internal error — belong to the CLI and are
-    raised where they happen.
+    Delegates to the engine, which owns the codes that describe a *result*, a run its
+    target stopped included, so the two cannot drift. The codes for situations with
+    no result at all — invalid usage, a target that failed before anything could be
+    saved, an internal error — belong to the CLI and are raised where they happen.
     """
     return ExitCode(exit_code_for(outcome, stopped_by))

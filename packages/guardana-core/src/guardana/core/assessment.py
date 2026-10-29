@@ -4,9 +4,6 @@ One record per case actually measured, pass included — the passes are what giv
 rate a denominator. A separate channel from `Finding` because a measurement and a
 defect are different sentences: one has a denominator, a direction and an
 uncertainty; the other has a severity and somebody who has to act.
-
-Why it is shaped this way, and what was rejected:
-[`docs/design/assessment-channel.md`](../../../../../docs/design/assessment-channel.md).
 """
 
 from dataclasses import dataclass
@@ -35,6 +32,26 @@ class AssessmentStatus(StrEnum):
 
     SKIPPED = "skipped"
     """The case was not applicable here — an explicit absence, not a low score."""
+
+
+class UnmeasuredReason(StrEnum):
+    """Why a case recorded no measurement, beside the status that says it did not."""
+
+    NOT_RECORDED = "not_recorded"
+    """The recording held no reply for this trial. Recorded with status `ERROR`."""
+
+    REPLY_ALTERED = "reply_altered"
+    """The recorded reply was changed by redaction or not kept verbatim. Status `INCONCLUSIVE`."""
+
+    DECLINED = "declined"
+    """The evaluator returned inconclusive."""
+
+    TARGET_DECLINED = "target_declined"
+    """The application declined the request, and the evaluator cannot grade a decline.
+
+    Status `INCONCLUSIVE`. Distinct from `DECLINED`: the evaluator was never handed reply
+    text to decide on, so this is what the target did, not what the evaluator could not tell.
+    """
 
 
 class Direction(StrEnum):
@@ -103,10 +120,40 @@ class Assessment:
     trial 3 of one run and trial 3 of another are not the same observation.
     """
 
+    reason: UnmeasuredReason | None = None
+    """Why the case went unmeasured; None when it was measured or when nobody said.
+
+    Not part of `comparable_key`: why one run could not measure a case does not change
+    which case it was.
+    """
+
+    def __post_init__(self) -> None:
+        """Refuse a measured case that also says why it went unmeasured."""
+        if self.status is AssessmentStatus.MEASURED and self.reason is not None:
+            raise ValueError(
+                f"a measured assessment carries no reason it went unmeasured, got {self.reason!r}"
+            )
+
     @property
-    def comparable_key(self) -> tuple[str, str, str | None]:
-        """Return the triple two runs must agree on before their values may be compared."""
-        return (self.case_id, self.assessor, self.dataset)
+    def comparable_key(self) -> "ComparableKey":
+        """Return what two runs must agree on before their values may be compared.
+
+        The case, its assessor and dataset, and the unit, direction and threshold
+        of the measurement: a moved threshold changes the verdict without changing
+        the system.
+        """
+        return (
+            self.case_id,
+            self.assessor,
+            self.dataset,
+            self.unit,
+            self.direction,
+            self.threshold,
+        )
+
+
+ComparableKey = tuple[str, str, str | None, str | None, Direction | None, float | None]
+"""`(case_id, assessor, dataset, unit, direction, threshold)` of one assessment."""
 
 
 def case_id_for(rule_id: str, *parts: str) -> str:
@@ -131,14 +178,19 @@ def from_verdict(  # noqa: PLR0913 — one keyword per fact the verdict cannot s
     dataset: str | None = None,
     tags: tuple[str, ...] = (),
     trial: int | None = None,
+    reason: UnmeasuredReason | None = None,
 ) -> Assessment:
     """Turn one graded exchange into a measurement, keeping "could not grade" apart.
 
     `passed` is `None` for an inconclusive verdict, never `False`: a judge that
     could not read the reply has not observed a failure, and counting it as one
-    makes a broken grader look like a worsening model.
+    makes a broken grader look like a worsening model. For the same reason an
+    inconclusive verdict records no measurement, and says why: `reason` when given
+    (`TARGET_DECLINED` for an exchange the application declined), else that the
+    evaluator declined. A measured verdict records no reason, whatever is passed.
     """
     inconclusive = verdict.outcome == "inconclusive"
+    measurement = None if inconclusive else verdict.measurement
     return Assessment(
         case_id=case_id,
         assessor=verdict.evaluator_id,
@@ -146,9 +198,14 @@ def from_verdict(  # noqa: PLR0913 — one keyword per fact the verdict cannot s
         status=AssessmentStatus.INCONCLUSIVE if inconclusive else AssessmentStatus.MEASURED,
         rule_id=rule_id,
         passed=None if inconclusive else verdict.outcome == "pass",
+        value=None if measurement is None else measurement.value,
+        unit=None if measurement is None else measurement.unit,
+        direction=None if measurement is None else measurement.direction,
+        threshold=None if measurement is None else measurement.threshold,
         confidence=None if inconclusive else verdict.confidence,
         dataset=dataset,
         rationale=verdict.rationale,
         tags=tags,
         trial=trial,
+        reason=(reason or UnmeasuredReason.DECLINED) if inconclusive else None,
     )

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._profile import resolve_profile
+from guardana.cli._profile import PRESET_HELP, resolve_profile
 from guardana.core.diff import IncomparableRunsError, compare_reports, gate_diff
 from guardana.core.report import ReportLoadError, load_report
 from guardana.report import get_diff_renderer
@@ -31,11 +31,9 @@ def diff(
     after: Annotated[Path, typer.Argument(help="The later run, saved with --output")],
     format: Annotated[DiffFormat, typer.Option(help="human|json")] = DiffFormat.human,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
-    preset: Annotated[
-        str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
-    ] = None,
+    preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
 ) -> None:
-    """Compare two saved runs and fail if the second is worse than the first."""
+    """Compare two saved runs and fail if the second is worse at the policy's severity bar."""
     prof = resolve_profile(profile, preset)
     try:
         comparison = compare_reports(load_report(before), load_report(after))

@@ -9,8 +9,6 @@ be exactly the false green this project refuses in its verdicts.
 Recording it anyway is right: the question an audit log usually answers is what
 happened, roughly when, and by which route. Real identity for humans arrives with
 users and RBAC.
-
-Design: `docs/design/audit-retention-and-deletion.md`.
 """
 
 import getpass

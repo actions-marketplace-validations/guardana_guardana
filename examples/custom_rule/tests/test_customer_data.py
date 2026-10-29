@@ -12,17 +12,20 @@ No public framework knows this assistant serves one customer at a time, so Guard
 ships no rule for it and could not. Acme writes it, maps it, and gates on it.
 """
 
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import EndpointTarget
 from guardana.core.testing import RefusingTransport, ScriptedTransport
 
+_ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
+
 RULE_ID = "acme.agent.customer_data"
 
 
 def _rule() -> tuple[Rule, RuleContext]:
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     ctx = RuleContext(evaluators=registry.evaluators())
     rule = next(r for r in registry.rules() if r.meta.id == RULE_ID)
     return rule, ctx

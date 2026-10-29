@@ -99,6 +99,18 @@ def test_readiness_fails_while_a_migration_is_pending(
     assert "pending" in response.json()["detail"]
 
 
+def test_head_on_readiness_fails_while_a_migration_is_pending(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    client = TestClient(create_app())
+
+    response = client.head("/readyz")
+
+    assert response.status_code == _UNAVAILABLE
+    assert response.content == b""
+
+
 def test_readiness_passes_once_the_schema_is_current(
     database_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:

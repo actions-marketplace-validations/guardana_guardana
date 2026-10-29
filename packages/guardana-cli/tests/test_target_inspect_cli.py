@@ -17,8 +17,15 @@ from guardana.core.registry import Registry
 from guardana.core.report import Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import Capability, Target, TargetKind
-from guardana.core.target.endpoint import ChatMessage, ToolCallReply, ToolSpec
+from guardana.core.target import (
+    Capability,
+    Decline,
+    DeclineReading,
+    RequestDeclined,
+    Target,
+    TargetKind,
+)
+from guardana.core.target.endpoint import ChatMessage, EndpointUnreachable, ToolCallReply, ToolSpec
 from typer.testing import CliRunner, Result
 
 runner = CliRunner()
@@ -248,3 +255,47 @@ def test_an_unknown_safety_level_is_refused(monkeypatch: pytest.MonkeyPatch) -> 
     )
 
     assert result.exit_code == ExitCode.INVALID_USAGE
+
+
+class _NeverAnswers:
+    """An endpoint that accepts the connection and never replies in time."""
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        raise EndpointUnreachable("http://fake#m did not answer within 30 seconds")
+
+
+class _GuardDeclinesSystemProbes(_HonoursTheSystemMessage):
+    """A guard that declines any request carrying an instruction in its system message."""
+
+    def send(
+        self, base_url: str, model: str, messages: Sequence[ChatMessage], api_key: str | None
+    ) -> str:
+        if any(m.role == "system" for m in messages):
+            raise RequestDeclined(Decline("prompt_shield", DeclineReading.REFUSAL, 400))
+        return super().send(base_url, model, messages, api_key)
+
+
+def test_a_capability_probe_the_application_declines_is_not_established(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = json.loads(
+        _inspect(monkeypatch, _GuardDeclinesSystemProbes, "--format", "json").output
+    )
+
+    assert "chat" in payload["verified"]
+    assert "plant_system_prompt" not in payload["verified"]
+    (planted,) = [c for c in payload["capabilities"] if c["capability"] == "plant_system_prompt"]
+    assert planted["support"] == "unknown"
+    assert "declined by the application: prompt_shield (HTTP 400)" in planted["detail"]
+    assert planted["requests"] == 1
+
+
+def test_an_endpoint_that_does_not_answer_is_unavailable_not_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = _inspect(monkeypatch, _NeverAnswers)
+
+    assert result.exit_code == ExitCode.TARGET_UNAVAILABLE, result.output
+    assert "did not answer within 30 seconds" in " ".join(result.output.split())

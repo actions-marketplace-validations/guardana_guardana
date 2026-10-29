@@ -4,8 +4,6 @@ paths:
 ---
 # The engine (`guardana-core`)
 
-Why and the incidents: `docs/maintainers/lessons.md` § Engine, § False green.
-
 - **The engine knows no regulation and no vendor.** A law, a model vendor or a file format is
   data in a rule, a taxonomy entry or an extension package — never a branch in core.
 - **Never import `guardana.server`**, directly or transitively; `uv run lint-imports` fails the
@@ -30,3 +28,9 @@ Why and the incidents: `docs/maintainers/lessons.md` § Engine, § False green.
 - **No new dependency without a justification in the PR**; core depends on `pyyaml` only.
 - Every public `Rule`, `Evaluator` and `Target` has a docstring and tests; they are the
   extension points third parties implement.
+- **A plan selects and fails exactly as the run does**: `runner.select_rules`,
+  `runner.pre_run_errors` and `RunPlan.blockers` (the gate's own `refused_by`). A new skip
+  reason, filter or pre-run error goes there, never into a second copy in `plan.py`.
+- **A trace's document digest is taken while it is read** (`_HashingReader` in
+  `trace/load.py`); `content` is claimed only after end of file. Never re-read a file to
+  digest it.

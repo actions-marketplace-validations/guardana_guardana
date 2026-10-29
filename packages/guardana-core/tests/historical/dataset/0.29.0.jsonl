@@ -1,0 +1,3 @@
+{"guardana_dataset": 1, "name": "historical-corpus", "version": "1"}
+{"input": "Say hello to the reader.", "tags": ["greeting"]}
+{"input": {"messages": [{"role": "system", "content": "Answer in one word."}, {"role": "user", "content": "Say hello."}]}}

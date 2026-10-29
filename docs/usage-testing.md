@@ -7,17 +7,7 @@ status: stable
 
 # Guardana in your test suite
 
-`guardana.testing.assert_secure` runs Guardana from inside an ordinary `pytest`
-test and fails it when the verdict is not a pass.
-
-It exists because a security check that needs its own command, its own pipeline
-stage and its own report is a check somebody runs on Tuesdays. A team already
-runs `pytest`; this puts the verification where they already are, with no new
-pipeline to own and no report to go and read.
-
-Same rules, same policy, same redaction and the same three-state gate as
-[`guardana scan`](usage-scan.md) and [`guardana probe`](usage-probe.md) — a
-verdict does not change because the runner did.
+`guardana.testing.assert_secure` runs Guardana in `pytest` when you need a security verdict in a test. It uses the same rules, policy, redaction, and gate as [`guardana scan`](usage-scan.md) and [`guardana probe`](usage-probe.md).
 
 ```bash
 pip install guardana-cli   # brings the engine, the rules and the reporters
@@ -37,7 +27,7 @@ def test_the_repository_ships_no_dangerous_artifact():
 object for something live: an `EndpointTarget`, an `McpServerTarget`, or one of
 the [framework adapters](#a-langchain-model) below.
 
-**A policy.** `preset="ci"` (or `"pre-training"`, `"monitor"`), or
+**A policy.** `preset="ci"` (or `"pre-training"`, `"monitor"`, `"release"`), or
 `profile=Path("guardana.yaml")`, or a `Profile` built in code. Passing both a
 profile and a preset is a `ValueError`, exactly as `--profile` with `--preset` is
 a usage error on the command line. With neither, the default applies: every rule,
@@ -54,7 +44,7 @@ E   guardana: 8 finding(s) at or above HIGH — examples/vulnerable-model
 E
 E     CRITICAL guardana.supply_chain.pickle_opcode
 E              examples/vulnerable-model/model.pt
-E              unpickling imports non-allowlisted callable: posix.system
+E              unpickling imports 1 non-allowlisted callable(s) (set 705e9da4c561): posix.system
 E
 E     HIGH     guardana.supply_chain.malicious_dependency
 E              examples/vulnerable-model/requirements.txt
@@ -107,7 +97,10 @@ except SecurityAssertionError as failure:
 
 Which reasons make a run indeterminate is the policy's decision, not this
 function's — see [`profiles.md`](profiles.md) for `fail_on_error`,
-`fail_on_inconclusive` and `fail_on_skipped`.
+`fail_on_inconclusive` and `fail_on_skipped`. One reason no policy turns off: a
+model or notebook a rule could not read is a coverage shortfall named by its file
+([`guardana scan`](usage-scan.md#model-files-no-rule-reads)), so `assert_secure`
+raises for it under every preset.
 
 ## Evidence in a CI log
 
@@ -148,9 +141,9 @@ in the profile — `budgets:` in [`profiles.md`](profiles.md) — and read
 [`safe-testing.md`](safe-testing.md) before pointing it at anything that matters.
 `guardana plan` prices the same run without sending a request.
 
-Passing `system_prompt` is worth doing: without something planted, the
-canary-backed system-prompt-leak rule has nothing to look for and is skipped, so
-the coverage a run reports shrinks quietly.
+The system-prompt-leak rule plants a fresh canary of its own in every run, so it
+runs whether or not you pass `system_prompt`. Pass `system_prompt` so every other
+check sees the instructions your application really sends.
 
 ## A LangChain model
 
@@ -190,13 +183,14 @@ Three things to know:
   the two you have.
 - **Token budgets need a model that reports usage.** When the reply carries
   `usage_metadata` the tokens are counted; when it does not, the count is recorded
-  as unknown rather than zero — so a *token* ceiling over such a model can never
-  fire, while a *request* ceiling always can.
+  as unknown rather than zero. A *token* ceiling over such a model cannot be
+  enforced. The first reply missing the required count stops the run as budget
+  exhausted (exit `6`). A *request* ceiling works as usual.
 
 ## A run your framework already performed
 
 The adapters above *drive* a model. These translate the record of a run that
-already happened into a [`Trace`](design/trace-domain-model.md), which
+already happened into a `Trace`, which
 [`analyze-trace`](usage-analyze-trace.md)'s rules grade. Nothing is sent anywhere.
 
 ```python
@@ -243,18 +237,48 @@ and the half where the interesting failures are.
 
 ```python
 from guardana.core.plugins import PluginMode, PluginTrust
-from guardana.core.registry import Registry
+
+ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
 
 
-def test_with_only_guardanas_own_rules():
-    trusted = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
-    assert_secure("models", preset="ci", registry=trusted)
+def test_with_our_own_pack_admitted():
+    assert_secure("models", preset="ci", trust=ACME)
 ```
 
-Left out, `assert_secure` discovers entry-point rules and loads the rule
-directories the profile names. Passed in, the registry is used exactly as given —
-a registry you assembled is not one this should add to behind your back. See
-[`extending.md`](extending.md) and `SECURITY.md` for what plugin trust means.
+`trust` names the installed distributions that may run code. Left out, the
+profile's `plugins:` decides, and without one only Guardana's own distributions
+load, as on the command line. `registry=` takes a registry you assembled: nothing
+is discovered or loaded into it, not even the profile's `rules.paths`, and each run
+works on a copy that gets the profile's trials and the judges under `evaluators:`. See
+[`extending.md`](extending.md) and `SECURITY.md` for what plugin trust means, and
+the [Python API](python-api.md) for a run you read as data instead of asserting on.
+
+## How it differs from a bare `Runner`
+
+`assert_secure` runs through the [Python API](python-api.md), so a check runs as
+`guardana probe` runs it: an endpoint gets one pass per canary rule with a fresh
+canary, the profile's calibrations apply, and the judges configured under
+`evaluators:` are built and called, with their key read from the environment.
+
+A target object runs once. Hand each test its own target (a function-scoped
+fixture); the second run of the same object raises `TargetReusedError`, because its
+meter and whatever it cached would describe both runs. A target that fails while a
+rule sends to it stops the run, and the stopped run fails the assertion as
+`indeterminate`, its errors naming what the target did; one that fails outside any rule
+raises `TargetUnavailableError`.
+
+A trace target is the exception: the Python API refuses traces, because
+`guardana analyze-trace` reads a trace file's contracts and unreadable records, so
+`assert_secure` runs a trace's rules directly, as it always has. A trace a framework
+translator builds in code has neither.
+
+## Checking an extension you wrote
+
+`guardana.testing` also holds the checks a pack runs on its own code, which test the
+extension rather than your system: `assert_target_conforms` for a target,
+`assert_renderer_conforms` for a format and `assert_reporter_conforms` for a reporter. Each
+raises an `AssertionError` subclass that names every problem it found. What each one proves,
+and what it does not: [conformance kit](conformance-kit.md).
 
 ## What this is not
 
@@ -274,3 +298,5 @@ a **rule you are writing**. See [`writing-rules.md`](writing-rules.md).
 - [`privacy.md`](privacy.md) — evidence modes and what is kept
 - [`exit-codes.md`](exit-codes.md) — the command-line equivalent of the three-state
   gate
+- [`conformance-kit.md`](conformance-kit.md) — the checks a pack runs on its own rules,
+  targets, formats and reporters

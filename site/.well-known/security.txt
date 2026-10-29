@@ -1,0 +1,6 @@
+Contact: https://github.com/guardana/guardana/security/advisories/new
+Contact: mailto:contact@guardana.dev
+Expires: 2027-03-29T00:00:00Z
+Preferred-Languages: en
+Policy: https://github.com/guardana/guardana/blob/main/SECURITY.md
+Canonical: https://guardana.dev/.well-known/security.txt

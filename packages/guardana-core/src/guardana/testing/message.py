@@ -17,6 +17,7 @@ from guardana.core.profile.model import Policy
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
 from guardana.core.report.result import ScanResult
+from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 
 _INDENT = "  "
@@ -81,15 +82,25 @@ def _findings(result: ScanResult, policy: Policy) -> list[str]:
 
 
 def _could_not(result: ScanResult) -> list[str]:
-    """Render the three ways a run can fail to answer, each said as itself."""
+    """Render every way a run can fail to answer, each said as itself."""
     lines: list[str] = []
     if not result.rules_run:
         lines.append(f"{_INDENT}no rule ran at all, so nothing about this target was verified")
+    lines.extend(_coverage(result.coverage_shortfall))
     lines.extend(_block("could not run", [_error(e) for e in result.errors]))
     lines.extend(_block("ran and could not grade", [_unverified(f) for f in result.unverified]))
     lines.extend(
         _block("skipped", [_skipped(s) for s in result.rules_skipped if s.is_coverage_gap])
     )
+    return lines
+
+
+def _coverage(gaps: tuple[CoverageShortfall, ...]) -> list[str]:
+    if not gaps:
+        return []
+    lines = [f"{_INDENT}{len(gaps)} piece(s) of coverage missing:"]
+    lines.extend(f"{_INDENT}{_INDENT}- {gap.kind} {gap.name}: {gap.detail}" for gap in gaps)
+    lines.append("")
     return lines
 
 

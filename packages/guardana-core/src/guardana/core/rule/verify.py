@@ -10,11 +10,17 @@ CLI reach the same conclusion about the same rule.
 """
 
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
-from guardana.core.rule.base import Rule, RuleContext
-from guardana.core.rule.fixture import FixtureOutcome, RuleFixture
+from guardana.core.manifest.records import SuiteOutcome
+from guardana.core.regression import Breach, Regraded, UnprovableError, regrade
+from guardana.core.rule.base import NOT_OFFERED_AFTER_REPORTING, NotOffered, Rule, RuleContext
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES, FixtureOutcome, RuleFixture
+from guardana.core.rule.suite_rule import SuiteRule
+from guardana.core.runner import ungraded_cases
+from guardana.core.source import UnreadSource
+from guardana.core.target.protocols import FileReader
 
 
 class FixtureVerdict(StrEnum):
@@ -53,6 +59,22 @@ class RuleVerification:
     fixture says the rule is wrong; a gap says nobody asked it the question.
     """
 
+    regressions: tuple[Regraded, ...] = ()
+    """A suite's regression pairs, each regraded with the rule as it is now."""
+
+    unprovable: str | None = None
+    """Why a suite's regression pairs could not be regraded without sending, when they could not."""
+
+    @property
+    def broken(self) -> tuple[Regraded, ...]:
+        """Regression pairs that no longer hold."""
+        return tuple(r for r in self.regressions if not r.proof.holds)
+
+    @property
+    def wrong_way(self) -> tuple[Regraded, ...]:
+        """Regression pairs a side of which grades the opposite way it must."""
+        return tuple(r for r in self.broken if r.proof.breach is Breach.WRONG_WAY)
+
     @property
     def failed(self) -> tuple[FixtureResult, ...]:
         """Fixtures the rule classified wrongly."""
@@ -67,11 +89,18 @@ class RuleVerification:
     def is_proven(self) -> bool:
         """Whether this rule's own samples actually demonstrate it works.
 
-        Requires all three at once: nothing failed, nothing errored, and no gap.
-        A rule with two green fixtures and no `inconclusive` one is not proven here
-        — see `verify_rule` for why that is `indeterminate` rather than a pass.
+        Requires all of it at once: nothing failed, nothing errored, no gap, and every
+        regression pair regraded and holding. A rule with two green fixtures and no
+        `inconclusive` one is not proven here — see `verify_rule` for why that is
+        `indeterminate` rather than a pass.
         """
-        return not self.failed and not self.errored and not self.gaps
+        return (
+            not self.failed
+            and not self.errored
+            and not self.gaps
+            and not self.broken
+            and self.unprovable is None
+        )
 
 
 def verify_rule(rule: Rule, ctx: RuleContext | None = None) -> RuleVerification:
@@ -86,11 +115,27 @@ def verify_rule(rule: Rule, ctx: RuleContext | None = None) -> RuleVerification:
     substantive half. Positive and negative samples prove a rule fires and stays
     quiet; neither says anything about whether it can decline, and a rule that
     cannot decline will one day report clean about something it never examined.
+
+    Each fixture runs in a fresh copy of the context, so what one sample recorded or
+    reported never counts in another. A fixture is classified as a run reads it: a
+    finding is `finding`; a coverage shortfall, recorded cases none of which were graded,
+    a suite that declined to conclude, a file the target could not read or an
+    inconclusive verdict without one is `inconclusive`; and `NotOffered` raised before
+    anything was reported is `not_offered`. No rule is asked to declare a `not_offered` sample.
+
+    A suite's regression pairs are regraded with the context's evaluators, sending
+    nothing; a suite whose evaluator cannot do that says so in `unprovable`.
     """
     context = ctx if ctx is not None else RuleContext()
     fixtures = tuple(rule.fixtures())
-    results = tuple(_run_fixture(rule, fixture, context) for fixture in fixtures)
-    return RuleVerification(rule.meta.id, results, _gaps(rule.meta.id, fixtures))
+    results = tuple(_run_fixture(rule, fixture, context.fresh()) for fixture in fixtures)
+    verification = RuleVerification(rule.meta.id, results, _gaps(rule.meta.id, fixtures))
+    if not isinstance(rule, SuiteRule):
+        return verification
+    try:
+        return replace(verification, regressions=regrade(rule, context.evaluators))
+    except UnprovableError as exc:
+        return replace(verification, unprovable=str(exc))
 
 
 def verify_rules(
@@ -107,7 +152,7 @@ def _gaps(rule_id: str, fixtures: Sequence[RuleFixture]) -> tuple[str, ...]:
             f"classifies anything correctly — an unsampled rule is an unchecked rule",
         )
     declared = {fixture.outcome for fixture in fixtures}
-    missing = [outcome for outcome in FixtureOutcome if outcome not in declared]
+    missing = [outcome for outcome in DEMANDED_OUTCOMES if outcome not in declared]
     if not missing:
         return ()
     return (
@@ -118,9 +163,22 @@ def _gaps(rule_id: str, fixtures: Sequence[RuleFixture]) -> tuple[str, ...]:
 
 def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureResult:
     """Run one fixture, converting anything it throws into an error rather than a failure."""
+    subject = fixture.rule if fixture.rule is not None else rule
+    findings: list[object] = []
     try:
-        findings = list(rule.run(fixture.target, ctx))
-    except Exception as exc:  # a rule with an ordinary bug, or a target that would not answer
+        findings.extend(subject.run(fixture.target, ctx))
+    except NotOffered:
+        if findings or ctx.recorded() or ctx.shortfalls() or ctx.concluded():
+            return FixtureResult(
+                rule.meta.id,
+                fixture.name,
+                fixture.outcome,
+                None,
+                FixtureVerdict.ERRORED,
+                NOT_OFFERED_AFTER_REPORTING,
+            )
+        return _judged(rule, fixture, FixtureOutcome.NOT_OFFERED)
+    except (Exception, SystemExit) as exc:  # a rule's bug, its `sys.exit()`, a silent target
         return FixtureResult(
             rule.meta.id,
             fixture.name,
@@ -129,7 +187,32 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
             FixtureVerdict.ERRORED,
             f"{type(exc).__name__}: {exc}",
         )
-    observed = _observed(findings)
+    gaps = (*ctx.shortfalls(), *ungraded_cases({rule.meta.id: ctx.recorded()}, None))
+    unread = _unread(fixture.target)
+    summary = ctx.concluded()
+    declined = (
+        bool(gaps)
+        or bool(unread)
+        or (summary is not None and summary.outcome is SuiteOutcome.INCONCLUSIVE)
+    )
+    observed = _observed(findings, declined=declined)
+    shortfall = f" (shortfall: {'; '.join(g.name for g in gaps)})" if gaps else ""
+    if unread:
+        shortfall += f" (unread: {'; '.join(f'{u.path.name}: {u.reason}' for u in unread)})"
+    return _judged(rule, fixture, observed, shortfall)
+
+
+def _unread(target: object) -> tuple[UnreadSource, ...]:
+    """Files a sample's target was prevented from reading; a run records each as an error."""
+    if not isinstance(target, FileReader):
+        return ()
+    return tuple(target.unread_sources())
+
+
+def _judged(
+    rule: Rule, fixture: RuleFixture, observed: FixtureOutcome, note: str = ""
+) -> FixtureResult:
+    """Compare what one fixture produced with what it declared."""
     if observed is fixture.outcome:
         return FixtureResult(
             rule.meta.id, fixture.name, fixture.outcome, observed, FixtureVerdict.PASSED
@@ -140,25 +223,23 @@ def _run_fixture(rule: Rule, fixture: RuleFixture, ctx: RuleContext) -> FixtureR
         fixture.outcome,
         observed,
         FixtureVerdict.FAILED,
-        f"expected {fixture.outcome}, got {observed}",
+        f"expected {fixture.outcome}, got {observed}{note}",
     )
 
 
-def _observed(findings: Sequence[object]) -> FixtureOutcome:
+def _observed(findings: Sequence[object], *, declined: bool) -> FixtureOutcome:
     """Classify what a rule produced into the same three outcomes a fixture declares.
 
-    An inconclusive verdict outranks a finding when a rule yields both: the rule
-    said it could not establish something, and a sample declaring `finding` has not
-    been satisfied by a run that also gave up. Reading it the other way would let a
-    rule pass a positive fixture while quietly declining on the same input.
+    A finding outranks an inconclusive verdict and a shortfall, as it does in a run's
+    gate: what a rule found stays found when it also declined elsewhere. `declined`
+    says the run reported a coverage shortfall.
     """
-    conclusive = False
     for finding in findings:
         verdict = getattr(finding, "verdict", None)
-        if verdict is not None and getattr(verdict, "outcome", None) == "inconclusive":
-            return FixtureOutcome.INCONCLUSIVE
-        conclusive = True
-    return FixtureOutcome.FINDING if conclusive else FixtureOutcome.CLEAN
+        if verdict is None or getattr(verdict, "outcome", None) != "inconclusive":
+            return FixtureOutcome.FINDING
+        declined = True
+    return FixtureOutcome.INCONCLUSIVE if declined else FixtureOutcome.CLEAN
 
 
 __all__ = [

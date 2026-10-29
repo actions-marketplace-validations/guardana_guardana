@@ -42,3 +42,6 @@ Thumbs.db
 .claude/worktrees/
 .playwright-mcp/
 cache/
+
+# Work in flight, plans, audits and research notes: never published.
+.work/

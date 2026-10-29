@@ -16,7 +16,7 @@ from guardana.core.severity import Severity
 
 Outcome = Literal["fail", "unverified"]
 
-DIFF_SCHEMA_VERSION = 2
+DIFF_SCHEMA_VERSION = 3
 """Version of the JSON document `guardana diff --format json` writes.
 
 Its own number rather than the run report's: a comparison and a run are separate
@@ -55,6 +55,14 @@ class ChangeKind(StrEnum):
     turning a rule off would be indistinguishable from fixing what it found.
     """
 
+    LEFT_SCAN = "left_scan"
+    """A file that held a problem or an unverified check is not among the files the later
+    run listed.
+
+    Deleted, moved, renamed or excluded: the comparison cannot tell which, so it never
+    calls the problem resolved. The location-level twin of `COVERAGE_LOST`.
+    """
+
     RESOLVED = "resolved"
     """A problem that is no longer reported."""
 
@@ -82,8 +90,9 @@ class ChangeKind(StrEnum):
     """The same check at the same outcome, over a different number of findings.
 
     Reported and never gated: under a live model this number is a function of
-    sampling, and under a static scan a genuinely new problem lands in a new
-    location, which is a new identity and a regression in its own right.
+    sampling. Between two file scans a rise in unwaived findings is not this kind but
+    `APPEARED`, since a second problem in a file that already held one keeps the
+    file's identity; a fall stays here.
     """
 
     @property
@@ -104,6 +113,7 @@ _REGRESSIONS = frozenset(
         ChangeKind.BLINDED,
         ChangeKind.ESCALATED,
         ChangeKind.COVERAGE_LOST,
+        ChangeKind.LEFT_SCAN,
     }
 )
 
@@ -137,6 +147,15 @@ class CheckState:
 
     count: int
     waived: bool
+    unwaived: int = 0
+    """How many of `count` no waiver covers; read by the comparison, never written by it."""
+    evidence: tuple[tuple[str, bool], ...] = ()
+    """Each finding's evidence summary and whether a waiver covers it, sorted; compared only.
+
+    Two findings of one rule in one file differ only here, so a new one that replaced a
+    fixed one keeps the count and still shows. Repeats are kept: a secret's summary
+    shows only its first characters, and two keys may share them.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,10 +201,10 @@ class RunDiff:
     Separate from `notes`, which are context. This is a refusal: a comparison
     against a run that stopped part-way answers "is this worse than last time"
     with a picture that was never finished, and a non-empty value here always
-    fails the gate. A rule whose attempts per case changed between the runs is
-    refused the same way, by name. Without it, lowering a budget until a run ends early would be
-    a way to quiet a red comparison — the same trick exit code 6 exists to stop,
-    one level further out.
+    fails the gate. A rule whose attempts per case changed between the runs, or
+    whose evaluator or judge did, is refused the same way, by name. Without it,
+    lowering a budget until a run ends early would be a way to quiet a red
+    comparison — the same trick exit code 6 exists to stop, one level further out.
     """
 
     @property

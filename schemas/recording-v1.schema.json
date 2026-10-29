@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/recording/v1.schema.json",
+  "title": "Guardana Recording v1",
+  "description": "One record of a Guardana recording: what an application answered, graded later without calling it. The file is JSONL: the first non-blank line is the header, every later non-blank line is one exchange. Each line validates against this schema independently; that the header comes first, that an exchange names a rule when the header names no default, and that a file holds at least one exchange are checked by the reader.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/header"
+    },
+    {
+      "$ref": "#/$defs/exchange"
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "header": {
+      "description": "The first record. `verbatim` has no default: the producer states whether every reply is exactly what the application said, and a reply that may not be is never graded.",
+      "type": "object",
+      "required": [
+        "guardana_recording",
+        "name",
+        "version",
+        "verbatim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "guardana_recording": {
+          "const": 1
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/text"
+        },
+        "verbatim": {
+          "type": "boolean"
+        },
+        "subject": {
+          "description": "What answered, as the producer names it.",
+          "$ref": "#/$defs/text"
+        },
+        "rule": {
+          "description": "The rule id of every exchange that names none.",
+          "$ref": "#/$defs/text"
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        }
+      }
+    },
+    "origin": {
+      "description": "The probe run the recording was kept from, as that run declared it. Written by `guardana probe --keep-exchanges`; declared, not verified.",
+      "type": "object",
+      "required": [
+        "run_id",
+        "target",
+        "trials",
+        "rules"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/text"
+        },
+        "target": {
+          "$ref": "#/$defs/text"
+        },
+        "started_at": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "stopped_by": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "gate": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "trials": {
+          "description": "The trials per case each rule ran with.",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "\\S"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "rules": {
+          "description": "Every rule the run's plain pass planned, reached or not.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "optional_text": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/text"
+        }
+      ]
+    },
+    "exchange": {
+      "description": "One exchange: the messages a rule sent and the reply the application gave.",
+      "type": "object",
+      "required": [
+        "input",
+        "reply"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/text"
+        },
+        "input": {
+          "description": "One user message as a string, or the messages in order; the last must be from the user, which the reader checks.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/text"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/message"
+              }
+            }
+          ]
+        },
+        "reply": {
+          "description": "What the application answered; may be empty.",
+          "type": "string"
+        },
+        "key": {
+          "description": "The digest of the messages as the rule sent them, taken before any redaction.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "altered": {
+          "description": "True when the reply is not exactly what the application said.",
+          "type": "boolean"
+        }
+      }
+    },
+    "message": {
+      "type": "object",
+      "required": [
+        "role",
+        "content"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -10,9 +10,11 @@ import os
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from fastapi import HTTPException, Request
 from guardana.server.auth import Authenticated, AuthError, Scope, authenticate
+from guardana.server.db.connection import connect
 
 UNAUTHENTICATED_VARIABLE = "GUARDANA_ALLOW_UNAUTHENTICATED"
 _TRUTHY = frozenset({"1", "true", "yes", "on"})
@@ -61,6 +63,18 @@ session, and an expired key ends it on its own.
 """
 
 
+def bearer_token(request: Request) -> str | None:
+    """Return the token of a `Bearer` authorization header, whatever the scheme's case, or `None`.
+
+    The one parser for the header, shared by authentication and the rate limiter, so
+    two spellings of one credential are always one caller.
+    """
+    header = request.headers.get("authorization", "")
+    if header.lower().startswith(_BEARER):
+        return header[len(_BEARER) :].strip()
+    return None
+
+
 def _presented_token(request: Request, *, accept_cookie: bool = False) -> str:
     """Return the credential this request presented: the header, or — for reads — a cookie.
 
@@ -70,9 +84,9 @@ def _presented_token(request: Request, *, accept_cookie: bool = False) -> str:
     Leaving that to `SameSite=Strict` alone would be one browser flag away from a
     cross-site submission.
     """
-    header = request.headers.get("authorization", "")
-    if header.lower().startswith(_BEARER):
-        return header[len(_BEARER) :].strip()
+    token = bearer_token(request)
+    if token is not None:
+        return token
     if accept_cookie:
         cookie = request.cookies.get(SESSION_COOKIE, "").strip()
         if cookie:
@@ -95,8 +109,6 @@ def guard(database_url: str | None, scope: Scope) -> Callable[[Request], Authent
         if database_url is None:
             return None
         token = _presented_token(request, accept_cookie=scope is Scope.READ)
-        from psycopg import connect  # noqa: PLC0415 — the engine never imports a driver
-
         try:
             with connect(database_url) as connection:
                 identity = authenticate(connection, token, now=datetime.now(UTC))
@@ -133,3 +145,64 @@ def guard(database_url: str | None, scope: Scope) -> Callable[[Request], Authent
         return identity
 
     return admit
+
+
+BEARER_SCHEME = "apiKey"
+COOKIE_SCHEME = "sessionCookie"
+SECURITY_SCHEMES: dict[str, dict[str, str]] = {
+    BEARER_SCHEME: {
+        "type": "http",
+        "scheme": "bearer",
+        "description": (
+            "A collector API key (`gdn_…`) from `guardana-collector key create`. Each key "
+            "belongs to one project and holds the `ingest` permission, the `read` "
+            "permission, or both."
+        ),
+    },
+    COOKIE_SCHEME: {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": SESSION_COOKIE,
+        "description": (
+            "The read key stored in the browser's session cookie after `POST /session`. "
+            "Accepted only on read routes, and only when the request carries no "
+            "`Authorization: Bearer` header."
+        ),
+    },
+}
+"""How a caller authenticates, as OpenAPI `components.securitySchemes` describe it."""
+
+
+def documented(scope: Scope) -> dict[str, Any]:
+    """Describe what `guard` admits for `scope`, as arguments to a FastAPI route decorator.
+
+    The cookie is offered for `read` alone because `_presented_token` accepts it there
+    alone. Key permissions are not OAuth2 scopes, so each requirement lists none.
+    """
+    security: list[dict[str, list[str]]] = [{BEARER_SCHEME: []}]
+    if scope is Scope.READ:
+        security.append({COOKIE_SCHEME: []})
+    forbidden = f"The key is valid but does not hold the `{scope}` permission."
+    if scope is Scope.INGEST:
+        forbidden += (
+            " Also returned when a key pinned to one environment submits a run for another."
+        )
+    return {
+        "openapi_extra": {"security": security},
+        "description": f"Requires an API key with the `{scope}` permission.",
+        "responses": {
+            _UNAUTHORIZED: {
+                "description": (
+                    "No API key is presented, or the key is not accepted: unknown, "
+                    "malformed, revoked or expired. Carries `WWW-Authenticate: Bearer`."
+                )
+            },
+            _FORBIDDEN: {"description": forbidden},
+            _UNAVAILABLE: {
+                "description": (
+                    "The collector cannot reach its database to check the key; this is not "
+                    "a credential problem."
+                )
+            },
+        },
+    }

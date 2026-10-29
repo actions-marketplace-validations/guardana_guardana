@@ -1,0 +1,101 @@
+{
+  "schema_version": 8,
+  "source": "subject",
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03",
+          "title": "Supply Chain"
+        },
+        {
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM04",
+          "title": "Supply Chain"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05",
+          "title": "Improper Output Handling"
+        },
+        {
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM10",
+          "title": "Improper Output Handling"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018",
+          "title": "Manipulate AI Model"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain",
+          "title": "GenAI Supply Chain Attack"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05",
+          "title": "Unexpected Code Execution"
+        }
+      ],
+      "target_ref": "subject/model.pkl",
+      "evidence": {
+        "summary": "unpickling imports non-allowlisted callable: os.system",
+        "detail": "file=model.pkl"
+      },
+      "verdict": null,
+      "identity": "sha256:abd0d1f930e07300cf3491de13d319788b937c3b669e551942563871f5e48d00"
+    }
+  ],
+  "unverified": [],
+  "errors": [],
+  "summary": {
+    "rules_run": 19,
+    "rules_executed": [
+      "guardana.supply_chain.pickle_opcode",
+      "guardana.supply_chain.dependency_risk",
+      "guardana.supply_chain.remote_code",
+      "guardana.supply_chain.remote_code_config",
+      "guardana.supply_chain.code_execution",
+      "guardana.supply_chain.insecure_transport",
+      "guardana.supply_chain.keras_lambda",
+      "guardana.supply_chain.saved_model_ops",
+      "guardana.supply_chain.malicious_dependency",
+      "guardana.supply_chain.hallucinated_package",
+      "guardana.supply_chain.hardcoded_secret",
+      "guardana.supply_chain.model_format",
+      "guardana.supply_chain.chat_template",
+      "guardana.supply_chain.onnx_graph",
+      "guardana.supply_chain.notebook_payload",
+      "guardana.supply_chain.provenance",
+      "guardana.prompt.mcp_tool_poisoning",
+      "guardana.prompt.hidden_instructions",
+      "guardana.training.dataset_integrity"
+    ],
+    "rules_skipped": [],
+    "max_severity": "CRITICAL",
+    "unverified": 0,
+    "errors": 0
+  },
+  "deployment": {
+    "ai_system": "historical-corpus",
+    "environment": "staging"
+  },
+  "run": {
+    "run_id": "733856dc-5127-4f94-80e1-98ebfb94b1a2",
+    "started_at": "2026-10-04T14:08:00.690041+00:00",
+    "completed_at": "2026-10-04T14:08:00.799489+00:00",
+    "tool_version": "0.13.0",
+    "gate": "fail",
+    "evidence_mode": "redacted",
+    "requests": 0,
+    "input_tokens": null,
+    "output_tokens": null,
+    "wall_time_seconds": 0.109448
+  }
+}

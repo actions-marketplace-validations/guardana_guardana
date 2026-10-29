@@ -1,7 +1,8 @@
+import math
 from pathlib import Path
 
 import pytest
-from guardana.core.profile import Policy, ProfileError, default_profile, load_profile
+from guardana.core.profile import FailOn, Policy, ProfileError, default_profile, load_profile
 from guardana.core.severity import Severity
 
 EXPECTED_CONFIDENCE = 0.7
@@ -62,6 +63,14 @@ def test_malformed_yaml_syntax_raises_profileerror(tmp_path: Path) -> None:
     (tmp_path / "broken.yaml").write_text("fail_on: [unclosed\n", encoding="utf-8")
     with pytest.raises(ProfileError):
         load_profile(tmp_path / "broken.yaml")
+
+
+def test_non_utf8_profile_names_its_file_in_profileerror(tmp_path: Path) -> None:
+    path = tmp_path / "guardana.yaml"
+    path.write_bytes(b"name: valid\n# \xff\n")
+
+    with pytest.raises(ProfileError, match=f"invalid profile {path}: not UTF-8"):
+        load_profile(path)
 
 
 def test_non_mapping_profile_raises(tmp_path: Path) -> None:
@@ -137,6 +146,24 @@ def test_out_of_range_min_confidence_is_rejected(tmp_path: Path, bad: str) -> No
         load_profile(tmp_path / "p.yaml")
 
 
+@pytest.mark.parametrize("bad", ["true", "false", "[0.5]", "'abc'", "'nan'", "'inf'"])
+def test_a_min_confidence_that_is_not_a_number_is_rejected(tmp_path: Path, bad: str) -> None:
+    # YAML `true` loads as a bool, which float() reads as 1.0 and which then hides every
+    # finding below full confidence from the gate.
+    (tmp_path / "p.yaml").write_text(f"fail_on:\n  min_confidence: {bad}\n", encoding="utf-8")
+    with pytest.raises(ProfileError, match="min_confidence must be a number"):
+        load_profile(tmp_path / "p.yaml")
+
+
+@pytest.mark.parametrize(("quoted", "expected"), [("'0.5'", 0.5), ("'1'", 1.0)])
+def test_a_quoted_min_confidence_still_loads_as_the_number_it_spells(
+    tmp_path: Path, quoted: str, expected: float
+) -> None:
+    (tmp_path / "p.yaml").write_text(f"fail_on:\n  min_confidence: {quoted}\n", encoding="utf-8")
+
+    assert load_profile(tmp_path / "p.yaml").policy.fail_on.min_confidence == expected
+
+
 def test_a_proper_list_still_loads(tmp_path: Path) -> None:
     (tmp_path / "p.yaml").write_text(
         "rules:\n"
@@ -150,7 +177,7 @@ def test_a_proper_list_still_loads(tmp_path: Path) -> None:
 
     assert prof.policy.include == ("guardana.*",)
     assert prof.policy.exclude == ("*.experimental",)
-    assert prof.rule_paths == ("./my-rules",)
+    assert prof.rule_paths == (str(tmp_path / "my-rules"),)
 
 
 def test_fail_on_error_can_be_turned_off(tmp_path: Path) -> None:
@@ -180,3 +207,25 @@ def test_a_non_boolean_fail_on_error_is_refused(tmp_path: Path) -> None:
     path.write_text("name: t\nfail_on:\n  fail_on_error: maybe\n", encoding="utf-8")
     with pytest.raises(ProfileError, match="fail_on_error"):
         load_profile(path)
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -0.1, 1.1])
+def test_a_confidence_bar_built_in_code_is_held_to_the_profiles_bounds(bad: float) -> None:
+    with pytest.raises(ValueError, match="min_confidence"):
+        FailOn(min_confidence=bad)
+
+
+@pytest.mark.parametrize("bad", [math.nan, 0.0, 1.5])
+def test_a_graded_share_built_in_code_is_held_to_the_profiles_bounds(bad: float) -> None:
+    with pytest.raises(ValueError, match="min_graded_share"):
+        FailOn(min_graded_share=bad)
+
+
+def test_a_severity_bar_built_in_code_must_be_a_severity() -> None:
+    with pytest.raises(TypeError, match="severity"):
+        FailOn(severity="high")  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("edge", [0.0, 1.0, 1])
+def test_the_bounds_of_a_confidence_bar_built_in_code_are_accepted(edge: float) -> None:
+    assert FailOn(min_confidence=edge, min_graded_share=1.0).min_confidence == edge

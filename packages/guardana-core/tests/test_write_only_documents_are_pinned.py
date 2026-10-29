@@ -24,7 +24,8 @@ from guardana.cli.plan import PLAN_SCHEMA_VERSION, _render_json
 from guardana.core.budget import Budgets
 from guardana.core.diff.measurement import MeasurementDelta
 from guardana.core.diff.model import Change, ChangeKind, CheckState, RunDiff
-from guardana.core.plan import RunPlan
+from guardana.core.plan import JudgeMeterPlan, JudgePlan, RunPlan
+from guardana.core.report import SkippedRule, SkipReason
 from guardana.core.severity import Severity
 from guardana.report import get_diff_renderer
 from jsonschema import Draft202012Validator
@@ -78,7 +79,15 @@ def _plan() -> RunPlan:
     """A plan with every field carrying something, including the one that keeps it honest."""
     return RunPlan(
         rules=("guardana.prompt.system_prompt_leak.canary",),
-        skipped=("guardana.mcp.tool_poisoning",),
+        skipped=(
+            SkippedRule(
+                rule_id="guardana.mcp.tool_poisoning",
+                reason=SkipReason.MISSING_CAPABILITY,
+                missing=("mcp",),
+                detail="http://model.test does not support mcp, which "
+                "guardana.mcp.tool_poisoning needs",
+            ),
+        ),
         unknown_cost=("acme.agent.customer_data",),
         min_requests=4,
         max_requests=12,
@@ -87,9 +96,16 @@ def _plan() -> RunPlan:
             max_input_tokens=50_000,
             max_output_tokens=25_000,
             max_duration_seconds=90.5,
+            max_requests_per_minute=120,
         ),
         trials=5,
         single_attempt=("guardana.mcp.auth.unauthenticated_access",),
+        judge=JudgePlan(
+            max_calls=270,
+            meters=(JudgeMeterPlan(evaluators=("llm_judge", "reference_judge"), max_calls=270),),
+            unknown_cost=("acme.agent.customer_data",),
+            unknown_on_meter=True,
+        ),
     )
 
 
@@ -100,8 +116,15 @@ def _emptied(value: _Document, name: str) -> _Document:
     """The same document with one field cleared, so its absence has to show in the output."""
     current = getattr(value, name)
     # A nested block empties to one where every ceiling is unset, which is the real
-    # "this run declared no budget" case rather than a synthetic blank.
-    blank: Any = cast("Any", type(current))() if is_dataclass(current) else _EMPTY[type(current)]
+    # "this run declared no budget" case rather than a synthetic blank; a block with
+    # no empty form empties to None, which is how a plan says it did not price it.
+    if is_dataclass(current):
+        try:
+            blank: Any = cast("Any", type(current))()
+        except TypeError:
+            blank = None
+    else:
+        blank = _EMPTY[type(current)]
     return replace(value, **{name: blank})
 
 
@@ -116,7 +139,9 @@ def test_every_field_of_a_comparison_reaches_the_document(name: str) -> None:
     )
 
 
-@pytest.mark.parametrize("name", [f.name for f in fields(RunPlan)])
+@pytest.mark.parametrize(
+    "name", [f.name for f in fields(RunPlan) if f.metadata.get("in_document", True)]
+)
 def test_every_field_of_a_plan_reaches_the_document(name: str) -> None:
     assert _render_json(_plan()) != _render_json(_emptied(_plan(), name)), (
         f"clearing RunPlan.{name} changes nothing in the rendered plan, so the field "
@@ -143,10 +168,10 @@ def test_the_published_diff_schema_requires_every_key_the_writer_emits() -> None
     """
     document: Document = json.loads(get_diff_renderer("json").render(_diff()))
 
-    optional = _unrequired(document, "diff-v2.schema.json")
+    optional = _unrequired(document, "diff-v3.schema.json")
 
     assert not optional, (
-        "keys the comparison writes that `diff-v2.schema.json` does not require, so a "
+        "keys the comparison writes that `diff-v3.schema.json` does not require, so a "
         "consumer validating against it is not promised them:\n  " + "\n  ".join(optional)
     )
 
@@ -154,10 +179,10 @@ def test_the_published_diff_schema_requires_every_key_the_writer_emits() -> None
 def test_the_published_plan_schema_requires_every_key_the_writer_emits() -> None:
     document: Document = json.loads(_render_json(_plan()))
 
-    optional = _unrequired(document, "plan-v2.schema.json")
+    optional = _unrequired(document, "plan-v4.schema.json")
 
     assert not optional, (
-        "keys the plan writes that `plan-v2.schema.json` does not require:\n  "
+        "keys the plan writes that `plan-v4.schema.json` does not require:\n  "
         + "\n  ".join(optional)
     )
 

@@ -10,6 +10,7 @@ quietly.
 
 from collections.abc import Iterable
 
+import pytest
 from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.profile import FailOn, Policy, Profile
 from guardana.core.registry import Registry
@@ -63,6 +64,14 @@ def test_a_skipped_rule_records_what_the_target_could_not_do() -> None:
     assert skipped.rule_id == "guardana.test.tools"
     assert skipped.reason is SkipReason.MISSING_CAPABILITY
     assert skipped.missing == ("call_tools",)
+
+
+@pytest.mark.parametrize("reason", list(SkipReason))
+def test_only_a_check_about_another_system_is_not_a_coverage_gap(reason: SkipReason) -> None:
+    # A rule the recording answers none of the questions for is a check that did not happen.
+    skipped = SkippedRule("guardana.test.chat", reason, (), "d")
+
+    assert skipped.is_coverage_gap is (reason is not SkipReason.NOT_APPLICABLE)
 
 
 def test_a_skipped_rule_explains_itself_in_words() -> None:

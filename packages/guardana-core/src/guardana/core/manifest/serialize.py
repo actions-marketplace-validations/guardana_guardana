@@ -2,19 +2,34 @@
 
 from datetime import UTC, datetime
 
+from guardana.core.fingerprint import DocumentDigest
 from guardana.core.manifest.coverage import CoverageRecord
 from guardana.core.manifest.identity import DeploymentRef, RunSource, TargetIdentity, ToolInfo
-from guardana.core.manifest.model import RunManifest
+from guardana.core.manifest.model import MANIFEST_SCHEMA_VERSION, RunManifest
 from guardana.core.manifest.records import (
+    CalibrationRecord,
     EvaluatorRecord,
+    ExchangesRecord,
+    FixturesRecord,
+    JudgeCorrection,
+    RecipeRecord,
+    RecordingRecord,
     ResultSummary,
     RuleRecord,
+    SuiteCorrection,
+    SuiteSummary,
     TrialSummary,
 )
 from guardana.core.manifest.settings import ConfigurationRef, ExecutionSettings, PrivacyRecord
-from guardana.core.manifest.usage import RunUsage
+from guardana.core.manifest.usage import JudgeUsage, RunUsage
 
-SCHEMA_URL = "https://guardana.dev/schemas/run/v7.schema.json"
+
+def schema_url(version: int) -> str:
+    """Return the identifier of the saved-run contract at `version`."""
+    return f"https://guardana.dev/schemas/run/v{version}.schema.json"
+
+
+SCHEMA_URL = schema_url(MANIFEST_SCHEMA_VERSION)
 """Identifier of the saved-run document, carrying its major version in the path.
 
 The practice in-toto and SLSA settled on, for the reason they settled on it: a
@@ -59,7 +74,14 @@ def _target(target: TargetIdentity) -> dict[str, object]:
         "fingerprint": target.fingerprint,
         "fingerprint_inputs": list(target.fingerprint_inputs),
         "capabilities": list(target.capabilities),
+        "document": _document(target.document),
     }
+
+
+def _document(document: DocumentDigest | None) -> dict[str, object] | None:
+    if document is None:
+        return None
+    return {"digest": document.digest, "kind": str(document.kind), "bytes": document.bytes}
 
 
 def _deployment(deployment: DeploymentRef) -> dict[str, object]:
@@ -84,6 +106,13 @@ def _configuration(configuration: ConfigurationRef) -> dict[str, object]:
         "retriever_digest": configuration.retriever_digest,
         "dataset_digest": configuration.dataset_digest,
         "adapter_digest": configuration.adapter_digest,
+        "provider": configuration.provider,
+        "plugins": None
+        if configuration.plugins is None
+        else {
+            "mode": str(configuration.plugins.mode),
+            "allowed": sorted(configuration.plugins.allowed),
+        },
     }
 
 
@@ -97,6 +126,7 @@ def _execution(execution: ExecutionSettings) -> dict[str, object]:
         "max_input_tokens": execution.max_input_tokens,
         "max_output_tokens": execution.max_output_tokens,
         "max_duration_seconds": execution.max_duration_seconds,
+        "max_requests_per_minute": execution.max_requests_per_minute,
         "trials": execution.trials,
     }
 
@@ -109,6 +139,19 @@ def _usage(usage: RunUsage) -> dict[str, object]:
         "requests_missing_token_counts": usage.requests_missing_token_counts,
         "estimated_cost": usage.estimated_cost,
         "wall_time_seconds": usage.wall_time_seconds,
+        "judge": None
+        if usage.judge is None
+        else {block: _judge_usage(spent) for block, spent in usage.judge.items()},
+    }
+
+
+def _judge_usage(spent: JudgeUsage) -> dict[str, object]:
+    return {
+        "requests": spent.requests,
+        "input_tokens": spent.input_tokens,
+        "output_tokens": spent.output_tokens,
+        "requests_missing_token_counts": spent.requests_missing_token_counts,
+        "budget_exhausted": spent.budget_exhausted,
     }
 
 
@@ -121,6 +164,46 @@ def _rule(rule: RuleRecord) -> dict[str, object]:
         "maturity": rule.maturity,
         "declared_requests": rule.declared_requests,
         "trial_summary": None if rule.trial_summary is None else _trial_summary(rule.trial_summary),
+        "suite": None if rule.suite is None else _suite(rule.suite),
+    }
+
+
+def _suite(suite: SuiteSummary) -> dict[str, object]:
+    return {
+        "dataset": suite.dataset,
+        "dataset_digest": suite.dataset_digest,
+        "sample_size": suite.sample_size,
+        "sample_seed": suite.sample_seed,
+        "trials_per_case": suite.trials_per_case,
+        "cases": suite.cases,
+        "measured": suite.measured,
+        "ungraded": suite.ungraded,
+        "worst": suite.worst,
+        "best": suite.best,
+        "low": suite.low,
+        "high": suite.high,
+        "min_pass_rate": suite.min_pass_rate,
+        "min_sample": suite.min_sample,
+        "outcome": str(suite.outcome),
+        "reason": suite.reason,
+        "correction": _suite_correction(suite.correction),
+    }
+
+
+def _suite_correction(correction: SuiteCorrection) -> dict[str, object]:
+    return {
+        "status": str(correction.status),
+        "assessor": correction.assessor,
+        "reason": correction.reason,
+        "worst": correction.worst,
+        "best": correction.best,
+        "low": correction.low,
+        "high": correction.high,
+        "sensitivity": correction.sensitivity,
+        "specificity": correction.specificity,
+        "dataset_digest": correction.dataset_digest,
+        "positives": correction.positives,
+        "negatives": correction.negatives,
     }
 
 
@@ -132,6 +215,23 @@ def _trial_summary(summary: TrialSummary) -> dict[str, object]:
         "cases_incomplete": summary.cases_incomplete,
         "bound": summary.bound,
         "mean_success_rate": summary.mean_success_rate,
+        "correction": None if summary.correction is None else _correction(summary.correction),
+    }
+
+
+def _correction(correction: JudgeCorrection) -> dict[str, object]:
+    return {
+        "status": str(correction.status),
+        "assessor": correction.assessor,
+        "reason": correction.reason,
+        "rate": correction.rate,
+        "low": correction.low,
+        "high": correction.high,
+        "sensitivity": correction.sensitivity,
+        "specificity": correction.specificity,
+        "dataset_digest": correction.dataset_digest,
+        "positives": correction.positives,
+        "negatives": correction.negatives,
     }
 
 
@@ -161,14 +261,84 @@ def _evaluator(evaluator: EvaluatorRecord) -> dict[str, object]:
         "id": evaluator.id,
         "version": evaluator.version,
         "digest": evaluator.digest,
-        "calibration": None
-        if calibration is None
+        "calibration": None if calibration is None else _calibration(calibration),
+        "judge": evaluator.judge,
+        "deterministic": evaluator.deterministic,
+    }
+
+
+def _exchanges(exchanges: ExchangesRecord | None) -> dict[str, object] | None:
+    if exchanges is None:
+        return None
+    return {"digest": exchanges.digest, "count": exchanges.count, "altered": exchanges.altered}
+
+
+def _recording(recording: RecordingRecord | None) -> dict[str, object] | None:
+    if recording is None:
+        return None
+    origin = recording.origin
+    return {
+        "name": recording.name,
+        "version": recording.version,
+        "subject": recording.subject,
+        "verbatim": recording.verbatim,
+        "origin": None
+        if origin is None
         else {
-            "dataset_digest": calibration.dataset_digest,
-            "measured_at": _utc(calibration.measured_at),
-            "brier": calibration.brier,
-            "ece": calibration.ece,
+            "run_id": origin.run_id,
+            "target": origin.target,
+            "started_at": origin.started_at,
+            "stopped_by": origin.stopped_by,
+            "gate": origin.gate,
         },
+    }
+
+
+def _recipe(recipe: RecipeRecord | None) -> dict[str, object] | None:
+    if recipe is None:
+        return None
+    return {
+        "name": recipe.name,
+        "digest": recipe.digest,
+        "lock_digest": recipe.lock_digest,
+        "kind": str(recipe.kind),
+        "source": str(recipe.source),
+        "unpinned": list(recipe.unpinned),
+    }
+
+
+def _fixtures(fixtures: FixturesRecord | None) -> dict[str, object] | None:
+    if fixtures is None:
+        return None
+    return {
+        "name": fixtures.name,
+        "digest": fixtures.digest,
+        "data": {"declared": fixtures.data},
+        "tenants": list(fixtures.tenants),
+        "counts": {
+            "documents": fixtures.documents,
+            "records": fixtures.records,
+            "tools": fixtures.tools,
+        },
+        "markers": fixtures.markers,
+    }
+
+
+def _calibration(calibration: CalibrationRecord) -> dict[str, object]:
+    return {
+        "dataset_digest": calibration.dataset_digest,
+        "measured_at": _utc(calibration.measured_at),
+        "brier": calibration.brier,
+        "ece": calibration.ece,
+        "assessor": calibration.assessor,
+        "judge_identity": calibration.judge_identity,
+        "starter_corpus": calibration.starter_corpus,
+        "positives": calibration.positives,
+        "negatives": calibration.negatives,
+        "positives_inconclusive": calibration.positives_inconclusive,
+        "negatives_inconclusive": calibration.negatives_inconclusive,
+        "sensitivity": calibration.sensitivity,
+        "specificity": calibration.specificity,
     }
 
 
@@ -234,4 +404,8 @@ def manifest_to_dict(manifest: RunManifest) -> dict[str, object]:
         "coverage": _coverage(manifest.coverage),
         "result_summary": _result_summary(manifest.result_summary),
         "privacy": _privacy(manifest.privacy),
+        "exchanges": _exchanges(manifest.exchanges),
+        "recording": _recording(manifest.recording),
+        "recipe": _recipe(manifest.recipe),
+        "fixtures": _fixtures(manifest.fixtures),
     }

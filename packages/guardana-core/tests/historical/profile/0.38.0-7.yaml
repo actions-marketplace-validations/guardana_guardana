@@ -1,0 +1,6 @@
+budgets:
+  max_requests: 200
+  max_input_tokens: 250000
+  max_output_tokens: 100000
+  max_duration: 15m        # number with s / m / h; a bare number is seconds
+  max_requests_per_minute: 30

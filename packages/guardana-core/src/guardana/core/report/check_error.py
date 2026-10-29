@@ -6,6 +6,14 @@ from dataclasses import dataclass
 _MAX_REASON = 500
 
 
+def bounded_reason(reason: str) -> str:
+    """Return `reason` cut to the length a recorded reason may have, saying so when cut."""
+    if len(reason) <= _MAX_REASON:
+        return reason
+    note = f"… [cut from {len(reason)} characters]"
+    return f"{reason[: _MAX_REASON - len(note)]}{note}"
+
+
 @dataclass(frozen=True, slots=True)
 class CheckError:
     """A check that could not run: which one, at which stage, and why.
@@ -20,7 +28,12 @@ class CheckError:
     """The rule id, entry-point name, or file path that failed."""
 
     stage: str
-    """Where it failed: `discovery`, `load`, or `run`."""
+    """Where it failed: `discovery`, `load`, `read`, `capability`, `applicability` or `run`.
+
+    A broken regression pair fails at `regression`. A send to an endpoint fails at
+    `request` when the application refused that one request, and at `target` when the
+    target failed.
+    """
 
     reason: str
     """The exception type and message, truncated."""

@@ -7,19 +7,29 @@ paths:
 ---
 # CI, the release pipeline and the site deploy
 
-Runbook: `RELEASING.md`; the order that has gone wrong: the `release` skill.
-
 - **Every action is pinned by commit SHA** with a version comment, and every workflow declares
   least-privilege `permissions`. A too-wide token never fails a build, which is why it is
   written down instead of defaulted.
 - **`ci.yml` runs on every push and PR**: the gate on three Python versions against a real
   PostgreSQL (`GUARDANA_REQUIRE_POSTGRES=1` — the skip is a failure there), `uv audit`, the
-  dogfood scan, the two container images, the clean-install check, the SBOM check and the three
-  isolated example suites. `scripts/ci_local.sh` mirrors it; keep them in step in the same change.
+  dogfood scan, the two container images, the clean-install check, the SBOM check and one
+  isolated suite per example package. `scripts/ci_local.sh` mirrors it; keep them in step in the
+  same change.
 - **`release.yml` runs on `v*.*.*` tags only**: clean install → build the five distributions →
-  SBOM per distribution → provenance → PyPI through the `pypi` environment's approval click →
-  both images (amd64, arm64) → the GitHub Release from the changelog section. The moving `vX.Y`
-  tag is for the Marketplace Action and never re-triggers a publish.
+  SBOM per distribution → provenance → PyPI for the five through the `pypi` environment's
+  approval click → the GitHub Release from the changelog section → both images (amd64, arm64).
+  CI and the clean-install check in `publish` build and check the reference pack before
+  anything is published, so a broken pack stops the release there. Its own build, attestation
+  and upload to the Release run afterwards in `reference-pack` (after `publish`);
+  `reference-pack-on-pypi` compares its digests with PyPI outside the `pypi` environment, and
+  `publish-reference-pack` (after both) asks for approval and uploads only while
+  `vars.REFERENCE_PACK_PYPI` is `true` and a file is new or PyPI could not be read; differing
+  bytes stop the release. The images wait on none of them. The moving `vX.Y` tag is for the Marketplace Action and never
+  re-triggers a publish.
+- **A squash merge is not a release.** CI runs on the PR and on main; a maintainer groups
+  completed issues, chooses the version under `docs/compatibility.md#versioning`, and uses
+  `scripts/release.py` to gate, merge the release PR, wait for green CI, then push a signed tag. Do not publish
+  packages from a pull_request or main-push workflow.
 - **A push to `main` deploys `site/`** through Cloudflare's `npx wrangler deploy`, from the
   tree, before CI has run: `wrangler.jsonc` is a static-assets Worker with no build step,
   `workers_dev` and previews off. The pre-push hook refuses a push while the generated site is

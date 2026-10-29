@@ -13,6 +13,8 @@ author having to remember it — and `test_no_shipped_artifact_rule_touches_the_
 in `guardana-rules/tests` measures the promise rather than trusting it.
 """
 
+from collections.abc import Mapping
+
 from guardana.core.rule import Rule
 
 
@@ -37,3 +39,8 @@ class ArtifactRule(Rule):
         it declares its own count, the same way a built-in endpoint rule does.
         """
         return 0
+
+    @property
+    def graded_verdicts(self) -> Mapping[str, int]:
+        """Empty: a built-in artifact rule grades what it reads in its own code."""
+        return {}

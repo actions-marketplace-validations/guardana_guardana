@@ -32,10 +32,11 @@ halves, then prove it with `guardana.testing.assert_target_conforms`.
 
 ## Non-negotiables
 
-**A framework mapping, or it does not ship.** Every rule maps to OWASP LLM /
-OWASP ASI / MITRE ATLAS / NIST. The mapping is what makes a finding answerable in
-somebody else's audit. Use the full reference form (`LLM07:2025`), never a bare
-id.
+**A framework mapping, or it does not ship.** Every built-in security rule maps to
+OWASP LLM / OWASP ASI / MITRE ATLAS / NIST. The mapping is what makes a finding
+answerable in somebody else's audit. Use the full reference form (`LLM07:2025`),
+never a bare id. A team's own quality criteria (suites, local checks) need no
+public mapping, and a built-in one is never invented to fill the field.
 
 **A positive fixture and a negative one.** The positive proves the rule fires;
 the negative proves it stays quiet. Dynamic rules get both in three lines with

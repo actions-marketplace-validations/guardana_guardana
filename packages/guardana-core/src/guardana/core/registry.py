@@ -1,10 +1,18 @@
+import copy
 import re
 from collections.abc import Callable, Iterable, Mapping
-from dataclasses import dataclass
-from importlib.metadata import entry_points
+from dataclasses import dataclass, field, fields, replace
 from pathlib import Path
 from typing import Any, Self
 
+from guardana.core.entrypoints import (
+    EVALUATOR_GROUP,
+    RULE_GROUP,
+    TARGET_GROUP,
+    TAXONOMY_GROUP,
+    InstalledEntryPoint,
+    installed_entry_points,
+)
 from guardana.core.evaluator.base import Evaluator, check_expectation
 from guardana.core.origin import UNATTRIBUTED, Origin
 from guardana.core.plugins import PluginTrust
@@ -13,20 +21,20 @@ from guardana.core.rule.base import Rule
 from guardana.core.rule.errors import RuleLoadError
 from guardana.core.rule.yaml_rule import load_yaml_rules
 from guardana.core.target import Target
-from guardana.core.taxonomy import TaxonomyRef
+from guardana.core.taxonomy import TaxonomyRef, catalogs, known_refs
 from guardana.core.taxonomy import register as register_taxonomy
+from guardana.core.taxonomy import unregister as unregister_taxonomy
 from guardana.core.trials import check_trials
 
-_RULE_GROUP = "guardana.rules"
-_EVALUATOR_GROUP = "guardana.evaluators"
-_TARGET_GROUP = "guardana.targets"
-_TAXONOMY_GROUP = "guardana.taxonomies"
 _CANARY_EVALUATOR_ID = "canary"
 # Never planted for real: only used to ask a rule whether it participates at all.
 _MARKER = "GUARDANA_CANARY_PARTICIPATION_CHECK"
 RESERVED_NAMESPACE = "guardana."
 _TARGET_SCHEME = re.compile(r"^[a-z][a-z0-9-]*$")
 RESERVED_TARGET_SCHEMES = frozenset({"file", "http", "https", "mcp", "trace"})
+
+BUILT_IN_CATALOGUES = "guardana-core"
+"""The distribution that ships the built-in taxonomy catalogues, and so owns their frameworks."""
 
 
 class RegistryConflictError(RuleLoadError):
@@ -46,6 +54,45 @@ class RuleDirLoad:
     errors: tuple[CheckError, ...]
 
 
+@dataclass(slots=True)
+class _LoadRecord:
+    """Everything a registry learned about what it could not load, kept as one value.
+
+    It also holds the rule ids it was told of without registering a rule for them.
+    """
+
+    errors: list[CheckError] = field(default_factory=list)
+    refused: list[InstalledEntryPoint] = field(default_factory=list)
+    refusal_errors: list[CheckError] = field(default_factory=list)
+    """The entries of `errors` that record a refusal, the same objects rather than copies."""
+    failed: list[tuple[InstalledEntryPoint, CheckError]] = field(default_factory=list)
+    """Each admitted entry point that failed to load, with the entry of `errors` it recorded."""
+    admitted: list[InstalledEntryPoint] = field(default_factory=list)
+    """Each entry point plugin trust let discovery import, whether it loaded or failed."""
+    trust: PluginTrust | None = None
+    """The trust discovery applied; None for a registry nothing discovered."""
+    named: set[str] = field(default_factory=set)
+    """Rule ids a document the run reads compiles to without this run registering them."""
+
+    def copied(self) -> "_LoadRecord":
+        """Return a copy whose containers are new and whose entries are shared.
+
+        Every field is copied by iterating `fields`, so a field added later travels too;
+        the entries stay shared so a refusal error is still found in `errors` by identity.
+        """
+        return replace(self, **{f.name: copy.copy(getattr(self, f.name)) for f in fields(self)})
+
+
+_Snapshot = tuple[
+    list[Rule],
+    dict[str, Evaluator],
+    list[type[Target]],
+    dict[str, Origin],
+    dict[str, frozenset[str]],
+]
+"""Every registration one provider can change, as `Registry._snapshot` copies it."""
+
+
 class Registry:
     """Single discovery point for rules, evaluators, and targets (built-in or third-party)."""
 
@@ -53,17 +100,86 @@ class Registry:
         self._rules: list[Rule] = []
         self._evaluators: dict[str, Evaluator] = {}
         self._targets: list[type[Target]] = []
-        self._load_errors: list[CheckError] = []
+        self._load = _LoadRecord()
         self._origins: dict[str, Origin] = {}
+        self._taxonomy_owners: dict[str, frozenset[str]] = {}
+
+    def empty_with_load_state(self) -> Self:
+        """Return a registry with no rules, evaluators or targets, carrying this one's load state.
+
+        Load errors, refusals, failed entry points and what tells them apart all travel,
+        so a registry built from part of this one still reports every plugin that did not
+        load, and which entry point each failure belongs to.
+        """
+        other: Self = type(self)()
+        other._load = self._load.copied()
+        return other
+
+    def copied(self) -> Self:
+        """Return a registry holding everything this one holds, its load state included.
+
+        Registering on the copy leaves this one as it was, so a run that adds its own
+        judges does not change a registry its caller shares between runs. Every attribute
+        is copied, so one added later travels too.
+        """
+        other: Self = type(self)()
+        for name, value in vars(self).items():
+            copied = value.copied() if isinstance(value, _LoadRecord) else copy.copy(value)
+            setattr(other, name, copied)
+        return other
+
+    @property
+    def trust(self) -> PluginTrust | None:
+        """The plugin trust `discover` loaded under; None for a registry built by hand."""
+        return self._load.trust
 
     @property
     def load_errors(self) -> tuple[CheckError, ...]:
         """Every plugin or rule file that could not be loaded, and why."""
-        return tuple(self._load_errors)
+        return tuple(self._load.errors)
+
+    @property
+    def refused(self) -> tuple[InstalledEntryPoint, ...]:
+        """Every entry point plugin trust kept from being imported, in discovery order.
+
+        The same refusals `load_errors` carries as `discovery` errors, as records a
+        caller can read without parsing a reason written for a human.
+        """
+        return tuple(self._load.refused)
+
+    @property
+    def admitted(self) -> tuple[InstalledEntryPoint, ...]:
+        """Every entry point plugin trust let discovery import, in discovery order.
+
+        One that failed to load is here too: importing it ran its distribution's code.
+        """
+        return tuple(self._load.admitted)
+
+    @property
+    def failed(self) -> tuple[tuple[InstalledEntryPoint, CheckError], ...]:
+        """Every admitted entry point that failed to load, paired with the error it recorded.
+
+        The error is the same object `load_failures` carries, so a caller attributes a
+        failure to its entry point without matching on a name two entry points can share.
+        """
+        return tuple(self._load.failed)
+
+    @property
+    def load_failures(self) -> tuple[CheckError, ...]:
+        """Every load error that is not a refusal by plugin trust, in the order recorded.
+
+        Told apart by the error the refusal recorded, not by name: an admitted entry
+        point that failed can share its name with a refused one.
+        """
+        return tuple(
+            error
+            for error in self._load.errors
+            if not any(error is refusal for refusal in self._load.refusal_errors)
+        )
 
     def record_load_error(self, error: CheckError) -> None:
         """Record something that could not be loaded, so the run can report it."""
-        self._load_errors.append(error)
+        self._load.errors.append(error)
 
     def register_rule(self, rule: Rule, origin: Origin = UNATTRIBUTED) -> None:
         """Add a rule under its id, refusing an id another origin already holds.
@@ -73,8 +189,7 @@ class Registry:
         doubled findings and doubled probe calls.
 
         A *different* origin raises `RegistryConflictError`, as does an installed
-        plugin claiming the reserved `guardana.*` namespace. Why silent last-wins
-        had to go: `docs/design/capability-protocols.md`.
+        plugin claiming the reserved `guardana.*` namespace.
         """
         _require_canary_participation(rule)
         self._refuse_conflict("rule", rule.meta.id, origin)
@@ -97,7 +212,20 @@ class Registry:
         self._origins[f"evaluator:{evaluator.id}"] = origin
 
     def register_target(self, target: type[Target], origin: Origin = UNATTRIBUTED) -> None:
-        """Add a target class, validating its optional command-line locator scheme."""
+        """Add a target class, validating its optional command-line locator scheme.
+
+        A class whose `__name__` a target from another distribution already holds is
+        refused: its origin is recorded under that name, so accepting it would let one
+        origin overwrite another and a lock pin the wrong distribution's code.
+        """
+        held_name = self._origins.get(f"target:{target.__name__}")
+        if held_name is not None and held_name.distribution != origin.distribution:
+            raise RegistryConflictError(
+                f"target {target.__name__!r} is already registered by "
+                f"{held_name.describe()}; {origin.describe()} cannot register another "
+                f"target under the same class name, which would leave the name saying "
+                f"nothing about whose code it is"
+            )
         scheme = target.scheme
         if scheme is not None:
             if not isinstance(scheme, str) or _TARGET_SCHEME.fullmatch(scheme) is None:
@@ -123,6 +251,33 @@ class Registry:
             self._origins[f"target-scheme:{scheme}"] = origin
         self._targets.append(target)
         self._origins[f"target:{target.__name__}"] = origin
+
+    def _record_taxonomy(self, ref: TaxonomyRef, origin: Origin) -> None:
+        """Register `ref` in the process-wide catalogue and name its distribution an owner.
+
+        An identical reference registered again still adds its distribution, so a
+        framework two packages contribute the same control to lists both of them.
+        """
+        register_taxonomy(ref)
+        if origin.distribution is not None:
+            held = self._taxonomy_owners.get(ref.framework, frozenset())
+            self._taxonomy_owners[ref.framework] = held | {origin.distribution}
+
+    def taxonomy_owners(self) -> Mapping[str, frozenset[str]]:
+        """Every distribution that registered a reference into each framework.
+
+        Discovery names `BUILT_IN_CATALOGUES` as the owner of the built-in frameworks. A
+        framework only code registered is absent.
+        """
+        return dict(self._taxonomy_owners)
+
+    def evaluator_origin(self, evaluator_id: str) -> Origin:
+        """Return which origin supplied the evaluator registered under `evaluator_id`."""
+        return self._origins.get(f"evaluator:{evaluator_id}", UNATTRIBUTED)
+
+    def target_origin(self, target: type[Target]) -> Origin:
+        """Return which origin supplied `target`, recorded under its class name."""
+        return self._origins.get(f"target:{target.__name__}", UNATTRIBUTED)
 
     def origin_of(self, rule_id: str) -> Origin:
         """Return which origin supplied the rule registered under `rule_id`.
@@ -217,7 +372,21 @@ class Registry:
         loaded: list[str] = []
         errors: list[CheckError] = []
         for path in paths:
-            for file in _yaml_files(path):
+            files = yaml_rule_files(path)
+            if not files:
+                # A directory someone configured that holds no rule file loads nothing,
+                # and a run without the checks it was told to add must not look complete.
+                errors.append(
+                    CheckError(
+                        source=str(path),
+                        stage="load",
+                        reason=(
+                            "the directory holds no .yaml or .yml rule file; files in its "
+                            "subdirectories are not read"
+                        ),
+                    )
+                )
+            for file in files:
                 # Resolved, not as written: `rules.paths: [my-rules]` and
                 # `--rules ./my-rules/` name one file, and two spellings of it must
                 # not read as two origins.
@@ -228,11 +397,11 @@ class Registry:
                         loaded.append(rule.meta.id)
                 except (RuleLoadError, OSError) as exc:
                     errors.append(CheckError.from_exception(str(file), "load", exc))
-        self._load_errors.extend(errors)
+        self._load.errors.extend(errors)
         return RuleDirLoad(tuple(loaded), tuple(errors))
 
     @classmethod
-    def discover(cls, trust: PluginTrust | None = None) -> Self:
+    def discover(cls, trust: PluginTrust) -> Self:
         """Load the rules, evaluators and targets that `trust` permits.
 
         This imports third-party code: an installed plugin is trusted code (see
@@ -250,64 +419,84 @@ class Registry:
         loads no checks whatsoever was also the only one that did not say so, and
         a run with no rules is a run whose silence means nothing.
         """
-        policy = trust if trust is not None else PluginTrust()
+        if not isinstance(trust, PluginTrust):
+            raise TypeError(
+                f"Registry.discover needs a PluginTrust, not {type(trust).__name__}: say "
+                f"which installed distributions may run code, for example "
+                f"PluginTrust(mode=PluginMode.BUILTINS)"
+            )
         reg = cls()
-        for group, expected, register in (
-            # Taxonomies first: a rule can only name a framework that is already
-            # registered, and a YAML rule pack resolves its `taxonomy:` ids while
-            # its own entry point is being loaded.
-            (_TAXONOMY_GROUP, TaxonomyRef, _ignoring_origin(register_taxonomy)),
-            (_RULE_GROUP, Rule, reg.register_rule),
-            (_EVALUATOR_GROUP, Evaluator, reg.register_evaluator),
-            (_TARGET_GROUP, Target, reg.register_target),
-        ):
-            for ep in entry_points(group=group):
-                if not policy.allows(_distribution_of(ep)):
-                    # Recorded, not silently dropped: a rule pack the user
-                    # installed and this run refused to load is coverage they
-                    # think they have. Landing in `load_errors` puts it in the
-                    # `errors` channel, which fails the gate by default.
-                    reg.record_load_error(
-                        CheckError(
-                            source=ep.name,
-                            stage="discovery",
-                            reason=(
-                                f"plugin from {_distribution_of(ep) or 'an unknown distribution'} "
-                                f"was not loaded: plugin trust is {policy.describe()}"
-                            ),
-                        )
-                    )
-                    continue
-                origin = _origin_of(ep)
-                # Rollback rather than a pre-flight, so a refusal added later stays
-                # atomic without needing a second implementation. The framework
-                # catalogue is deliberately outside it: it is process-wide, and
-                # re-registering an identical reference is already a no-op.
-                snapshot = reg._snapshot()
-                try:
-                    _absorb(ep.load()(), expected, register, origin)
-                except Exception as exc:
-                    reg._restore(snapshot)
-                    reg.record_load_error(CheckError.from_exception(ep.name, "discovery", exc))
+        reg._load.trust = trust
+        for catalog in catalogs():
+            reg._taxonomy_owners[catalog.framework] = frozenset({BUILT_IN_CATALOGUES})
+        handlers: dict[str, tuple[type | tuple[type, ...], Callable[[Any, Origin], None]]] = {
+            TAXONOMY_GROUP: (TaxonomyRef, reg._record_taxonomy),
+            RULE_GROUP: (Rule, reg.register_rule),
+            EVALUATOR_GROUP: (Evaluator, reg.register_evaluator),
+            TARGET_GROUP: (Target, reg.register_target),
+        }
+        for entry_point in installed_entry_points():
+            expected, register = handlers[entry_point.group]
+            if not trust.allows(entry_point.distribution):
+                # Recorded, not silently dropped: a rule pack the user
+                # installed and this run refused to load is coverage they
+                # think they have. Landing in `load_errors` puts it in the
+                # `errors` channel, which fails the gate by default.
+                refusal = CheckError(
+                    source=entry_point.name,
+                    stage="discovery",
+                    reason=(
+                        f"plugin from "
+                        f"{entry_point.distribution or 'an unknown distribution'} "
+                        f"was not loaded: plugin trust is {trust.describe()}"
+                    ),
+                )
+                reg._load.refused.append(entry_point)
+                reg._load.refusal_errors.append(refusal)
+                reg.record_load_error(refusal)
+                continue
+            reg._load.admitted.append(entry_point)
+            origin = Origin(distribution=entry_point.distribution, version=entry_point.version)
+            # Rollback rather than a pre-flight, so a refusal added later stays
+            # atomic without needing a second implementation. The framework
+            # catalogue is process-wide, so what a failed provider added to it
+            # is forgotten too, and a rule cannot cite a reference whose
+            # provider was reported broken.
+            snapshot = reg._snapshot()
+            references = {ref.reference for ref in known_refs()}
+            try:
+                _absorb(_provided_by(entry_point), expected, register, origin)
+            except (Exception, SystemExit) as exc:
+                # `sys.exit()` while importing or providing is that pack's failure: letting
+                # it end the command would exit 0 with nothing examined.
+                reg._restore(snapshot)
+                for ref in known_refs():
+                    if ref.reference not in references:
+                        unregister_taxonomy(ref.reference)
+                failure = CheckError.from_exception(entry_point.name, "discovery", exc)
+                reg._load.failed.append((entry_point, failure))
+                reg.record_load_error(failure)
         return reg
 
-    def _snapshot(
-        self,
-    ) -> tuple[list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Origin]]:
+    def _snapshot(self) -> _Snapshot:
         """Copy the registrations, so one provider's failure can be undone whole."""
-        return (list(self._rules), dict(self._evaluators), list(self._targets), dict(self._origins))
-
-    def _restore(
-        self,
-        snapshot: tuple[list[Rule], dict[str, Evaluator], list[type[Target]], dict[str, Origin]],
-    ) -> None:
-        """Put the registrations back as they were before a provider was absorbed."""
-        self._rules, self._evaluators, self._targets, self._origins = (
-            snapshot[0],
-            snapshot[1],
-            snapshot[2],
-            snapshot[3],
+        return (
+            list(self._rules),
+            dict(self._evaluators),
+            list(self._targets),
+            dict(self._origins),
+            dict(self._taxonomy_owners),
         )
+
+    def _restore(self, snapshot: _Snapshot) -> None:
+        """Put the registrations back as they were before a provider was absorbed."""
+        (
+            self._rules,
+            self._evaluators,
+            self._targets,
+            self._origins,
+            self._taxonomy_owners,
+        ) = snapshot
 
 
 def _repeated(rule: Rule, trials: int) -> Rule:
@@ -316,36 +505,12 @@ def _repeated(rule: Rule, trials: int) -> Rule:
     return rule if repeated is None else repeated
 
 
-def _ignoring_origin(register: Callable[[Any], None]) -> Callable[[Any, Origin], None]:
-    """Adapt a one-argument registrar to the two-argument shape discovery uses."""
-
-    def call(item: Any, _origin: Origin) -> None:  # noqa: ANN401 — provider payload
-        register(item)
-
-    return call
-
-
-def _origin_of(ep: object) -> Origin:
-    """Name the distribution and version behind one entry point."""
-    dist = getattr(ep, "dist", None)
-    name = getattr(dist, "name", None)
-    version = getattr(dist, "version", None)
-    return Origin(
-        distribution=str(name) if name else None,
-        version=str(version) if version else None,
-    )
-
-
-def _distribution_of(ep: object) -> str | None:
-    """Which installed distribution advertised this entry point, if it says.
-
-    `EntryPoint.dist` is populated by `importlib.metadata` when the entry point
-    came from an installed distribution. An entry point that cannot name its
-    origin is treated as third-party, which is the cautious reading.
-    """
-    dist = getattr(ep, "dist", None)
-    name = getattr(dist, "name", None)
-    return str(name) if name else None
+def _provided_by(entry_point: InstalledEntryPoint) -> object:
+    """Import the entry point and call the provider it names."""
+    provider = entry_point.load()
+    if not callable(provider):
+        raise TypeError(f"entry point {entry_point.value!r} does not name a callable provider")
+    return provider()
 
 
 def _require_canary_participation(rule: Rule) -> None:
@@ -407,7 +572,30 @@ def _resolved(path: Path) -> Path:
         return path
 
 
-def _yaml_files(path: Path) -> list[Path]:
+def yaml_rule_files(path: Path) -> list[Path]:
+    """Return the files `load_yaml_rule_dirs` reads for one configured path.
+
+    A file is read as itself, a directory for the rule files directly inside it.
+    Public so a profile check finds an empty directory exactly as a run does.
+    """
     if not path.is_dir():
         return [path]
-    return sorted(p for p in path.iterdir() if p.suffix in (".yaml", ".yml"))
+    return sorted(
+        p for p in path.iterdir() if p.is_file() and p.suffix.lower() in (".yaml", ".yml")
+    )
+
+
+def name_rule_ids(registry: Registry, rule_ids: Iterable[str]) -> None:
+    """Count `rule_ids` as rules an include pattern may name, without registering any.
+
+    For the ids a document the run reads compiles to on another run, such as a contract
+    about another AI system: a pattern naming one is not misspelled, though this run
+    executes no such rule.
+    """
+    registry._load.named.update(rule_ids)  # noqa: SLF001 — load state this module owns
+
+
+def known_rule_ids(registry: Registry) -> frozenset[str]:
+    """Every id an include pattern may match: each registered rule's and each named one."""
+    named = registry._load.named  # noqa: SLF001 — load state this module owns
+    return frozenset(rule.meta.id for rule in registry.rules()) | named

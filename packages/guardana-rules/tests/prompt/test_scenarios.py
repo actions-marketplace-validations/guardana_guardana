@@ -4,6 +4,7 @@ on a model that refuses throughout) — both driven by scripted doubles, no netw
 
 from guardana.core.evaluator.canary import CanaryEvaluator
 from guardana.core.evaluator.keyword import KeywordEvaluator
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.target import EndpointTarget
@@ -14,7 +15,7 @@ _INDIRECT_INJECTION = "guardana.scenario.indirect_injection"
 
 
 def _rule(rule_id: str) -> Rule:
-    for rule in Registry.discover().rules():
+    for rule in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules():
         if rule.meta.id == rule_id:
             return rule
     raise AssertionError(f"scenario not discovered: {rule_id}")

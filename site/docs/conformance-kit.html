@@ -1,0 +1,345 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Conformance kit — Guardana documentation</title>
+<meta name="description" content="what a pack runs in its own tests to prove its rules, targets, formats and reporters keep Guardana&#x27;s contracts, and what each check does not prove">
+<link rel="canonical" href="https://guardana.dev/docs/conformance-kit">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html" aria-current="page">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Conformance kit</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html" aria-current="page">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Conformance kit — prove your pack keeps the contract</h1><p class="lede">what a pack runs in its own tests to prove its rules, targets, formats and reporters keep Guardana's contracts, and what each check does not prove</p><p>A pack's tests can use the same checks Guardana uses on its own extensions. Each check below
+ships in <code>guardana-core</code>, so a pack's test suite does not copy it. A check that passes proves
+what its row says. It proves nothing else.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Check</th>
+<th>What it proves</th>
+<th>What it does not prove</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="usage-rule-test.html"><code>guardana rule test</code></a>, <code>guardana.core.rule.verify.verify_rule</code> (outside the supported surface)</td>
+<td>each rule classifies its own <code>finding</code>, <code>clean</code> and <code>inconclusive</code> samples as declared; a rule missing one of the three is reported as a gap, never as passed</td>
+<td>that a prompt carries an attack against a real model, or that the samples resemble your targets</td>
+</tr>
+<tr>
+<td><code>guardana.testing.assert_target_conforms</code></td>
+<td>a target implements every capability it declares and declares every capability it implements, has a <code>ref</code>, and finds its files in any suffix case</td>
+<td>that it reads the right data or reaches the right address; over an empty root it has no file to sample</td>
+</tr>
+<tr>
+<td><code>ScriptedMcpServer</code>, <code>ScriptedA2aAgent</code> (via <code>McpServerTarget</code> or <code>A2aAgentTarget</code>, both outside the supported surface)</td>
+<td>a rule runs against a server or agent that enforces authorization and one that does not, through the same interfaces a live one uses</td>
+<td>that a real server implementation behaves like the double</td>
+</tr>
+<tr>
+<td><code>files_target</code> (with <code>source_read_limit=</code> for a file the target leaves unread), a <code>Trace</code> in a <code>TraceTarget</code> (both outside the supported surface), the scripted transports</td>
+<td>a rule's fixtures built in code: a file tree, a recorded execution, a model's replies</td>
+<td>anything about the model or the files your team actually ships</td>
+</tr>
+<tr>
+<td><code>guardana.testing.assert_renderer_conforms</code></td>
+<td>a format's name can be selected, and <code>render</code> returns text for every sample run, through the boundary <code>--format</code> uses</td>
+<td>that the text is correct or complete, or that it states the verdict</td>
+</tr>
+<tr>
+<td><code>guardana.testing.assert_reporter_conforms</code></td>
+<td><code>prepare</code> sends nothing, the deliverer has the right shape, and each destination yields its own status for every sample run, through the boundary <code>--reporter</code> uses; given the <code>receiver()</code> it delivers to, each <code>delivered</code> arrived there as exactly one request</td>
+<td>what the request carries, whether it ignores proxy variables, or a connection made by a subprocess or a C extension during <code>prepare</code>; without <code>receiver=</code>, that anything was sent at all</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>guardana.core.rule.verify.verify_rule</code>, <code>Trace</code>, <code>TraceTarget</code>, and <code>McpServerTarget</code> and
+<code>A2aAgentTarget</code> from <code>guardana.core.target</code> are outside the
+<a href="compatibility.html#the-supported-surface">supported surface</a>. They are subject to change in
+any release. While your code imports them, pin the exact <code>guardana-core</code> version you tested.</p>
+<p>The kit has no evaluator check: an evaluator is exercised through the fixtures of the rules
+that use it.</p>
+<h2 id="rules-targets-and-fixtures">Rules, targets and fixtures</h2>
+<p><a href="usage-rule-test.html"><code>guardana rule test</code></a> runs every fixture a rule declares;
+<code>verify_rule(rule)</code>, outside the supported surface, does the same from Python and returns
+the gaps it found. <a href="extending.html#testing-your-extension"><code>extending.md</code></a> lists every double in
+<code>guardana.core.testing</code> and shows <code>assert_target_conforms</code>. As it shows, pointing a rule at
+<code>ScriptedMcpServer</code> or <code>ScriptedA2aAgent</code> needs <code>McpServerTarget</code> or <code>A2aAgentTarget</code> from
+<code>guardana.core.target</code>, both outside the supported surface. A file the target could not read
+makes a sample <code>inconclusive</code>, as a run reports it, so a fixture over an unreadable file never
+counts as clean.</p>
+<h2 id="outputs">Outputs</h2>
+<p><code>guardana.core.testing.sample_verifications()</code> runs the engine five times and returns each
+run: a passed scan, a failed scan, a scan of an empty tree, a probe stopped by its request
+budget and a scan in which no rule ran. The output checks run your format or reporter over
+all five. A format tested only against a passing run has never seen the runs it most needs
+to describe.</p>
+<pre><code class="language-python">import base64
+
+from guardana.core.testing import receiver
+from guardana.testing import assert_renderer_conforms, assert_reporter_conforms
+
+from acme_outputs import provide_table, provide_webhook
+
+
+def test_the_table_keeps_the_output_contract():
+    assert_renderer_conforms(provide_table(), name=&quot;acme-table&quot;)
+
+
+def test_the_webhook_keeps_the_output_contract(monkeypatch):
+    key = base64.b64encode(b&quot;a key for this test only&quot;).decode()
+    monkeypatch.setenv(&quot;ACME_WEBHOOK_SECRET&quot;, f&quot;whsec_{key}&quot;)
+    with receiver() as served:
+        assert_reporter_conforms(
+            provide_webhook(),
+            delivered=served.accepting,
+            rejected=served.refusing,
+            unreachable=served.closed,
+            name=&quot;acme-webhook&quot;,
+            receiver=served,
+        )
+</code></pre>
+<p><code>name</code> is the entry point's name, and <code>spec.name</code> must equal it. If <code>name</code> is omitted, the
+spec's own name is checked. A name must match <code>[a-z][a-z0-9-]*</code>, be at most 40 characters long,
+and not be reserved for its kind (<a href="outputs.html#write-your-own">installed outputs</a>).</p>
+<p><strong><code>assert_renderer_conforms(spec)</code></strong> calls <code>render</code> through <code>guardana.core.output.render</code>, so
+the format sees what <code>--format</code> hands it, redacted a second time. It fails when <code>render</code>
+raises or returns anything but text holding more than whitespace for any sample.</p>
+<p><strong><code>assert_reporter_conforms(spec, *, delivered, rejected, unreachable)</code></strong> takes three locators,
+written as they would follow <code>&lt;name&gt;://</code>. They point at a destination that accepts, one that
+answers and refuses, and one that does not answer. For every sample and every locator, it
+checks:</p>
+<ul>
+<li><code>prepare</code> makes no connection and no name lookup. <code>socket.socket.connect</code>, <code>connect_ex</code>,
+<code>socket.create_connection</code> and <code>socket.getaddrinfo</code> are refused while it runs, and an
+attempt fails the check even when <code>prepare</code> catches the error. A subprocess or a C
+extension that opens its own connection is not covered.</li>
+<li><code>destination</code> is a <code>str</code> and <code>sent_secrets()</code> is a tuple of <code>str</code>.</li>
+<li>delivered through <code>guardana.core.output.deliver</code>, the run comes back with that locator's
+status: <code>delivered</code>, <code>rejected</code> or <code>unreachable</code>. <code>unknown</code> always fails, with its detail:
+the reporter raised, overran 30 seconds, or said <code>delivered</code> with no attempt or with a
+status outside 2xx.</li>
+<li>with <code>receiver=</code>, the <code>receiver()</code> the <code>delivered</code> locator points at, each run the reporter
+called <code>delivered</code> reached its accepting URL as exactly one request. A reporter that says
+<code>delivered</code> and sends nothing, or sends a run twice, fails. A <code>delivered</code> locator that does
+not point at that receiver fails too, since nothing can be counted.</li>
+</ul>
+<p><strong><code>guardana.core.testing.receiver()</code></strong> serves the three destinations for an HTTP reporter on
+<code>127.0.0.1</code>, for the length of a <code>with</code> block. <code>accepting</code> answers <code>200</code> with
+<code>{&quot;status&quot;:&quot;ok&quot;,&quot;duplicate&quot;:false,&quot;stored&quot;:0}</code>, the collector's acknowledgement, <code>refusing</code>
+answers <code>403</code>, and <code>closed</code> is a port nothing listens on.
+<code>received</code> lists every request the first two answered. A reporter may append its own path to
+either URL. A reporter that retries waits out its backoff on <code>closed</code> once per sample, so
+<code>examples/output_pack</code> hands the check a <code>prepare</code> whose sleep returns at once.</p>
+<p>Both checks raise <code>OutputContractError</code>, an <code>AssertionError</code>, naming every problem they found,
+so one failing run lists everything to fix.</p>
+<p>The kit does not check that a reporter ignores <code>HTTP_PROXY</code> and <code>HTTPS_PROXY</code>, as
+<a href="outputs.html#write-your-own">installed outputs</a> asks. Test that yourself: <code>examples/output_pack</code>
+sets every proxy variable to a refusing address and still expects the delivery.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/conformance-kit.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

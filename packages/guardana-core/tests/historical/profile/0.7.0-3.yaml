@@ -1,0 +1,8 @@
+privacy:
+  evidence_mode: redacted     # metadata_only | redacted | full
+  redact_secrets: true
+  redact_emails: true
+  redact_ip_addresses: false  # an IP address is frequently the finding itself
+  hash_identifiers: true
+  custom_patterns: []
+  max_evidence_bytes: 16384

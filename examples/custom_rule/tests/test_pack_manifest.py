@@ -12,12 +12,16 @@ from acme_rules.prompt_library_target import AcmePromptLibraryTarget
 from guardana.core.pack import (
     EXTENSION_API_VERSION,
     PackManifest,
+    Registered,
     check_pack,
     installed_manifests,
     load_manifest,
 )
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.target import TargetKind
+
+_ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
 
 
 def _manifest() -> PackManifest:
@@ -48,7 +52,7 @@ def test_the_manifest_lists_exactly_what_the_entry_points_register() -> None:
 
 def test_validate_finds_this_pack_through_its_entry_point() -> None:
     """Discovery has to work for an installed third-party package, not just for ours."""
-    found = [m for m in installed_manifests() if m.name == "acme-guardana-rules"]
+    found = [m for m in installed_manifests(_ACME) if m.name == "acme-guardana-rules"]
 
     assert found, "the pack registers entry points and ships a manifest, so it must be found"
 
@@ -59,9 +63,10 @@ def test_a_promise_the_package_does_not_keep_is_reported() -> None:
     The check exists for the case where the two drift apart; testing it by deleting
     a line from the manifest would only prove the parser reads fewer lines.
     """
-    registered = {rule.meta.id for rule in acme_rules.provide_rules()}
+    rules = {r.meta.id: None for r in acme_rules.provide_rules()}
+    del rules["acme.agent.customer_data"]
 
-    check = check_pack(_manifest(), registered - {"acme.agent.customer_data"})
+    check = check_pack(_manifest(), Registered(rules=rules))
 
     assert not check.ok
     assert "acme.agent.customer_data" in check.problems[0]
@@ -76,11 +81,11 @@ def test_the_target_entry_point_is_registered_and_declared() -> None:
     and accuse any pack shipping one — with no example able to notice. This closes
     both halves: the entry point is exercised, and the manifest declares it.
     """
-    registered = {target.__name__ for target in Registry.discover().targets()}
+    registered = {target.__name__ for target in Registry.discover(_ACME).targets()}
 
     assert "AcmePromptLibraryTarget" in registered
     assert "AcmePromptLibraryTarget" in _manifest().provides
-    assert check_pack(_manifest(), registered | _registered_ids()).ok
+    assert check_pack(_manifest(), _registered(targets=registered)).ok
     assert AcmePromptLibraryTarget("/no/such/dir").kind is TargetKind.ARTIFACT
 
 
@@ -92,6 +97,16 @@ def test_a_prompt_library_that_is_not_there_lists_nothing_rather_than_raising() 
     empty list rather than an exception a rule would have to guess about.
     """
     assert AcmePromptLibraryTarget("/no/such/dir").templates() == []
+
+
+def _registered(*, targets: set[str]) -> Registered:
+    """Every id this pack's entry points register, each under its own kind."""
+    return Registered(
+        rules={rule.meta.id: None for rule in acme_rules.provide_rules()},
+        evaluators={evaluator.id: None for evaluator in acme_rules.provide_evaluators()},
+        targets=dict.fromkeys(targets),
+        taxonomies={ref.framework: None for ref in acme_rules.provide_taxonomies()},
+    )
 
 
 def _registered_ids() -> set[str]:

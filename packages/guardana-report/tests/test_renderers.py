@@ -86,6 +86,42 @@ def test_the_human_report_still_ticks_when_a_check_reached_a_verdict() -> None:
     assert "✓ No findings." in get_renderer("human").render(result)
 
 
+def _skips_with_one_not_offered() -> ScanResult:
+    from guardana.core.report import SkippedRule, SkipReason  # noqa: PLC0415
+
+    capability = [
+        SkippedRule(f"guardana.chat.c{i}", SkipReason.MISSING_CAPABILITY, ("chat",), "no chat")
+        for i in range(30)
+    ]
+    not_offered = SkippedRule(
+        "guardana.a2a.task_visibility",
+        SkipReason.NOT_OFFERED,
+        ("ListTasks",),
+        "the agent answers ListTasks as an operation it does not offer",
+    )
+    return ScanResult((), ("guardana.demo",), (*capability[:15], not_offered, *capability[15:]))
+
+
+def test_the_human_report_names_a_check_the_target_did_not_offer() -> None:
+    rendered = get_renderer("human").render(_skips_with_one_not_offered())
+    summary = rendered.splitlines()[-1]
+
+    assert "Not offered by the target:" in summary
+    assert "guardana.a2a.task_visibility" in summary
+    assert "ListTasks" in summary
+    assert "guardana.chat.c0" not in rendered
+
+
+def test_the_human_report_still_ticks_over_capability_skips_alone() -> None:
+    from guardana.core.report import SkippedRule, SkipReason  # noqa: PLC0415
+
+    skipped = (SkippedRule("guardana.chat.c0", SkipReason.MISSING_CAPABILITY, ("chat",), "x"),)
+    rendered = get_renderer("human").render(ScanResult((), ("guardana.demo",), skipped))
+
+    assert "✓ No findings." in rendered
+    assert "not offered" not in rendered
+
+
 def test_junit_does_not_render_a_run_of_pure_skips_as_a_clean_suite() -> None:
     """`failures="0" errors="0"` with everything skipped is green on every dashboard.
 

@@ -11,9 +11,10 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import pytest
-from guardana.core import registry as registry_module
+from guardana.core import entrypoints as entrypoints_module
 from guardana.core.evaluator.base import Evaluator, Expectation, Verdict
 from guardana.core.exchange import Exchange
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.report import Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
@@ -43,10 +44,12 @@ class _FakeEntryPoint:
         self,
         name: str,
         *,
-        load_raises: Exception | None = None,
+        load_raises: BaseException | None = None,
         provides: object = None,
     ) -> None:
         self.name = name
+        self.value = f"{name}_module:provide"
+        self.dist = None
         self._load_raises = load_raises
         self._provides = provides
 
@@ -60,7 +63,7 @@ def _patch_entry_points(monkeypatch: pytest.MonkeyPatch, **groups: list[_FakeEnt
     def _fake(group: str) -> list[_FakeEntryPoint]:
         return groups.get(group.replace("guardana.", ""), [])
 
-    monkeypatch.setattr(registry_module, "entry_points", _fake)
+    monkeypatch.setattr(entrypoints_module, "entry_points", _fake)
 
 
 def test_an_entry_point_that_fails_to_import_does_not_kill_discovery(
@@ -73,7 +76,7 @@ def test_an_entry_point_that_fails_to_import_does_not_kill_discovery(
             _FakeEntryPoint("healthy", provides=[_HealthyRule()]),
         ],
     )
-    reg = Registry.discover()
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
     assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
     assert [e.source for e in reg.load_errors] == ["broken"]
@@ -95,10 +98,47 @@ def test_a_provider_that_raises_when_called_is_isolated_too(
         monkeypatch,
         rules=[_AngryEntryPoint("angry"), _FakeEntryPoint("healthy", provides=[_HealthyRule()])],
     )
-    reg = Registry.discover()
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
     assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
     assert [e.source for e in reg.load_errors] == ["angry"]
+
+
+@pytest.mark.parametrize("where", ["import", "provider"])
+def test_a_pack_calling_sys_exit_is_a_load_error_not_the_end_of_discovery(
+    monkeypatch: pytest.MonkeyPatch, where: str
+) -> None:
+    class _ExitingProvider(_FakeEntryPoint):
+        def load(self) -> Callable[[], object]:
+            def _provide() -> object:
+                raise SystemExit(0)
+
+            return _provide
+
+    exiting = (
+        _FakeEntryPoint("exiting", load_raises=SystemExit(0))
+        if where == "import"
+        else _ExitingProvider("exiting")
+    )
+    _patch_entry_points(
+        monkeypatch, rules=[exiting, _FakeEntryPoint("healthy", provides=[_HealthyRule()])]
+    )
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
+
+    assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
+    assert [e.source for e in reg.load_errors] == ["exiting"]
+    assert "SystemExit" in reg.load_errors[0].reason
+
+
+def test_a_keyboard_interrupt_during_discovery_still_stops_the_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _patch_entry_points(
+        monkeypatch, rules=[_FakeEntryPoint("interrupted", load_raises=KeyboardInterrupt())]
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
 
 def test_a_broken_rules_entry_point_does_not_stop_evaluator_discovery(
@@ -118,7 +158,7 @@ def test_a_broken_rules_entry_point_does_not_stop_evaluator_discovery(
         rules=[_FakeEntryPoint("broken", load_raises=ImportError("boom"))],
         evaluators=[_FakeEntryPoint("grader", provides=_Evaluator())],
     )
-    reg = Registry.discover()
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
     assert "acme.grader" in reg.evaluators()
     assert len(reg.load_errors) == 1
@@ -166,7 +206,7 @@ def test_a_provider_returning_the_wrong_type_cannot_poison_the_registry(
             _FakeEntryPoint("builtin", provides=[_HealthyRule()]),
         ],
     )
-    reg = Registry.discover()
+    reg = Registry.discover(PluginTrust(mode=PluginMode.ALL))
 
     assert [r.meta.id for r in reg.rules()] == ["acme.healthy"]
     assert [e.source for e in reg.load_errors] == ["sloppy"]

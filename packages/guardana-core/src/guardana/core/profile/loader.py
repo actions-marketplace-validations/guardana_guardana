@@ -1,16 +1,27 @@
+import math
 import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.budget import Budgets, parse_duration
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.errors import ProfileError
 from guardana.core.profile.model import FailOn, Policy, Profile
 from guardana.core.redaction import DEFAULT_MAX_EVIDENCE_BYTES, EvidenceMode, RedactionPolicy
 from guardana.core.severity import Severity
 from guardana.core.trace.model import Dimension
 from guardana.core.trials import check_trials
+
+PROFILE_SCHEMA_VERSION = 1
+"""The profile schema this build reads; a profile without `schema_version` is version 1.
+
+No writer states it while it is 1, so a profile this build writes still loads in a build
+that predates the key. A key added later raises it, and an older build then refuses the
+file naming the upgrade instead of reading the new key as a typo.
+"""
 
 # Typos must fail loudly: a misspelled `fail_on:` would otherwise silently
 # fall back to defaults and weaken the gate the user thinks they configured.
@@ -27,16 +38,50 @@ _ALLOWED_PROFILE_KEYS = frozenset(
         "contracts",
         "calibrations",
         "trials",
+        "plugins",
+        "delivery",
     }
 )
 _ALLOWED_RULES_KEYS = frozenset({"include", "exclude", "paths", "paths_exclude"})
 _ALLOWED_TRACE_KEYS = frozenset({"require"})
+_ALLOWED_PLUGINS_KEYS = frozenset({"mode", "allow"})
+_ALLOWED_DELIVERY_KEYS = frozenset({"required"})
 _ALLOWED_FAIL_ON_KEYS = frozenset(
-    {"severity", "min_confidence", "fail_on_inconclusive", "fail_on_error", "fail_on_skipped"}
+    {
+        "severity",
+        "min_confidence",
+        "fail_on_inconclusive",
+        "fail_on_error",
+        "fail_on_skipped",
+        "min_graded_share",
+    }
 )
 _ALLOWED_BUDGET_KEYS = frozenset(
-    {"max_requests", "max_input_tokens", "max_output_tokens", "max_duration"}
+    {
+        "max_requests",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_duration",
+        "max_requests_per_minute",
+    }
 )
+EVALUATOR_BLOCK_KEYS: Mapping[str, frozenset[str]] = {
+    "llm_judge": frozenset(
+        {
+            "endpoint",
+            "model",
+            "api_key_env",
+            "provider",
+            "adapter",
+            "prompt_version",
+            "min_agreement",
+            "calibration",
+        }
+    ),
+    "guard": frozenset({"endpoint", "model", "api_key_env", "provider", "adapter"}),
+}
+"""The blocks `evaluators:` may hold and the keys each accepts; anything else is a typo."""
+
 _ALLOWED_PRIVACY_KEYS = frozenset(
     {
         "evidence_mode",
@@ -46,6 +91,7 @@ _ALLOWED_PRIVACY_KEYS = frozenset(
         "hash_identifiers",
         "custom_patterns",
         "max_evidence_bytes",
+        "keep_exchanges",
     }
 )
 
@@ -75,9 +121,35 @@ def _as_mapping(value: object, what: str, path: Path) -> dict[str, Any]:
 def _reject_unknown_keys(
     raw: Mapping[str, Any], allowed: frozenset[str], what: str, path: Path
 ) -> None:
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise ProfileError(f"invalid profile {path}: unknown {what} key(s): {', '.join(unknown)}")
+
+
+def check_evaluator_blocks(blocks: Mapping[str, object], *, where: str = "") -> None:
+    """Refuse a block under `evaluators:` this build does not know, or a key it does not read.
+
+    A misspelled judge block was never wired, so the rules naming its evaluator were
+    skipped while the profile read as configured. `where` prefixes each message.
+    """
+    unknown = sorted(str(name) for name in set(blocks) - set(EVALUATOR_BLOCK_KEYS))
+    if unknown:
+        raise ProfileError(
+            f"{where}unknown evaluators block(s): {', '.join(unknown)}; "
+            f"known: {', '.join(sorted(EVALUATOR_BLOCK_KEYS))}"
+        )
+    for name, block in blocks.items():
+        if not isinstance(block, Mapping):
+            raise ProfileError(f"{where}evaluators.{name} must be a mapping")
+        keys = sorted(str(key) for key in set(block) - EVALUATOR_BLOCK_KEYS[name])
+        if keys:
+            raise ProfileError(f"{where}unknown evaluators.{name} key(s): {', '.join(keys)}")
+
+
+def _evaluators(raw: object, path: Path) -> dict[str, Any]:
+    blocks = _as_mapping(raw, "evaluators", path)
+    check_evaluator_blocks(blocks, where=f"invalid profile {path}: ")
+    return blocks
 
 
 def _as_glob_list(value: object, what: str, path: Path) -> tuple[str, ...]:
@@ -117,10 +189,12 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
     severity_name = raw.get("severity", "high")
     if not isinstance(severity_name, str) or severity_name.upper() not in Severity.__members__:
         raise ProfileError(f"invalid profile {path}: unknown severity {severity_name!r}")
-    try:
-        min_confidence = float(raw.get("min_confidence", 0.0))
-    except (TypeError, ValueError) as exc:
-        raise ProfileError(f"invalid profile {path}: min_confidence must be a number") from exc
+    raw_confidence = raw.get("min_confidence", 0.0)
+    min_confidence = _confidence_number(raw_confidence)
+    if min_confidence is None:
+        raise ProfileError(
+            f"invalid profile {path}: min_confidence must be a number, got {raw_confidence!r}"
+        )
     # NaN and out-of-range values silently disable the confidence gate — the
     # comparison `confidence >= min_confidence` is always False for them.
     if not 0.0 <= min_confidence <= 1.0:
@@ -142,7 +216,45 @@ def _fail_on(raw: dict[str, Any], path: Path) -> FailOn:
         fail_on_inconclusive=fail_on_inconclusive,
         fail_on_error=fail_on_error,
         fail_on_skipped=fail_on_skipped,
+        min_graded_share=_graded_share(raw.get("min_graded_share"), path),
     )
+
+
+def _confidence_number(value: object) -> float | None:
+    """Read `min_confidence` as a number: an int, a float or a quoted finite number; never a bool.
+
+    YAML `true` is an int to Python, and reading it as 1.0 would hide every finding below
+    full confidence from the gate.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int | float):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            number = float(value)
+        except ValueError:
+            return None
+        return number if math.isfinite(number) else None
+    return None
+
+
+def _graded_share(value: object, path: Path) -> float | None:
+    """Read the floor on a rule's graded share, refusing anything outside `(0, 1]`.
+
+    Zero is refused with the rest: a floor nothing can fall below is not a floor, and a
+    team that wrote one believes the run is held to it.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        raise ProfileError(f"invalid profile {path}: fail_on.min_graded_share must be a number")
+    share = float(value)
+    if not 0.0 < share <= 1.0:
+        raise ProfileError(
+            f"invalid profile {path}: fail_on.min_graded_share must be in (0, 1], got {value}"
+        )
+    return share
 
 
 def _positive_int(raw: dict[str, Any], key: str, path: Path) -> int | None:
@@ -180,6 +292,7 @@ def _budgets(raw: dict[str, Any], path: Path) -> Budgets:
         max_input_tokens=_positive_int(raw, "max_input_tokens", path),
         max_output_tokens=_positive_int(raw, "max_output_tokens", path),
         max_duration_seconds=seconds,
+        max_requests_per_minute=_positive_int(raw, "max_requests_per_minute", path),
     )
 
 
@@ -229,6 +342,13 @@ def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
         raise ProfileError(
             f"invalid profile {path}: privacy.max_evidence_bytes must be a positive whole number"
         )
+    keep_exchanges = _flag(raw, "keep_exchanges", False, path)
+    if keep_exchanges and mode is EvidenceMode.METADATA_ONLY:
+        raise ProfileError(
+            f"invalid profile {path}: privacy.keep_exchanges is true and "
+            f"privacy.evidence_mode is metadata_only; keeping exchanges stores what the "
+            f"target said, which metadata_only forbids, so set one of the two differently"
+        )
     return RedactionPolicy(
         mode=mode,
         redact_emails=_flag(raw, "redact_emails", True, path),
@@ -236,6 +356,7 @@ def _privacy(raw: dict[str, Any], path: Path) -> RedactionPolicy:
         hash_identifiers=_flag(raw, "hash_identifiers", True, path),
         custom_patterns=patterns,
         max_evidence_bytes=limit,
+        keep_exchanges=keep_exchanges,
     )
 
 
@@ -268,6 +389,70 @@ def _trials(raw: object, path: Path) -> int:
         raise ProfileError(f"invalid profile {path}: {exc}") from exc
 
 
+def _plugins(raw: object, path: Path) -> PluginTrust | None:
+    """Parse `plugins:`, refusing any shape whose trust is not exactly what was written.
+
+    An allowlist with nobody on it, or names beside a mode that ignores them, would
+    load something other than what the author believes they stated.
+    """
+    if raw is None:
+        return None
+    block = _as_mapping(raw, "plugins", path)
+    _reject_unknown_keys(block, _ALLOWED_PLUGINS_KEYS, "plugins", path)
+    modes = [str(mode) for mode in PluginMode]
+    mode_name = block.get("mode")
+    if not isinstance(mode_name, str) or mode_name not in modes:
+        raise ProfileError(
+            f"invalid profile {path}: plugins.mode must be one of {', '.join(modes)}, "
+            f"got {mode_name!r}"
+        )
+    mode = PluginMode(mode_name)
+    if "allow" in block and mode is not PluginMode.ALLOWLIST:
+        raise ProfileError(
+            f"invalid profile {path}: plugins.allow names distributions, which only "
+            f"plugins.mode: allowlist admits; mode is {mode_name!r}"
+        )
+    allow = _as_glob_list(block.get("allow"), "plugins.allow", path)
+    if any(not name.strip() for name in allow):
+        raise ProfileError(f"invalid profile {path}: plugins.allow holds an empty name")
+    if mode is PluginMode.ALLOWLIST and not allow:
+        raise ProfileError(
+            f"invalid profile {path}: plugins.mode: allowlist needs plugins.allow to name "
+            f"at least one distribution; for the built-ins alone use mode: builtins"
+        )
+    return PluginTrust(mode=mode, allowed=frozenset(allow))
+
+
+def _delivery_required(raw: object, path: Path) -> bool:
+    """Parse `delivery:`, whose one key says whether every delivery must be acknowledged."""
+    block = _as_mapping(raw, "delivery", path)
+    _reject_unknown_keys(block, _ALLOWED_DELIVERY_KEYS, "delivery", path)
+    required = block.get("required", False)
+    if not isinstance(required, bool):
+        raise ProfileError(f"invalid profile {path}: delivery.required must be true or false")
+    return required
+
+
+def _check_schema_version(raw: Mapping[str, Any], path: Path) -> None:
+    """Refuse a profile written for a schema this build does not read.
+
+    Checked before unknown keys, so a profile from a newer build names the upgrade rather
+    than the key that build added.
+    """
+    if "schema_version" not in raw:
+        return
+    version = raw["schema_version"]
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise ProfileError(f"invalid profile {path}: schema_version must be an integer")
+    if version > PROFILE_SCHEMA_VERSION:
+        raise ProfileError(
+            f"invalid profile {path}: profile schema {version} was written by a newer "
+            f"Guardana; this build reads schema {PROFILE_SCHEMA_VERSION} — upgrade Guardana"
+        )
+    if version < 1:
+        raise ProfileError(f"invalid profile {path}: schema_version {version} does not exist")
+
+
 def load_profile(path: Path) -> Profile:
     """Parse a `guardana.yaml`, rejecting anything it can't honour.
 
@@ -275,14 +460,17 @@ def load_profile(path: Path) -> Profile:
     a gate you think you configured but didn't is worse than no gate.
     """
     try:
-        raw_document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw_document = load_yaml(path.read_text(encoding="utf-8"))
+    except UnicodeDecodeError as exc:
+        raise ProfileError(f"invalid profile {path}: not UTF-8: {exc}") from exc
     except OSError as exc:
         raise ProfileError(f"cannot read profile {path}: {exc}") from exc
     except yaml.YAMLError as exc:
         raise ProfileError(f"invalid profile {path}: {exc}") from exc
 
     raw = _as_mapping(raw_document, "profile", path)
-    _reject_unknown_keys(raw, _ALLOWED_PROFILE_KEYS, "profile", path)
+    _check_schema_version(raw, path)
+    _reject_unknown_keys(raw, _ALLOWED_PROFILE_KEYS | {"schema_version"}, "profile", path)
     rules = _as_mapping(raw.get("rules"), "rules", path)
     _reject_unknown_keys(rules, _ALLOWED_RULES_KEYS, "rules", path)
 
@@ -301,8 +489,10 @@ def load_profile(path: Path) -> Profile:
         name=str(raw.get("name", "custom")),
         policy=policy,
         rule_config=_as_mapping(raw.get("rule_config"), "rule_config", path),
-        evaluator_config=_as_mapping(raw.get("evaluators"), "evaluators", path),
-        rule_paths=_as_glob_list(rules.get("paths"), "rules.paths", path),
+        evaluator_config=_evaluators(raw.get("evaluators"), path),
+        rule_paths=_beside_the_profile(
+            _as_glob_list(rules.get("paths"), "rules.paths", path), path
+        ),
         path_excludes=_as_glob_list(rules.get("paths_exclude"), "rules.paths_exclude", path),
         budgets=_budgets(_as_mapping(raw.get("budgets"), "budgets", path), path),
         privacy=_privacy(_as_mapping(raw.get("privacy"), "privacy", path), path),
@@ -312,6 +502,11 @@ def load_profile(path: Path) -> Profile:
         contract_paths=_beside_the_profile(
             _as_glob_list(raw.get("contracts"), "contracts", path), path
         ),
-        calibration_paths=_as_glob_list(raw.get("calibrations"), "calibrations", path),
+        calibration_paths=_beside_the_profile(
+            _as_glob_list(raw.get("calibrations"), "calibrations", path), path
+        ),
         trials=_trials(raw.get("trials", 1), path),
+        plugins=_plugins(raw.get("plugins"), path),
+        delivery_required=_delivery_required(raw.get("delivery"), path),
+        source=path,
     )

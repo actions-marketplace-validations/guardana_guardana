@@ -6,58 +6,78 @@
 <title>The collector — Guardana documentation</title>
 <meta name="description" content="the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness">
 <link rel="canonical" href="https://guardana.dev/docs/usage-collector">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,61 +98,112 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>The collector</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html" aria-current="page">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>The collector — tenants, persistence, migrations, and what a database does not fix<span class="status beta">beta</span></h1><p class="lede">the optional collector: what a run verified and where, organizations and projects, persistence, migrations, health and readiness</p><p>The collector (<code>guardana-server</code>) aggregates findings from many agents. It is
 <strong>optional in every direction</strong>: the engine never imports it, no feature needs it,
 and nothing is sent anywhere unless a run is given <code>--reporter</code>.</p>
@@ -144,7 +216,8 @@ that expire, every state change is <strong>audited</strong>, and <strong>retenti
 operator applies. Still ahead of it: RBAC and human identities.</p>
 </blockquote>
 <h2 id="standing-one-up-three-commands">Standing one up: three commands</h2>
-<pre><code class="language-bash">export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
+<pre><code class="language-bash">pip install &quot;guardana-server[serve]&quot;                    # the collector and the ASGI server serve needs
+export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
 guardana-collector migrate
 guardana-collector bootstrap --org acme --project web   # prints the key, once
 guardana-collector serve                                # http://127.0.0.1:8000
@@ -153,6 +226,9 @@ guardana-collector serve                                # http://127.0.0.1:8000
 because a security boundary that adds four commands to the first run is a boundary
 that makes a tool nobody starts. The granular commands below exist for the second
 team, not for the first one.</p>
+<p><code>bootstrap</code> takes <code>--key-name TEXT</code> (default <code>first-key</code>): what to call the first
+key. It also takes <code>--scope [ingest|read]</code> (default <code>ingest</code> only): repeatable,
+exactly like <code>key create</code>.</p>
 <p><code>serve</code> binds <strong>loopback</strong> unless told otherwise: <code>--host 0.0.0.0</code> is a decision,
 so it is one you type. It needs an ASGI server, which is an extra
 (<code>pip install &quot;guardana-server[serve]&quot;</code>) rather than a dependency — a deployment
@@ -163,11 +239,11 @@ uvicorn 'guardana.server:create_app' --factory        # what serve does for you
 </code></pre>
 <p>Or as a container, where the same three commands are three <code>docker run</code>s:</p>
 <pre><code class="language-bash">docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.27 migrate
+  ghcr.io/guardana/guardana-collector:1.0 migrate
 docker run --rm -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.27 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:1.0 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL=&quot;$GUARDANA_DATABASE_URL&quot; \
-  ghcr.io/guardana/guardana-collector:0.27
+  ghcr.io/guardana/guardana-collector:1.0
 </code></pre>
 <p>The image's default command is <code>serve --host 0.0.0.0 --port 8000</code>, and it does
 <strong>not</strong> migrate on start — see
@@ -237,28 +313,31 @@ findings a baseline waived. A run whose agent did not say prints <code>unknown</
 blank and never <code>pass</code>.</p>
 <p><code>finding list</code> groups every sighting by the identity the engine computes — the rule
 and where it was found, never the evaluator's rationale, which moves on every
-re-run — and shows how many runs saw it, first and last. That is the &quot;has this been
+re-run — and shows how many runs saw it, first and last. <code>--environment E</code> lists only
+findings seen in E, filters before the limit, and counts runs within E. That is the &quot;has this been
 there since Tuesday, or is it new&quot; question.</p>
 <p><strong>Runs, not sightings.</strong> One run's rule can report the same identity several times
 — <code>malicious_dependency</code> names three bad packages in a single <code>requirements.txt</code>,
 and the identity is the rule plus the path — so counting rows would answer &quot;how
 often was this printed&quot; while the column claims to answer the other question. A
 finding a single scan reported three times reads <code>1 runs</code>.</p>
-<p><strong>A retried job is stored once.</strong> The same run id in the same project is accepted
-with <code>200</code> and <code>&quot;duplicate&quot;: true</code> instead of being stored again: a retry is not a
-failure and must not turn a pipeline red, and counting it twice would make a
-regression answer from a duplicate. An agent older than 0.9 sends no run id,
+<p><strong>A retried job is stored once.</strong> The same run id in the same project and environment is accepted
+with <code>200</code> and <code>&quot;duplicate&quot;: true</code>, keeping the first submission whatever the retry
+holds: a retry is not a failure and must not turn a pipeline red, and counting it twice
+would make a regression answer from a duplicate. An agent older than 0.9 sends no run id,
 identifies nothing, and is stored every time — which is honest, not clever.</p>
 <h2 id="triage-what-somebody-decided-about-a-finding">Triage: what somebody decided about a finding</h2>
 <p>A finding is an entity, not just a pile of sightings. It carries a status, an
 owner, and — when a team accepts the risk — a waiver with a name, a reason and a
 date it lapses.</p>
 <pre><code class="language-bash">guardana-collector finding list --project acme/web [--status open]
-guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner konrad
+guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner alice
 guardana-collector finding waive  1854bc20 --project acme/web \
-  --approver konrad --reason &quot;vendor fix due in September&quot; --expires 2026-09-30
+  --approver alice --reason &quot;vendor fix due in September&quot; --expires 2026-09-30
 </code></pre>
-<p>Identities are <code>sha256:…</code>, so every command takes a <strong>unique prefix</strong>, like git.
+<p>Identities are <code>sha256:…</code>, so every command takes a <strong>unique, non-empty hexadecimal
+prefix</strong>, optionally beginning with <code>sha256:</code>, and matches it literally. A prefix of any
+other form is refused with exit <code>3</code>.
 An ambiguous one is refused with the candidates listed and nothing is changed:
 acting on the wrong finding is worse than being asked to type four more
 characters.</p>
@@ -333,11 +412,10 @@ legitimate thing to do and a surprise is not.</p>
 </tr>
 </tbody>
 </table></div>
-<p>The collector never tells an agent what to do. A gate that asked a server whether
-to fail would be a gate that fails open when the network does — so if you want a
-build to stop failing, that is still <code>guardana baseline</code>
-(<a href="usage-baseline.html">usage-baseline.md</a>). Exporting a project's collector waivers
-<em>as</em> a baseline file is a natural next step and is deliberately not here yet.</p>
+<p>The collector never tells an agent what to do. A gate that relies on a server to decide
+whether to fail fails open when the network fails. To stop a build from failing, use
+<code>guardana baseline</code> (<a href="usage-baseline.html">usage-baseline.md</a>). The collector does not export
+its waivers as a baseline file.</p>
 <h2 id="the-audit-log">The audit log</h2>
 <pre><code class="language-bash">guardana-collector audit list [--project acme/web] [--limit 50]
 </code></pre>
@@ -361,18 +439,21 @@ recorded — a log that grows with every dashboard refresh is a log nobody reads
 </tr>
 <tr>
 <td><code>cli</code></td>
-<td><code>cli:konrad@ops-1</code></td>
+<td><code>cli:alice@ops-1</code></td>
 <td><strong>asserted</strong> — an operator with database access said so</td>
 </tr>
 </tbody>
 </table></div>
-<p>A CLI actor is the operating-system user, taken from the environment rather than
-typed, and <code>--actor</code> overrides it for a shared operations account. It is not
-authentication: anybody who can reach the database can write any name. It is
-recorded anyway, because &quot;what happened, roughly when, by which route&quot; is the
-question a log usually answers — and labelling an assertion as proof would be the
-same false green this tool refuses in a verdict. Real identities arrive with users
-and RBAC.</p>
+<p>A CLI actor is the operating-system user, taken from the environment rather than typed.
+<code>--actor</code> overrides it for a shared operations account. This is not authentication: anybody
+who can reach the database can write any name. The log still records the actor because a log
+usually answers what happened, roughly when, and by which route. Labelling this assertion as
+proof would be the same false green the tool refuses in a verdict. The
+collector has no user accounts or role-based access control, so the log records no verified
+person.</p>
+<ul>
+<li><strong>The audit log is not tamper-evident.</strong> It has no per-row signature or hash chain. Anyone with database write access can edit or delete rows. It records actions; it does not prove them.</li>
+</ul>
 <p><code>api_keys.created_by</code> is filled by the same actor, and a stored submission now
 records <strong>which key wrote it</strong>.</p>
 <p>One event can never be recorded: rolling back the migration that created the log
@@ -391,6 +472,10 @@ a collector that removes evidence because nobody said not to.</p>
 <p><strong>Applying is a command, never a background job.</strong> There is no scheduler in the
 collector, so &quot;what deleted my evidence&quot; is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.</p>
+<p><code>apply</code> reports and audits the submissions it actually deletes, so concurrent
+passes never claim the same rows. <code>--dry-run</code> reports how many would go at that moment.
+A read overlapping a retention pass returns each submission with its findings
+as they stood when the read began, never emptied halfway through.</p>
 <p>Two things retention deliberately does not touch:</p>
 <ul>
 <li><strong>The audit log.</strong> A log pruned by the policy it describes cannot answer
@@ -427,14 +512,14 @@ guardana-collector project list [--org acme]
 guardana-collector project rename --project acme/web --to api
 </code></pre>
 <p><strong>The project comes from the key, never from the envelope.</strong> If the envelope named
-it, the runner would declare where it writes — and a credential that does not bound
-the write is not a boundary at all. It is also why the envelope stays at v5 and why
-nothing in the engine changed: an agent and a collector upgrade independently, and
-no fleet has to move in step with a collector. The cost is real and accepted: a
-team with ten projects needs ten keys in CI.</p>
-<p><strong>There is no command that deletes an organization or a project</strong>, and the foreign
-keys are <code>on delete restrict</code>. Removing tenant data is retention, and it deserves
-to be designed there rather than smuggled in here.</p>
+it, the runner would declare where it writes — and a credential that does not
+bound the write is not a boundary at all. Adding key-scoped projects required no
+envelope change or engine change: an agent and a collector upgrade independently,
+and no fleet has to move in step with a collector. The cost is real and accepted:
+a team with ten projects needs ten keys in CI.</p>
+<p><strong>Deleting an organization or a project is its own command</strong>
+(<a href="#deleting-a-project-an-organization-or-a-typo">below</a>), and the foreign keys are
+<code>on delete restrict</code>, so nothing cascades by accident.</p>
 <p><strong>Renaming is safe.</strong> A key hangs off a project's identity, not its name, so
 <code>project rename</code> does not invalidate anything.</p>
 <h3 id="what-migration-0003-did-to-a-collector-that-already-had-data">What migration <code>0003</code> did to a collector that already had data</h3>
@@ -457,6 +542,11 @@ without reading a changelog still finds out where their history went.</p>
 tenant column on a database serving two teams folds their evidence into one
 undifferentiated pile, so the down migration counts the tenants across the
 submissions <em>and</em> the keys first and raises rather than doing it.</p>
+<h2 id="what-the-collector-refuses-and-redacts-on-ingest">What the collector refuses and redacts on ingest</h2>
+<p><code>POST /findings</code> redacts recognisable secrets with engine patterns and <code>[redacted:&lt;label&gt;:&lt;12 hex digits&gt;]</code>; a value reaching past a recognised key becomes one placeholder with it; placeholders the engine writes remain unchanged. Redacted fields: <code>source</code>; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).</p>
+<p>Post-redaction overflow (4,096 characters: <code>source</code>/error sources; 65,536: other text fields) returns <code>422</code>; nothing is stored. A v8 envelope without <code>findings</code>, <code>unverified</code>, <code>errors</code> or <code>summary</code> also returns <code>422</code>, naming the missing field.</p>
+<p>Across accepted envelope versions, published-schema violations return <code>422</code>, one error entry (<code>loc</code>, <code>msg</code>, <code>input</code>) per value: severity outside exact-case <code>INFO</code>/<code>LOW</code>/<code>MEDIUM</code>/<code>HIGH</code>/<code>CRITICAL</code>; verdict outcome outside <code>pass</code>/<code>fail</code>/<code>inconclusive</code>; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside <code>pass</code>/<code>fail</code>/<code>indeterminate</code>; evidence mode outside <code>metadata_only</code>/<code>redacted</code>/<code>full</code>; a skip reason outside <code>missing_capability</code>/<code>unsafe_mode</code>/<code>not_applicable</code>/<code>not_recorded</code>/<code>not_offered</code>; an identity that is present but not <code>sha256:</code> followed by 64 lower-case hex digits. Permitted <code>null</code> remains accepted.</p>
+<p>Data stored earlier reads back unchanged, including any secret it holds; redaction applies to new submissions. The dashboard never ranks an unknown severity as the worst.</p>
 <h2 id="limits-how-much-one-caller-may-send-and-how-often">Limits: how much one caller may send, and how often</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -491,8 +581,14 @@ four times the limit, and there is no shared counter. That is stated rather than
 implied, because a limit somebody believes is global and is not is worse than one
 they know to put a reverse proxy in front of. For a real global limit, rate-limit
 at the proxy that already terminates your TLS.</p>
-<p>An unauthenticated caller is charged by peer address, an authenticated one by its
-credential — so one noisy agent cannot spend a whole fleet's allowance.</p>
+<p>A credential is charged on its own only after the collector has accepted it; every
+other request — no key, a rejected key, a key no route checked — is charged to the
+peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
+inventing a new token per request cannot buy a fresh one. Key acceptance and
+usage are separate: a route that checks no key, such as <code>/healthz</code> or <code>/readyz</code>,
+leaves its count unchanged. A key refused by one route and accepted again resumes
+its existing minute. The limiter tracks at
+most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its <code>Bearer</code> scheme; an Authorization header with a scheme other than <code>Bearer</code> is charged to the peer address.</p>
 <h2 id="choosing-where-submissions-go">Choosing where submissions go</h2>
 <p>There is no default, on purpose. A store nobody chose is a store somebody
 deploys, and the ephemeral one loses everything on restart.</p>
@@ -518,7 +614,9 @@ guardana-collector key revoke &lt;prefix&gt;
 <p><strong><code>--project</code> is required, and this command does not guess</strong> even when exactly one
 project exists. Issuing a credential against a tenant nobody named has the same
 shape as a default credential, and <code>bootstrap</code> already covers the case where there
-is only one.</p>
+is only one. <code>--expires-in-days</code> must be at least <code>1</code>; a smaller value exits <code>3</code> and
+stores nothing. <code>key list</code> shows each key as <code>active</code>, <code>expired</code> or <code>revoked</code>, with
+its expiry.</p>
 <pre><code class="language-bash">export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
 guardana scan . --reporter server://https://collector.example.com
 curl -H &quot;Authorization: Bearer gdn_…&quot; https://collector.example.com/findings
@@ -532,7 +630,11 @@ credential on a command line lands in shell history, in <code>ps</code>, and in 
 command of most CI logs — the same reason <code>probe</code> takes <code>--api-key-env</code> rather
 than <code>--api-key</code>. A collector that rejects a submission says so as a warning
 naming the status, because a whole fleet quietly failing to report while a
-dashboard shows stale data as current is the failure that matters.</p>
+dashboard shows stale data as current is the failure that matters. What the
+collector says back, and why it could not be reached, is printed with that key
+withheld, recognisable secrets redacted and control characters dropped, so a
+collector that echoes the <code>Authorization</code> header cannot put the key in a CI log or
+rewrite the terminal.</p>
 <p><strong><code>--reporter</code> takes the collector's URL, not a route.</strong> The reporter appends the
 ingest path itself, so <code>server://https://collector.example.com</code> is the whole thing
 a pipeline needs to know. A URL that already carries a path is left alone, for a
@@ -564,17 +666,75 @@ bearer token and every panel would have loaded empty. Now the browser signs in:<
 <pre><code class="language-bash">guardana-collector key create --project acme/web --name panel --scope read
 # then open the collector and paste the key once
 </code></pre>
-<p>The key goes into an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie the page itself cannot
-read; <code>key revoke</code> ends the session, and an expiring key ends it on its own. There
-are no user accounts — those arrive with RBAC and replace this.</p>
+<p>The key is stored in an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie that the page itself cannot read.
+<code>key revoke</code> ends the session, and the session also ends when the key expires. There are no
+user accounts: the key is the page's only identity.</p>
+<p><strong>The cookie holds the read-scoped API key itself.</strong> Stealing it gives read access until the key is revoked or expires. It is marked <code>Secure</code> only when the request reaches the collector as <code>https</code>, directly or through a trusted <code>X-Forwarded-Proto</code>; over plain http the key travels in clear. It is a browser-session cookie with no remember-me, refresh or idle timeout. Bound its lifetime with <code>--expires-in-days</code> on the panel key.</p>
 <p><strong>The cookie authenticates reads and nothing else.</strong> Ingest takes a bearer header
 only, so a page on another origin cannot make a signed-in browser submit findings.
 That is enforced in the guard rather than left to <code>SameSite</code>, because a control
 that rests on one browser flag fails the day somebody adds an exception for a
-proxy (<a href="design/panel-sessions.html">design</a>).</p>
+proxy.</p>
 <p>A signed-in browser sees exactly what the key sees: one project, and one
 environment when the key is pinned to one. It cannot reach further than a <code>curl</code>
 with the same key.</p>
+<p>The panel's <code>/stats</code> aggregates the newest 1,000 submissions of that project, not
+its whole history, so a refresh costs the same on a collector that has held a
+project for years. The response says which: <code>window.limit</code> is the bound, and
+<code>window.complete</code> is <code>false</code> when older submissions exist that the totals leave
+out. <code>guardana-collector run list --limit N</code> still lists the older runs.</p>
+<p><code>/stats</code> also counts what runs did not check. <code>totals.skipped</code> counts rules skipped
+for any reason except <code>not_applicable</code>. A bare rule id from an agent older than skip
+reasons also counts because it gives no reason. <code>by_gate</code> counts submissions per
+recorded gate, using <code>not_recorded</code> when a run sent none. Each <code>by_source</code> row carries
+its <code>skipped</code> count and its newest run's <code>gate</code> (<code>null</code> when that run sent none).
+The page gives skipped checks and indeterminate gates their own tiles and lists
+each beside the findings. A run with a skipped check or an undecided gate therefore
+never reads as &quot;No findings&quot;.</p>
+<p><code>GET /stats</code> responds only while the dashboard is mounted, to a read key or a signed-in
+browser:</p>
+<pre><code class="language-bash">curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/stats
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>What it holds</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>window</code></td>
+<td><code>{limit, complete}</code>: the bound, <code>1000</code>, and whether every submission fitted inside it</td>
+</tr>
+<tr>
+<td><code>totals</code></td>
+<td><code>{submissions, sources, findings, unverified, errors, skipped}</code> over the window. <code>submissions</code> counts submissions and <code>sources</code> distinct sources; <code>findings</code>, <code>unverified</code> and <code>errors</code> count entries; <code>skipped</code> counts skipped rules whose reason is not <code>not_applicable</code></td>
+</tr>
+<tr>
+<td><code>by_severity</code></td>
+<td>findings per severity name</td>
+</tr>
+<tr>
+<td><code>by_gate</code></td>
+<td>submissions per recorded gate, with <code>not_recorded</code> for a run that sent none</td>
+</tr>
+<tr>
+<td><code>by_source</code></td>
+<td>one row per source, most findings first: <code>{source, findings, unverified, errors, skipped, gate, worst_severity, last_seen}</code>; <code>gate</code> is the newest run's</td>
+</tr>
+<tr>
+<td><code>by_rule</code></td>
+<td>the 10 rules with the most findings, as <code>{rule_id, count}</code></td>
+</tr>
+<tr>
+<td><code>series</code></td>
+<td>up to 24 equal time buckets across the window, each <code>{t, findings, unverified, errors}</code>; empty when nothing is stored</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>last_seen</code> and <code>t</code> are Unix times in seconds, taken when the collector received a submission;
+a bucket's <code>t</code> is its start time.</p>
 <h3 id="a-database-outage-is-not-a-rejected-key">A database outage is not a rejected key</h3>
 <p>If the collector cannot reach its database while checking a key, it answers <code>503</code>,
 not <code>401</code>. A fleet told its credentials were rejected goes and rotates credentials
@@ -587,13 +747,128 @@ the app in code) accepts a collector anyone who can reach the port can read and
 write. It exists for evaluating Guardana on a laptop, and it has to be typed:
 combined with choosing the ephemeral store, that is two explicit switches for the
 toy configuration and none for the real one.</p>
+<h2 id="the-http-api">The HTTP API</h2>
+<p>The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with <code>--reporter server://&lt;collector URL&gt;</code>.</p>
+<p><code>/openapi.json</code> lists routes, key permissions and refusals: <code>401</code> for a missing or unaccepted key, <code>403</code> for insufficient permission, and <code>503</code> when the database cannot be reached to check the key.</p>
+<p>The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. <code>/docs</code>, <code>/redoc</code> and <code>/docs/oauth2-redirect</code> return <code>404</code>. To browse the API, download the document (<code>curl --fail --show-error &quot;$COLLECTOR_URL/openapi.json&quot; -o openapi.json</code>) and open it in an OpenAPI viewer installed on your machine.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Permission</th>
+<th>Session cookie accepted</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>POST /findings</code></td>
+<td><code>ingest</code></td>
+<td>No</td>
+</tr>
+<tr>
+<td><code>GET /findings</code></td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>GET /trend</code></td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>GET /stats</code> (dashboard only)</td>
+<td><code>read</code></td>
+<td>Yes</td>
+</tr>
+<tr>
+<td><code>/healthz</code>, <code>/readyz</code></td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/catalog</code>, <code>/</code> (dashboard only)</td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>POST /session</code>, <code>DELETE /session</code> (dashboard only)</td>
+<td>None; <code>POST</code> takes a <code>read</code> key in its body</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>/openapi.json</code></td>
+<td>None (public)</td>
+<td>—</td>
+</tr>
+</tbody>
+</table></div>
+<p>Send keys as <code>Authorization: Bearer &lt;key&gt;</code>. Read routes also accept the <code>guardana_session</code> cookie set by the dashboard after <code>POST /session</code>; a <code>Bearer</code> header takes precedence. Permissions belong to keys, not OAuth2 scopes.</p>
+<p>With <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code>, no route requires a key and the OpenAPI document declares no security requirement.</p>
+<p><code>--reporter</code> sends the whole versioned envelope: gate, run id and findings. Its schema is <a href="https://github.com/guardana/guardana/blob/main/schemas/collector-envelope-v8.schema.json"><code>schemas/collector-envelope-v8.schema.json</code></a>.</p>
+<p>This example posts a hand-written synthetic envelope to show its shape:</p>
+<pre><code class="language-bash">export INGEST_KEY=gdn_…   # a key with the ingest permission
+export READ_KEY=gdn_…     # a key with the read permission
+curl -s -X POST https://collector.example.com/findings \
+  -H &quot;Authorization: Bearer $INGEST_KEY&quot; -H &quot;Content-Type: application/json&quot; \
+  -d '{&quot;schema_version&quot;: 8, &quot;source&quot;: &quot;ci/acme-web&quot;,
+       &quot;findings&quot;: [{&quot;rule_id&quot;: &quot;acme.synthetic_check&quot;, &quot;severity&quot;: &quot;HIGH&quot;,
+                     &quot;title&quot;: &quot;Synthetic finding&quot;, &quot;target_ref&quot;: &quot;app/settings.py:3&quot;,
+                     &quot;evidence&quot;: {&quot;summary&quot;: &quot;a synthetic example&quot;}}],
+       &quot;unverified&quot;: [], &quot;errors&quot;: [],
+       &quot;summary&quot;: {&quot;rules_run&quot;: 1, &quot;rules_executed&quot;: [&quot;acme.synthetic_check&quot;],
+                   &quot;rules_skipped&quot;: [], &quot;max_severity&quot;: &quot;HIGH&quot;, &quot;unverified&quot;: 0, &quot;errors&quot;: 0}}'
+curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; &quot;https://collector.example.com/findings?limit=1&quot;
+curl -s -H &quot;Authorization: Bearer $READ_KEY&quot; https://collector.example.com/trend   # {&quot;HIGH&quot;: 1} on a fresh project
+</code></pre>
+<h3 id="reading-results-back">Reading results back</h3>
+<p><code>GET /findings</code> returns the newest submissions the key may read, newest first, as a JSON list
+of envelopes in their stored form. It takes two query parameters:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>limit</code></td>
+<td><code>100</code></td>
+<td>how many submissions, from <code>1</code> to <code>1000</code>; anything else is refused with <code>422</code></td>
+</tr>
+<tr>
+<td><code>source</code></td>
+<td>none</td>
+<td>only submissions whose <code>source</code> is exactly this value</td>
+</tr>
+</tbody>
+</table></div>
+<p>There is no cursor or offset. A reader gets at most the newest 1,000 matching submissions;
+older submissions are not accessible through this route.
+<code>guardana-collector run list --limit N</code> lists older runs for an operator with database access.
+<code>GET /trend</code> returns finding counts by severity across everything the key's project stores.</p>
+<h3 id="what-the-envelope-leaves-out">What the envelope leaves out</h3>
+<p>The envelope is smaller than the saved run and has its own version (8). The collector keeps
+only what the envelope contains: <code>source</code>, <code>findings</code>, <code>unverified</code>, <code>errors</code>, a <code>summary</code>
+(<code>rules_run</code>, <code>rules_executed</code>, <code>rules_skipped</code> as <code>{rule_id, reason, missing}</code>,
+<code>max_severity</code>, and the <code>unverified</code> and <code>errors</code> counts), the declared <code>deployment</code>, and a
+<code>run</code> block (<code>run_id</code>, <code>started_at</code>, <code>completed_at</code>, <code>tool_version</code>, <code>gate</code>,
+<code>evidence_mode</code>, <code>requests</code>, <code>input_tokens</code>, <code>output_tokens</code>, <code>wall_time_seconds</code>). It does
+not contain waived findings, observations, assessments, the file listing, coverage shortfalls,
+why a run stopped, a skip's <code>detail</code>, or the manifest's rule, suite and trial records. A
+<code>gate</code> of <code>indeterminate</code> means the run did not pass; the saved run explains why. A tool that
+needs the whole result reads the saved run (<a href="reading-results.html">reading results</a>).</p>
 <h2 id="migrations">Migrations</h2>
 <pre><code class="language-bash">guardana-collector status      # what is applied, what is pending
 guardana-collector migrate     # apply everything pending
 guardana-collector rollback    # undo the most recent (--steps N for more)
 </code></pre>
 <p>Exit codes match <a href="exit-codes.html">the table the rest of the tool uses</a>: <code>0</code> did
-what was asked, <code>1</code> the database said no, <code>3</code> the command was pointed at nothing.</p>
+what was asked, <code>1</code> the database said no, <code>3</code> the command was pointed at nothing,
+<code>4</code> the database could not be reached. Every command that needs the database,
+<code>status</code> included, exits <code>4</code> when the connection cannot be opened; an error after
+it opened is <code>1</code>. <code>serve</code> opens its own connections and starts without one.</p>
 <p><strong>Every migration ships a rollback</strong>, checked when the migration set is loaded
 rather than when it is needed. A schema change that cannot be undone is an upgrade
 nobody will risk, and &quot;we will write the rollback if we need it&quot; is a decision
@@ -603,7 +878,7 @@ One that fails half-way leaves the database as it found it, rather than in a sta
 no version describes.</p>
 <p><strong>A Postgres advisory lock covers the whole run</strong>, so two replicas starting
 together cannot both apply the same version.</p>
-<h3 id="three-things-the-runner-refuses">Three things the runner refuses</h3>
+<h3 id="four-things-the-runner-refuses">Four things the runner refuses</h3>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -632,13 +907,17 @@ together cannot both apply the same version.</p>
 </table></div>
 <p>Rolling back <code>0004</code> needs no refusal: it drops labels, which loses information and
 merges no tenants, and the submissions themselves stay.</p>
+<p><code>rollback --steps N</code> undoes one migration at a time, each in its own transaction.
+A refusal at <code>0003</code> comes after the later migrations are already rolled back.
+The command exits <code>1</code>; <code>migrate</code> applies them again, but labels dropped by rolling
+back <code>0004</code> stay lost.</p>
 <h2 id="health-and-readiness-are-two-questions">Health and readiness are two questions</h2>
 <pre><code class="language-bash">curl -s localhost:8000/healthz   # the process is running. Touches no database
 curl -s localhost:8000/readyz    # the schema this build expects is the one present
 </code></pre>
 <p><code>/readyz</code> returns <code>503</code> while a migration is pending, so a rolling deploy does not
 send traffic at a schema that is not there yet — and returns <code>503</code> again after a
-rollback, which is the direction that matters during an incident.</p>
+rollback, which is the direction that matters during an incident. <code>/</code>, <code>/healthz</code> and <code>/readyz</code> also answer <code>HEAD</code> with the status and headers <code>GET</code> gives and no body, so a <code>HEAD</code> monitor sees the same <code>503</code>.</p>
 <p>Under <code>GUARDANA_STORAGE=memory</code> it reports <code>&quot;storage&quot;: &quot;memory&quot;</code> rather than a
 plain &quot;ready&quot;. A fleet view that cannot tell durable from ephemeral will read one
 as the other, and the ephemeral one is the one that forgets.</p>
@@ -663,10 +942,19 @@ guardana scan . --reporter server://http://127.0.0.1:8000
 <p>To look at nothing but the dashboard, skip all of it — <code>GUARDANA_STORAGE=memory</code>
 with <code>GUARDANA_ALLOW_UNAUTHENTICATED=1</code> still starts a collector with a working
 page, no database, no organization and no key.</p>
-<p>A collector that is unreachable never changes a gate's exit code — the scan
-already ran and its verdict stands on its own. A collector that <em>rejects</em> a
-submission is different and says so, because a whole fleet silently failing to
-report while a dashboard shows stale data as current is the failure that matters.</p>
+<p>A submission counts as delivered only when the collector answers with its own
+acknowledgement — a JSON object whose <code>status</code> is <code>ok</code>, with an integer <code>stored</code> and a
+boolean <code>duplicate</code>, which every collector that accepts envelope 8 sends. Any other <code>2xx</code>,
+from a proxy, a health check or another service at the collector's address, is
+<code>could not submit to reporter: the response was not a collector acknowledgement</code>.</p>
+<p>By default a collector that is unreachable or does not acknowledge never changes a gate's
+exit code — the scan already ran and its verdict stands on its own. A collector that
+<em>rejects</em> a submission says so, because a whole fleet silently failing to report while a
+dashboard shows stale data as current is the failure that matters. A pipeline whose run
+only counts once the collector holds it sets <a href="profiles.html#delivery"><code>delivery.required</code></a> in
+its profile: then each of those is an <code>error:</code> and the command exits <code>8</code>, with the verdict
+printed. The client honours the proxy variables (<code>HTTPS_PROXY</code>, <code>NO_PROXY</code>): the collector
+is a destination the operator names, reached through the operator's network.</p>
 <h2 id="contributing-to-the-collector">Contributing to the collector</h2>
 <p>Its tests need a real PostgreSQL. Without one they <strong>skip</strong>, so changing a rule
 does not require running a database. Setting <code>GUARDANA_REQUIRE_POSTGRES=1</code> turns
@@ -684,8 +972,6 @@ run against both for the same reason, and a further test walks the <code>Store</
 protocol and fails on any method that does not take a tenant scope first.</p>
 <h2 id="see-also">See also</h2>
 <ul>
-<li><a href="design/collector-persistence.html"><code>design/collector-persistence.md</code></a> — why persistence is shaped the way it is</li>
-<li><a href="design/collector-tenancy.html"><code>design/collector-tenancy.md</code></a> — the organization/project boundary that is being built next</li>
 <li><a href="architecture.html#the-coreserver-boundary"><code>architecture.md</code></a> — why the engine never imports this</li>
 <li><a href="privacy.html"><code>privacy.md</code></a> — evidence is redacted by the agent before it is sent</li>
 </ul>
@@ -693,8 +979,10 @@ protocol and fails on any method that does not take a tenant scope first.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-collector.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

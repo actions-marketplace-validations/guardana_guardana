@@ -1,0 +1,272 @@
+{
+  "schema_version": 2,
+  "$schema": "https://guardana.dev/schemas/run/v2.schema.json",
+  "run": {
+    "run_id": "572127ef-6041-41a8-bd52-9bbbdf823f7b",
+    "created_at": "2026-10-04T14:07:10.151996Z",
+    "started_at": "2026-10-04T14:07:10.129359Z",
+    "completed_at": "2026-10-04T14:07:10.151996Z",
+    "migrated_from": null,
+    "source": {
+      "kind": "local",
+      "provider": "local",
+      "run_url": null
+    },
+    "guardana": {
+      "version": "0.7.0",
+      "commit": null,
+      "distribution_versions": {}
+    },
+    "target": {
+      "type": "artifact",
+      "ref": "subject",
+      "fingerprint": "sha256:cf6965804d2fb73b6a022930082687fcf4c9251947c29117b9c4cd4e8fcdcb40",
+      "fingerprint_inputs": [
+        "kind",
+        "ref"
+      ],
+      "capabilities": [
+        "read_files"
+      ]
+    },
+    "deployment": {
+      "ai_system": null,
+      "environment": null,
+      "deployment_id": null,
+      "commit_sha": null,
+      "image_digest": null,
+      "model_digest": null,
+      "model_name": null,
+      "model_revision": null
+    },
+    "configuration": {
+      "profile_name": "default",
+      "profile_digest": null,
+      "system_prompt_digest": null,
+      "tool_manifest_digest": null,
+      "retriever_digest": null,
+      "dataset_digest": null,
+      "adapter_digest": null
+    },
+    "execution": {
+      "concurrency": 1,
+      "timeout_seconds": 30,
+      "seed": null,
+      "temperature": null,
+      "max_requests": null,
+      "max_input_tokens": null,
+      "max_output_tokens": null,
+      "max_duration_seconds": null
+    },
+    "usage": {
+      "requests": 0,
+      "input_tokens": null,
+      "output_tokens": null,
+      "requests_missing_token_counts": 0,
+      "estimated_cost": null,
+      "wall_time_seconds": 0.022637
+    },
+    "rules": [
+      {
+        "id": "guardana.supply_chain.pickle_opcode",
+        "digest": "4cce7cc8b5045bde",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.dependency_risk",
+        "digest": "dee1724bc40dd6af",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code",
+        "digest": "cebd31381682c870",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.remote_code_config",
+        "digest": "234243eb9fca874b",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.code_execution",
+        "digest": "92f6cd71725e0dcd",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.insecure_transport",
+        "digest": "edac142b3a102d04",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.keras_lambda",
+        "digest": "001e1af9a9ac77df",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.saved_model_ops",
+        "digest": "bf42202f1e37397c",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.malicious_dependency",
+        "digest": "fde62633dcca8af4",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.hallucinated_package",
+        "digest": "8ffdd7e005f67861",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.hardcoded_secret",
+        "digest": "2bf864470fd6e142",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.model_format",
+        "digest": "ace6cbcc5855f5da",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.chat_template",
+        "digest": "cd3152568201d8c5",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.onnx_graph",
+        "digest": "b474288bbb1a0292",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.notebook_payload",
+        "digest": "8cfde6a512b21350",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.supply_chain.provenance",
+        "digest": "be61cb0adb97efe8",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.prompt.mcp_tool_poisoning",
+        "digest": "6c8162e0b6c6e071",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.prompt.hidden_instructions",
+        "digest": "df94948061ac7fd7",
+        "version": null,
+        "maturity": null
+      },
+      {
+        "id": "guardana.training.dataset_integrity",
+        "digest": "34a8a95209d981d8",
+        "version": null,
+        "maturity": null
+      }
+    ],
+    "evaluators": [],
+    "result_summary": {
+      "findings": 1,
+      "unverified": 0,
+      "waived": 0,
+      "errors": 0,
+      "observations": 1,
+      "rules_run": [
+        "guardana.supply_chain.pickle_opcode",
+        "guardana.supply_chain.dependency_risk",
+        "guardana.supply_chain.remote_code",
+        "guardana.supply_chain.remote_code_config",
+        "guardana.supply_chain.code_execution",
+        "guardana.supply_chain.insecure_transport",
+        "guardana.supply_chain.keras_lambda",
+        "guardana.supply_chain.saved_model_ops",
+        "guardana.supply_chain.malicious_dependency",
+        "guardana.supply_chain.hallucinated_package",
+        "guardana.supply_chain.hardcoded_secret",
+        "guardana.supply_chain.model_format",
+        "guardana.supply_chain.chat_template",
+        "guardana.supply_chain.onnx_graph",
+        "guardana.supply_chain.notebook_payload",
+        "guardana.supply_chain.provenance",
+        "guardana.prompt.mcp_tool_poisoning",
+        "guardana.prompt.hidden_instructions",
+        "guardana.training.dataset_integrity"
+      ],
+      "rules_skipped": [],
+      "max_severity": "CRITICAL",
+      "gate": "fail",
+      "stopped_by": null
+    },
+    "privacy": {
+      "evidence_mode": "redacted",
+      "redaction_policy_digest": "sha256:0cd5e234a4743cfec51f347eb119e68353aeb246899b9de04b7e1e1f1336106f"
+    }
+  },
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "subject/model.pkl",
+      "evidence": {
+        "summary": "unpickling imports non-allowlisted callable: os.system",
+        "detail": "file=model.pkl"
+      },
+      "verdict": null
+    }
+  ],
+  "unverified": [],
+  "waived": [],
+  "errors": [],
+  "observations": [
+    {
+      "kind": "model",
+      "name": "model.pkl",
+      "ref": "subject/model.pkl",
+      "attributes": {
+        "format": "pickle",
+        "size_bytes": "41"
+      }
+    }
+  ]
+}

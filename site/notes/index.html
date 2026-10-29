@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guardana notes</title>
+<meta name="description" content="Articles from the Guardana maintainers about AI security verification.">
+<link rel="canonical" href="https://guardana.dev/notes/">
+<link rel="alternate" type="application/atom+xml" title="Guardana notes" href="/notes/feed.xml">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="/docs/docs.css">
+<style>main.notes{margin:0 auto;padding:34px 20px 88px}.notes-index{list-style:none;padding:0}.notes-index li{margin:0 0 26px}.notes-index time,.notes time{color:var(--faint);font-size:14px}.notes-index h2{font-size:21px;margin:2px 0 4px;border:0;padding:0}.notes-index p{margin:0;color:var(--muted)}</style>
+</head>
+<body>
+<header class="top"><div class="bar">
+<a class="mark" href="/"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="/docs/">Docs</a>
+<a href="/notes/">Notes</a>
+</nav>
+</div></header>
+<main class="notes">
+<h1>Notes</h1><p class="lede">Articles from the Guardana maintainers. Follow them with the <a href="/notes/feed.xml">Atom feed</a>; nothing here needs an account.</p><ol class="notes-index">
+<li><time datetime="2026-10-27">2026-10-27</time><h2><a href="/notes/release-gate-evidence-1-0-0">1.0.0 release gate evidence for engineering criteria (#144)</a></h2><p>The engineering tests passed on fb9ab309 for 1.0.0; items without their own tests are tracked in #215.</p></li>
+<li><time datetime="2026-10-25">2026-10-25</time><h2><a href="/notes/security-runbook-drill">Security runbook drill (#142)</a></h2><p>The maintainer exercised private intake, coordination, a fix, TestPyPI release and withdrawal, disclosure on paper, and cleanup on a made-up report.</p></li>
+<li><time datetime="2026-10-23">2026-10-23</time><h2><a href="/notes/retrieval-pilot-poisoned-document-and-tenant-filter">Retrieval pilot: poisoned document and tenant filter (#139)</a></h2><p>The fixed pilot passed; a broken tenant filter failed the tenancy check, and a model obeying a document failed the poisoned-document check.</p></li>
+<li><time datetime="2026-10-23">2026-10-23</time><h2><a href="/notes/regression-loop-with-a-redacted-regression">Regression loop with a redacted regression (#140)</a></h2><p>A redacted recording retained the regression, failed regrading and the CI comparison, and supplied a regression pair after the question was rewritten.</p></li>
+<li><time datetime="2026-10-23">2026-10-23</time><h2><a href="/notes/collector-recovery-runbooks">Collector recovery runbooks (#143)</a></h2><p>The proof upgraded a database created by 0.41.0, checked rollback and readiness, and restored a Compose backup in place and onto a new volume.</p></li>
+<li><time datetime="2026-10-20">2026-10-20</time><h2><a href="/notes/customization-through-published-extension-points">Customization through published extension points (#141)</a></h2><p>The customization proof passed all 12 steps using the published reference pack in a fresh environment with the network cut.</p></li>
+<li><time datetime="2026-10-20">2026-10-20</time><h2><a href="/notes/clean-install-offline-first-run">Clean-install offline first run (#138)</a></h2><p>The offline first-run proof passed all 12 cells across Linux, macOS and Windows, each with 14 of 14 steps.</p></li>
+<li><time datetime="2026-10-07">2026-10-07</time><h2><a href="/notes/tenant-leaks-and-poisoned-documents">Catching tenant leaks and poisoned documents before release</a></h2><p>A reference retrieval app shows how to check tenant answers and document instructions, save the result, and rerun it with clear coverage limits.</p></li>
+</ol>
+</main>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana · Apache-2.0</span>
+<a href="/notes/feed.xml">Atom feed</a>
+<a href="/llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

@@ -5,6 +5,8 @@ from pathlib import Path
 from guardana.core.formats import FormatError, read_gguf_metadata
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -16,23 +18,40 @@ from guardana.core.taxonomy import (
     OWASP_LLM05_2025,
     OWASP_LLM10_2026,
 )
+from guardana.core.testing import build_gguf
 from guardana.rules._base import ArtifactRule
+from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._jinja_gadgets import Gadget, jinja_gadgets
-from guardana.rules.supply_chain._leads import unscanned_verdict
-from guardana.rules.supply_chain._reading import read_bytes_bounded, read_text_bounded
+from guardana.rules.supply_chain._leads import unread_component, unscanned_verdict
+from guardana.rules.supply_chain._reading import (
+    MAX_SCAN_BYTES,
+    read_bytes_bounded,
+    read_model,
+    read_text_prefix,
+)
 
 _RULE_ID = "guardana.supply_chain.chat_template"
 _UNSCANNED_TITLE = "Chat template not scanned"
+_PAST_THE_BOUND = f"the file is larger than the {MAX_SCAN_BYTES}-byte read bound"
 
 # The same template ships in up to four places for one model, and a scanner that
 # knows only one of them reports the other three clean: inside GGUF metadata, in
 # `tokenizer_config.json`, and — since transformers 4.47 saves it this way by
-# default — as a standalone `chat_template.jinja`.
+# default — as a standalone `chat_template.jinja`. A GGUF file also carries named
+# templates (`tokenizer.chat_template.tool_use`), which llama.cpp loads as readily.
 _GGUF_TEMPLATE_KEY = "tokenizer.chat_template"
 _CONFIG_NAMES = frozenset({"tokenizer_config.json", "chat_template.json", "processor_config.json"})
 _CONFIG_KEY = "chat_template"
 _TEMPLATE_STEM = "chat_template"
 _TEMPLATE_SUFFIXES = (".jinja", ".j2")
+# transformers 5 also loads every `.jinja` in this directory as a named template, and
+# the one named `default` takes priority over `tokenizer_config.json`.
+_TEMPLATE_DIRECTORY = "additional_chat_templates"
+_ENTRIES_LISTED = 5
+
+
+_GADGET = "{{ lipsum.__globals__['os'].popen('id').read() }}"
+_PLAIN_TEMPLATE = "{% for m in messages %}{{ m['role'] }}: {{ m['content'] }}\n{% endfor %}"
 
 
 class ChatTemplateRule(ArtifactRule):
@@ -58,71 +77,100 @@ class ChatTemplateRule(ArtifactRule):
             OWASP_ASI05_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
 
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a GGUF template with a gadget, a plain one and a GGUF file cut short."""
+        return materialise(
+            (
+                _samples.sample(
+                    "a GGUF chat template reaching os through lipsum.__globals__",
+                    FixtureOutcome.FINDING,
+                    {"model.gguf": build_gguf({_GGUF_TEMPLATE_KEY: _GADGET})},
+                ),
+                _samples.sample(
+                    "a GGUF chat template that only formats messages",
+                    FixtureOutcome.CLEAN,
+                    {"model.gguf": build_gguf({_GGUF_TEMPLATE_KEY: _PLAIN_TEMPLATE})},
+                ),
+                _samples.sample(
+                    "a GGUF file cut off inside its template",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {"model.gguf": build_gguf({_GGUF_TEMPLATE_KEY: _GADGET})[:-8]},
+                ),
+            )
+        )
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`."""
+        """Scan every carrier of a chat template: GGUF metadata, tokenizer config, `.jinja`.
+
+        A `.jinja` counts when it is named `chat_template*` or sits in
+        `additional_chat_templates/`, where transformers finds its named templates.
+        """
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".gguf",)):
-            yield from self._scan_gguf(path)
+            yield from self._scan_gguf(path, ctx)
+            ctx.examined(path)
         for path in target.iter_files(_TEMPLATE_SUFFIXES):
-            if path.stem.startswith(_TEMPLATE_STEM):
-                yield from self._scan_template_file(path)
+            if _is_template_file(path):
+                yield from self._scan_template_file(path, ctx)
         for path in target.iter_files((".json",)):
-            if path.name in _CONFIG_NAMES:
-                yield from self._scan_config(path)
+            if path.name.lower() in _CONFIG_NAMES:
+                yield from self._scan_config(path, ctx)
 
-    def _scan_gguf(self, path: Path) -> Iterator[Finding]:
+    def _scan_gguf(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         try:
-            metadata = read_gguf_metadata(path)
+            metadata = read_model(read_gguf_metadata, path)
         except FormatError as exc:
-            yield self._unscanned(path, str(exc))
+            yield self._unscanned(path, str(exc), ctx)
             return
         # A model with no template is not an open question — the file was read and
         # understood. Only an unreadable file is.
-        template = metadata.text(_GGUF_TEMPLATE_KEY)
-        if template is not None:
-            yield from self._graded(path, _GGUF_TEMPLATE_KEY, template)
+        for key in sorted(metadata.entries):
+            if key != _GGUF_TEMPLATE_KEY and not key.startswith(f"{_GGUF_TEMPLATE_KEY}."):
+                continue
+            template = metadata.text(key)
+            if template is not None:
+                yield from self._graded(path, key, template)
 
-    def _scan_template_file(self, path: Path) -> Iterator[Finding]:
+    def _scan_template_file(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
         prefix = read_bytes_bounded(path)
         if prefix is None:
-            yield self._unscanned(path, "file could not be read")
+            yield self._unscanned(path, "file could not be read", ctx)
             return
         raw, truncated = prefix
-        findings = list(self._graded(path, path.name, raw.decode("utf-8", errors="ignore")))
-        yield from findings
-        # Padding a template past the read bound to push the gadget out of view is
-        # the obvious evasion once a scanner is known, so a partial read that found
-        # nothing reports what it is: a partial read.
-        if truncated and not findings:
-            yield self._unscanned(path, "the template is larger than the read bound")
+        yield from self._graded(path, path.name, raw.decode("utf-8", errors="ignore"))
+        # Padding a template past the read bound to push a gadget out of view is the
+        # obvious evasion once a scanner is known, and a gadget found in the part that
+        # was read says nothing about a worse one after it.
+        if truncated:
+            yield self._unscanned(path, _PAST_THE_BOUND, ctx)
 
-    def _scan_config(self, path: Path) -> Iterator[Finding]:
-        document = self._config_document(path)
+    def _scan_config(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        prefix = read_text_prefix(path, errors="ignore")
+        if prefix is not None and prefix[1]:
+            yield self._unscanned(path, _PAST_THE_BOUND, ctx)
+            return
+        document = None if prefix is None else _json_object(prefix[0])
         if document is None:
-            yield self._unscanned(path, "not a readable JSON object")
+            yield self._unscanned(path, "not a readable JSON object", ctx)
             return
         if _CONFIG_KEY not in document:
             return
-        templates = list(_config_templates(document[_CONFIG_KEY]))
-        if not templates:
-            yield self._unscanned(path, f"'{_CONFIG_KEY}' is present in a shape we cannot read")
+        value = document[_CONFIG_KEY]
+        templates = list(_config_templates(value))
+        if not templates and not isinstance(value, list):
+            yield self._unscanned(
+                path, f"'{_CONFIG_KEY}' is present in a shape we cannot read", ctx
+            )
             return
         for label, template in templates:
             yield from self._graded(path, label, template)
-
-    @staticmethod
-    def _config_document(path: Path) -> dict[str, object] | None:
-        raw = read_text_bounded(path, errors="ignore")
-        if raw is None:
-            return None
-        try:
-            document = json.loads(raw)
-        except ValueError:
-            return None
-        return document if isinstance(document, dict) else None
+        unreadable = _unreadable_entries(value)
+        if unreadable or not templates:
+            yield self._unscanned(path, _unreadable_entries_reason(unreadable), ctx)
 
     def _graded(self, path: Path, label: str, template: str) -> Iterator[Finding]:
         gadgets = list(jinja_gadgets(template))
@@ -143,7 +191,8 @@ class ChatTemplateRule(ArtifactRule):
             ),
         )
 
-    def _unscanned(self, path: Path, reason: str) -> Finding:
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(_RULE_ID, path, reason))
         return Finding(
             rule_id=_RULE_ID,
             severity=Severity.LOW,
@@ -156,6 +205,22 @@ class ChatTemplateRule(ArtifactRule):
             ),
             verdict=unscanned_verdict("the template could not be read, so nothing was cleared"),
         )
+
+
+def _is_template_file(path: Path) -> bool:
+    """Whether a `.jinja` file is one a tokenizer loads as a chat template."""
+    return (
+        path.stem.lower().startswith(_TEMPLATE_STEM)
+        or path.parent.name.lower() == _TEMPLATE_DIRECTORY
+    )
+
+
+def _json_object(raw: str) -> dict[str, object] | None:
+    try:
+        document = json.loads(raw)
+    except (ValueError, RecursionError):
+        return None
+    return document if isinstance(document, dict) else None
 
 
 def _summary(gadgets: list[Gadget]) -> str:
@@ -176,3 +241,27 @@ def _config_templates(value: object) -> Iterator[tuple[str, str]]:
         for entry in value:
             if isinstance(entry, dict) and isinstance(entry.get("template"), str):
                 yield f"{_CONFIG_KEY}[{entry.get('name', '?')}]", entry["template"]
+
+
+def _readable_entry(entry: object) -> bool:
+    return isinstance(entry, dict) and isinstance(entry.get("template"), str)
+
+
+def _unreadable_entries(value: object) -> list[int]:
+    """Return the index of every entry of a named-template list that holds no template."""
+    if not isinstance(value, list):
+        return []
+    return [index for index, entry in enumerate(value) if not _readable_entry(entry)]
+
+
+def _unreadable_entries_reason(indexes: list[int]) -> str:
+    """Name, in one reason, the entries of a named-template list that could not be read."""
+    if not indexes:
+        return f"'{_CONFIG_KEY}' is an empty list of named templates"
+    listed = ", ".join(str(index) for index in indexes[:_ENTRIES_LISTED])
+    more = len(indexes) - _ENTRIES_LISTED
+    return (
+        f"'{_CONFIG_KEY}' {'entry' if len(indexes) == 1 else 'entries'} {listed}"
+        f"{f', and {more} more' if more > 0 else ''} of the named-template list "
+        "in a shape we cannot read"
+    )

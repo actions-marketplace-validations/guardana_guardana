@@ -13,6 +13,10 @@ scan` and `guardana probe` — a verdict does not change because the runner did.
 run that could not reach a verdict raises too: a check that did not happen has
 never been a check that passed, and a test suite is where that goes quiet.
 
+It also holds the checks a pack runs on its own extensions: `assert_target_conforms`
+for a target, `assert_renderer_conforms` for a format and `assert_reporter_conforms`
+for a reporter.
+
 **Not to be confused with `guardana.core.testing`**, which is the other direction:
 test doubles (scripted transports, crafted artifacts, fake credentials) for writing
 tests *about a rule you are writing*. This module is for testing *your own system*
@@ -21,10 +25,18 @@ with the rules that already exist.
 
 from guardana.testing.assertion import SecurityAssertionError, assert_secure
 from guardana.testing.conformance import TargetContractError, assert_target_conforms
+from guardana.testing.outputs import (
+    OutputContractError,
+    assert_renderer_conforms,
+    assert_reporter_conforms,
+)
 
 __all__ = [
+    "OutputContractError",
     "SecurityAssertionError",
     "TargetContractError",
+    "assert_renderer_conforms",
+    "assert_reporter_conforms",
     "assert_secure",
     "assert_target_conforms",
 ]

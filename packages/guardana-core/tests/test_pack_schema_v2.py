@@ -25,6 +25,7 @@ from guardana.core.pack import (
     check_pack,
     load_manifest,
 )
+from guardana.core.pack.discover import Registered
 
 _CORPUS = Path(__file__).resolve().parent / "pack_manifests"
 
@@ -50,7 +51,7 @@ def test_a_pack_that_ships_only_a_catalogue_can_describe_itself(tmp_path: Path) 
 
     assert manifest.taxonomies == ("ACME-CONTROLS",)
     assert manifest.provides == ("ACME-CONTROLS",)
-    assert manifest.schema_version == PACK_SCHEMA_VERSION
+    assert manifest.schema_version == 2
     assert manifest.migrated_from is None
 
 
@@ -60,7 +61,10 @@ def test_a_taxonomy_only_pack_validates_clean_against_the_catalogue_it_registers
     """Exit `0` and say something true: the pack declares a catalogue and registers it."""
     manifest = load_manifest(_write(tmp_path, _TAXONOMY_ONLY))
 
-    check = check_pack(manifest, ["ACME-CONTROLS", "guardana.prompt.injection"])
+    check = check_pack(
+        manifest,
+        Registered(rules={"guardana.prompt.injection": None}, taxonomies={"ACME-CONTROLS": None}),
+    )
 
     assert check.ok
     assert check.problems == ()
@@ -75,7 +79,7 @@ def test_a_catalogue_declared_and_not_registered_is_still_caught(tmp_path: Path)
     """
     manifest = load_manifest(_write(tmp_path, _TAXONOMY_ONLY))
 
-    check = check_pack(manifest, ["guardana.prompt.injection"])
+    check = check_pack(manifest, Registered(rules={"guardana.prompt.injection": None}))
 
     assert not check.ok
     assert "ACME-CONTROLS" in check.problems[0]

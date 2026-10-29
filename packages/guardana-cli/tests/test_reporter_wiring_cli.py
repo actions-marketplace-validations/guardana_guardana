@@ -178,7 +178,7 @@ def test_the_reporter_carries_the_collector_token_when_one_is_set(
 
     reporter = reporter_from_url("server://http://collector")
     monkeypatch.setattr(
-        "guardana.core.reporter.urlopen",
+        "guardana.core.reporter.open_unredirected",
         lambda request, timeout: _record(sent, request),
     )
     reporter.submit(ScanResult((), (), ()), source="test")
@@ -195,7 +195,7 @@ def test_no_token_means_no_authorization_header(monkeypatch: pytest.MonkeyPatch)
 
     reporter = reporter_from_url("server://http://collector")
     monkeypatch.setattr(
-        "guardana.core.reporter.urlopen",
+        "guardana.core.reporter.open_unredirected",
         lambda request, timeout: _record(sent, request),
     )
     reporter.submit(ScanResult((), (), ()), source="test")
@@ -209,6 +209,10 @@ class _Closeable:
 
     def __exit__(self, *_args: object) -> None:
         return None
+
+    def read(self, size: int = -1) -> bytes:
+        """Answer as a collector that accepted the envelope."""
+        return b'{"status": "ok", "duplicate": false, "stored": 0}'
 
 
 def _record(sent: list[dict[str, str]], request: object) -> _Closeable:

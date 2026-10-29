@@ -20,6 +20,7 @@ runner = CliRunner()
 
 
 def _scan(tmp_path: Path) -> Path:
+    (tmp_path / "notes.txt").write_text("nothing to see\n", encoding="utf-8")
     out = tmp_path / "run.json"
     result = runner.invoke(app, ["scan", str(tmp_path), "--format", "json", "--output", str(out)])
     assert result.exit_code == 0, result.output

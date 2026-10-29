@@ -1,11 +1,15 @@
 """What a server declares about who may hold a copy of a manifest it will not give away."""
 
+import pytest
+from _offline import refuse_name_lookups
 from guardana.core.rule import RuleContext
-from guardana.core.target import McpServerTarget
+from guardana.core.target import McpServerTarget, TargetChanged
 from guardana.core.target._mcp_wire import LATEST_VERSION, LEGACY_VERSION
 from guardana.core.testing import ScriptedMcpServer
 from guardana.rules.mcp import McpCacheScopeRule
 from mcp_fixtures import CREDENTIAL, ROUTABLE, findings, guarded, outcomes, summaries, wide_open
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 RULE = McpCacheScopeRule()
 
@@ -49,12 +53,23 @@ def test_a_legacy_server_declares_nothing_to_any_cache() -> None:
     assert findings(RULE, server, credential=CREDENTIAL) == []
 
 
-def test_an_unreachable_server_is_inconclusive_rather_than_clean() -> None:
-    from mcp_fixtures import unreachable  # noqa: PLC0415
-
-    target = McpServerTarget(ROUTABLE, sender=unreachable)
+def test_a_server_sharing_no_revision_is_inconclusive_rather_than_clean() -> None:
+    server = ScriptedMcpServer(ROUTABLE, protocol_versions=["2031-01-01"])
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     reported = list(RULE.run(target, RuleContext()))
 
     assert outcomes(reported) == ["inconclusive"]
-    assert "could not be reached" in summaries(reported)[0]
+    assert "no revision in common" in summaries(reported)[0]
+
+
+def test_a_modern_server_dropping_its_revision_mid_run_stops_the_run() -> None:
+    server = _modern(cache_scope="public")
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
+    target.authorization().anonymous  # noqa: B018 — settles the revision with the server
+    server.protocol_versions = ["2031-01-01"]
+
+    with pytest.raises(TargetChanged, match="stopped accepting revision 2026-07-28"):
+        list(RULE.run(target, RuleContext()))

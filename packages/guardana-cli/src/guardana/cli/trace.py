@@ -13,8 +13,14 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._plugins import resolve_trust, warn_about_load_errors
-from guardana.cli._profile import resolve_profile
+from guardana.cli._plugins import (
+    AllowPluginOption,
+    PluginsOption,
+    hint_refused_plugins,
+    resolve_trust,
+    warn_about_load_errors,
+)
+from guardana.cli._profile import PRESET_HELP, resolve_profile
 from guardana.cli._rules_loading import load_custom_rules
 from guardana.cli._trace_input import load_trace_or_exit, trace_source
 from guardana.core.registry import Registry
@@ -43,18 +49,10 @@ def inspect(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; the co
         ),
     ] = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
-    preset: Annotated[
-        str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
-    ] = None,
+    preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
     format: Annotated[InspectFormat, typer.Option(help="human|json")] = InspectFormat.human,
-    plugins: Annotated[
-        str,
-        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
-    ] = "all",
-    allow_plugin: Annotated[
-        list[str],
-        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
-    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    plugins: PluginsOption = None,
+    allow_plugin: AllowPluginOption = None,
     rules: Annotated[
         list[Path],
         typer.Option("--rules", help="Directory or file of custom YAML rules; repeatable."),
@@ -68,8 +66,10 @@ def inspect(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; the co
     """
     prof = resolve_profile(profile, preset)
     read = load_trace_or_exit(trace, dialect)
-    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=False))
-    warn_about_load_errors(registry, what="rule")
+    resolved = resolve_trust(plugins, allow_plugin, prof)
+    registry = Registry.discover(resolved.trust)
+    warn_about_load_errors(registry, resolved, what="rule")
+    hint_refused_plugins(registry, resolved)
     load_custom_rules(registry, prof, rules)
     matrix = evidence_matrix(read.trace)
     licensed = _licensed_rules(registry)
@@ -218,12 +218,37 @@ def _notes(
             f"note: {', '.join(str(d) for d in gaps)} are not recorded at all, so the rules "
             f"needing them do not run — their silence is not evidence that nothing happened"
         )
+    silent, total = _messages_without_text(trace)
+    if silent:
+        lines.append(
+            f"note: {silent} of {total} message(s) carry no readable text and no tool call, "
+            f"so a rule reading message text grades them as empty — check the producer "
+            f"writes each part's text under 'content'"
+        )
     if trace.truncated is not None:
         lines.append(
             f"note: the trace is incomplete ({trace.truncated}), so a step this file does "
             f"not contain may still have happened"
         )
+    if trace.unreadable:
+        lines.append(
+            f"note: {trace.unreadable} record(s) of this file could not be read, so a step "
+            f"they held may still have happened — `guardana analyze-trace` reports each as "
+            f"an error"
+        )
     return lines
+
+
+def _messages_without_text(trace: Trace) -> tuple[int, int]:
+    """Count the messages with neither readable text nor a tool call, and all messages.
+
+    `records` says a message was there, which is not that a rule can read it: a message
+    whose every part is empty or opaque grades as nothing said. A tool-call turn is
+    excluded because it is read as structure, and counting it would fire on every agent.
+    """
+    messages = [message for span in trace.spans for message in span.messages]
+    silent = sum(1 for m in messages if not m.text().strip() and not m.tool_calls())
+    return silent, len(messages)
 
 
 def _document(  # noqa: PLR0913, PLR0917 — one already-computed report fact per argument
@@ -248,7 +273,9 @@ def _document(  # noqa: PLR0913, PLR0917 — one already-computed report fact pe
         "producer": trace.provenance.producer,
         "spans": len(trace.spans),
         "truncated": None if trace.truncated is None else str(trace.truncated),
+        "unreadable_records": trace.unreadable,
         "trace_rules_loaded": trace_rule_count,
+        "messages_without_text": _messages_without_text(trace)[0],
         "dimensions": [
             {
                 "dimension": str(row.dimension),

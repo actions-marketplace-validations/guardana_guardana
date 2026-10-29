@@ -1,0 +1,4 @@
+# guardana.yaml
+name: production-traces
+trace:
+  require: [identity, approval, effects]

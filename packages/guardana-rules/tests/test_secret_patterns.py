@@ -1,6 +1,7 @@
 """The secret patterns are the heart of a security tool: a missed modern key is
 a silent failure. These pin the shapes that matter most in AI repos."""
 
+import random
 import re
 
 import pytest
@@ -113,3 +114,98 @@ def test_every_provider_hit_carries_its_own_label() -> None:
         labels = [m[2] for m in find_secret_matches(text, FILE_SECRET_PATTERNS)]
 
         assert labels == [expected], f"{text[:12]}… reported {labels}"
+
+
+# The file-scan private-key pattern as it was before its body became one possessive run;
+# the new one must report the same spans on every input.
+_OLD_PRIVATE_KEY_WITH_BODY = re.compile(
+    r"-----BEGIN (?:RSA |DSA |EC |OPENSSH |ENCRYPTED |PGP )?PRIVATE KEY( BLOCK)?-----"
+    r"\s*(?:[A-Za-z0-9+/=\s]{100,})-----END"
+)
+_PRIVATE_KEY_WITH_BODY = dict(FILE_SECRET_PATTERNS)["private key header"]
+_BODY_LINE = "MIIEvQ" + "IBADAN" + "Bgkqhk" * 9 + "+/=="
+
+
+def _pem(label: str, body: str, *, end: bool = True, newline: str = "\n") -> str:
+    tail = f"{newline}-----END {label}-----{newline}" if end else ""
+    return f"-----BEGIN {label}-----{newline}{body}{tail}"
+
+
+def _body(lines: int, newline: str = "\n") -> str:
+    return newline.join([_BODY_LINE] * lines)
+
+
+_LABELS = [
+    "PRIVATE KEY",
+    "RSA PRIVATE KEY",
+    "DSA PRIVATE KEY",
+    "EC PRIVATE KEY",
+    "OPENSSH PRIVATE KEY",
+    "ENCRYPTED PRIVATE KEY",
+    "PGP PRIVATE KEY BLOCK",
+]
+
+# (text, how many blocks the scan reports)
+_PEM_SHAPES = [
+    *((_pem(label, _body(3)), 1) for label in _LABELS),
+    *((_pem(label, _body(3, "\r\n"), newline="\r\n"), 1) for label in _LABELS),
+    (_pem("RSA PRIVATE KEY", "\n\n\t  " + _body(3)), 1),
+    (_pem("RSA PRIVATE KEY", _body(3) + "\n\n   "), 1),
+    ("key = '''" + _pem("OPENSSH PRIVATE KEY", _body(4)) + "'''\n", 1),
+    (_pem("RSA PRIVATE KEY", _body(2)) + "\n" + _pem("EC PRIVATE KEY", _body(2)), 2),
+    (_pem("RSA PRIVATE KEY", "Proc-Type: 4,ENCRYPTED\n\n" + _body(3)), 0),
+    (_pem("PGP PRIVATE KEY BLOCK", "Version: GnuPG v2\n\n" + _body(3)), 0),
+    (_pem("PRIVATE KEY", _BODY_LINE), 0),
+    (_pem("PRIVATE KEY", _body(3), end=False), 0),
+    (_pem("PRIVATE KEY", _body(3) + "\n-----BEGIN CERTIFICATE-----\n" + _body(3)), 0),
+    (_pem("PUBLIC KEY", _body(3)), 0),
+    (_pem("PGP PRIVATE KEY", _body(3)), 1),
+    ("-----BEGIN PRIVATE KEY BLOCK-----\n" + _body(3) + "\n-----END", 1),
+]
+
+
+def _spans_of(
+    pattern: re.Pattern[str], text: str
+) -> list[tuple[tuple[int, int], tuple[str | None, ...]]]:
+    return [(m.span(), m.groups()) for m in pattern.finditer(text)]
+
+
+@pytest.mark.parametrize(("text", "blocks"), _PEM_SHAPES)
+def test_the_file_scan_finds_a_key_block_where_it_always_did(text: str, blocks: int) -> None:
+    found = _spans_of(_PRIVATE_KEY_WITH_BODY, text)
+
+    assert found == _spans_of(_OLD_PRIVATE_KEY_WITH_BODY, text)
+    assert len(found) == blocks
+
+
+def test_the_file_scan_agrees_with_the_old_pattern_on_generated_text() -> None:
+    pieces = [
+        "-----BEGIN " + "PRIVATE KEY-----",
+        "-----BEGIN " + "RSA PRIVATE KEY-----",
+        "-----BEGIN " + "PGP PRIVATE KEY BLOCK-----",
+        "-----BEGIN " + "PGP PRIVATE KEY BLOCK",
+        "-----END",
+        "-----",
+        "-",
+        _BODY_LINE,
+        "A" * 40,
+        " " * 30,
+        "\n",
+        "\u2003" * 10,
+        "x:",
+    ]
+    rng = random.Random(1)  # noqa: S311 — seeded generated text, not a secret
+    for _ in range(20_000):
+        text = "".join(rng.choice(pieces) for _ in range(rng.randint(0, 12)))
+
+        assert _spans_of(_PRIVATE_KEY_WITH_BODY, text) == _spans_of(
+            _OLD_PRIVATE_KEY_WITH_BODY, text
+        ), repr(text)
+
+
+@pytest.mark.parametrize("filler", [" ", "\n", " \t\r\n", "A", "A "])
+def test_a_header_followed_by_a_mebibyte_of_body_and_no_end_is_scanned(filler: str) -> None:
+    text = "-----BEGIN " + "PRIVATE KEY-----" + filler * (2**20 // len(filler))
+
+    assert list(find_secret_matches(text, FILE_SECRET_PATTERNS)) == []
+    assert len(list(find_secret_matches(text + "-----END", FILE_SECRET_PATTERNS))) == 1

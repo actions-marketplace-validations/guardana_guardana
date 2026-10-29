@@ -15,7 +15,7 @@ Range: $ARGUMENTS
 In-flight work files — read the one that matches the change for its goal and done-criteria:
 
 ```!
-ls docs/work/*.md 2>/dev/null | grep -v -E 'README|BACKLOG|TEMPLATE' || echo "none"
+ls .work/*.md 2>/dev/null || echo "none"
 ```
 
 Changed files right now:
@@ -26,5 +26,8 @@ git status --short | head -60
 
 Other people's uncommitted work may sit in this tree. Review only what belongs to the change
 described by the work file or the range; list anything else under "not reviewed".
+
+When the work file names an issue, check each ticked acceptance box against its evidence and
+say which are not proven; a closing keyword over an unproven box is a finding.
 
 Follow your review order and report format exactly.

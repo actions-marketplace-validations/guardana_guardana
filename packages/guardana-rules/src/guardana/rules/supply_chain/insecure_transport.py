@@ -1,15 +1,20 @@
 import ast
 from collections.abc import Iterable, Iterator
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules._base import ArtifactRule
+from guardana.rules.supply_chain import _samples
 from guardana.rules.supply_chain._leads import lead_verdict
+from guardana.rules.supply_chain._unread_python import unread_python
 
 # Bare call names that fetch a model, dataset, or file over the network. A
 # plaintext `http://` URL only matters as an argument to one of these — an
@@ -31,6 +36,7 @@ _FETCH_CALLS = frozenset(
     }
 )
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "0.0.0.0", "::1"})  # noqa: S104 — matched, not bound
+_UNREADABLE_HOST = "an unreadable host"
 
 
 def _bare_call_name(node: ast.Call) -> str:
@@ -63,12 +69,22 @@ def _plaintext_host(url: str) -> str | None:
 
     The scheme is matched case-insensitively — `HTTP://` and `Http://` are exactly
     as plaintext as `http://`, and an attacker (or a sloppy config) will use them.
+    The host is the one a client connects to, after any `user:password@`; an
+    authority that cannot be read is reported, since nothing shows it stays local.
     """
-    scheme, sep, rest = url.partition("://")
+    scheme, sep, _ = url.partition("://")
     if not sep or scheme.lower() != "http":
         return None
-    host = rest.split("/", 1)[0].split(":", 1)[0]
-    return None if host.lower() in _LOCAL_HOSTS else host
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return _UNREADABLE_HOST
+    if not host:
+        return _UNREADABLE_HOST
+    return None if host in _LOCAL_HOSTS else host
+
+
+_FETCH = "import requests\n\nrequests.get('https://models.example.invalid/weights.bin'{})\n"
 
 
 class InsecureTransportRule(ArtifactRule):
@@ -85,7 +101,30 @@ class InsecureTransportRule(ArtifactRule):
             NIST_SUPPLY_CHAIN,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a fetch with TLS checks off, a verified one and a file the scan could not read."""
+        return materialise(
+            (
+                _samples.sample(
+                    "a weights download with verify=False",
+                    FixtureOutcome.FINDING,
+                    {"fetch.py": _FETCH.format(", verify=False")},
+                ),
+                _samples.sample(
+                    "a weights download over verified HTTPS",
+                    FixtureOutcome.CLEAN,
+                    {"fetch.py": _FETCH.format(", timeout=30")},
+                ),
+                _samples.past_the_source_limit(
+                    "a TLS-off fetch padded past the read limit, so nobody read it",
+                    "fetch.py",
+                    _FETCH.format(", verify=False"),
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every `.py` file for TLS-off calls and plaintext-HTTP fetches."""
@@ -93,7 +132,9 @@ class InsecureTransportRule(ArtifactRule):
             return
         for path in target.iter_files((".py",)):
             source = target.python_source(path)
-            if source is not None:
+            if source is None:
+                yield from unread_python(self.meta, target, path, ctx)
+            else:
                 yield from self._scan(source)
 
     def _scan(self, source: PythonSource) -> Iterator[Finding]:

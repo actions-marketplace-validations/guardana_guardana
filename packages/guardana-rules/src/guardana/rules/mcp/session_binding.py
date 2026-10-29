@@ -1,19 +1,22 @@
-from collections.abc import Iterator, Sequence
-from itertools import pairwise
-from os.path import commonprefix
+from collections.abc import Iterable, Iterator, Sequence
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
-from guardana.core.safety import Impact
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, McpAuthorizationView, TargetKind
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP07_2025
+from guardana.rules.mcp import _samples
 from guardana.rules.mcp._base import McpAuthorizationRule
+from guardana.rules.mcp._ids import SHORT_ID, counts_up, shortest
 
-# A UUID is 36 characters and a 128-bit random token base64s to 22. Below this a
-# session id is short enough that guessing becomes a matter of patience rather than
-# of luck; it is a structural observation, not a claim about entropy.
-_SHORT_ID = 16
+_UNSTRUCTURED = (
+    "5d0c9e3a-8f1b-4c62-a7e4-1b93f0d26c88",
+    "e2a74b19-03cd-4f85-9b6a-7c51d8e40f13",
+    "91f6c3d7-4a28-4e0b-8d95-f3027ab6c541",
+)
+"""Session ids no structure can be read from, so only the stripped request can decide."""
 
 
 class McpSessionBindingRule(McpAuthorizationRule):
@@ -35,19 +38,23 @@ class McpSessionBindingRule(McpAuthorizationRule):
     invented from them would be worse than none — it looks for structure: the same
     id handed to everybody, a counter, or an id short enough to enumerate.
 
-    **Silent against a server that offers no revision with sessions in it.** MCP
-    `2026-07-28` removed protocol sessions, so a server implementing only modern
+    **Silent against a server observed to offer no revision with sessions in it.**
+    MCP `2026-07-28` removed protocol sessions, so a server implementing only modern
     revisions has none to mint, none to guess and none to authenticate with: the
-    invariant holds, and silence is what this codebase says when it does. Reporting
-    `inconclusive` there would have failed the build of the team that upgraded
-    correctly, which is an accusation rather than a verdict. Which revision was
-    negotiated is recorded in `coverage.protocols`, where a `diff` reads it as the
-    reach changing rather than as the system changing.
+    invariant holds, and silence is what this codebase says when it does. Observed,
+    not read: a server whose discovery lists only modern revisions is asked whether
+    it still answers the `2025-11-25` handshake, and a refusal that says who may ask
+    rather than which era answers, or a legacy revision guardana does not speak, is
+    inconclusive. Which revision was negotiated is recorded in `coverage.protocols`,
+    where a `diff` reads it as the reach changing rather than as the system changing.
 
     A **dual-era** server is graded exactly as before, whichever era the run
     negotiated. It still hands a session to every legacy client it serves, and a
     counter there is a live defect that the modern half of the same server cannot
-    show. See `docs/design/mcp-protocol-eras.md`.
+    show. A handshake answered with an error, or not sent at all, is sampling that
+    stopped rather than a server issuing no session id: before any id it leaves the
+    whole rule inconclusive, and after some it leaves the shape of the ids unverified
+    unless the partial sample already shows a structure.
     """
 
     meta = RuleMeta(
@@ -58,14 +65,49 @@ class McpSessionBindingRule(McpAuthorizationRule):
         taxonomy=(OWASP_MCP07_2025, OWASP_ASI03_2026),
         required_capabilities=frozenset({Capability.INSPECT_AUTHORIZATION}),
         impact=Impact.ACTIVE,
+        detection=Detection.HEURISTIC,
     )
 
     claim = "how it binds a session was not established"
 
     @property
     def estimated_requests(self) -> int:
-        """The discovery probe, the anonymous pair, a handshake per sample, and the stripped one."""
-        return 7
+        """The discovery probe, the anonymous three, three handshakes, a notification, one stripped.
+
+        Over a modern server the anonymous probe is one request and the legacy probe adds
+        one, which stays below the handshake era's nine.
+        """
+        return 9
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a session that authenticates, one that does not, and no session to open."""
+        return materialise(
+            (
+                _samples.sample(
+                    "a session answering without the credential that opened it",
+                    FixtureOutcome.FINDING,
+                    lambda: _samples.target(
+                        _samples.gated_server(
+                            session_ids=_UNSTRUCTURED, session_authenticates=True
+                        ),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "a session checked for the credential on every request",
+                    FixtureOutcome.CLEAN,
+                    lambda: _samples.target(
+                        _samples.gated_server(session_ids=_UNSTRUCTURED),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "a gated server refusing a run that holds no credential to open a session",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(_samples.gated_server(session_ids=_UNSTRUCTURED)),
+                ),
+            )
+        )
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Grade the session ids, then the request that carried one without a credential."""
@@ -76,7 +118,25 @@ class McpSessionBindingRule(McpAuthorizationRule):
         sessions = view.sessions
         if sessions.no_protocol_sessions is not None:
             return
-        yield from self._shape(view, sessions.ids)
+        if sessions.unsettled_offer is not None:
+            yield self.unverified(
+                view,
+                f"whether the server offers a revision with sessions was not settled: "
+                f"{sessions.unsettled_offer}",
+            )
+            return
+        if sessions.sampling_error is not None and not sessions.ids:
+            yield self.unverified(view, f"session sampling stopped: {sessions.sampling_error}")
+            return
+        shape = list(self._shape(view, sessions.ids))
+        yield from shape
+        if not shape and sessions.sampling_error is not None:
+            count = len(sessions.ids)
+            yield self.unverified(
+                view,
+                f"session sampling stopped after {count} session id{'' if count == 1 else 's'}, "
+                f"so whether the ids are guessable was not settled: {sessions.sampling_error}",
+            )
         if sessions.stripped_credential:
             if sessions.stripped_listed_tools:
                 yield self.finding(
@@ -104,35 +164,17 @@ class McpSessionBindingRule(McpAuthorizationRule):
                 severity=Severity.CRITICAL,
             )
             return
-        shortest = min(len(value) for value in ids)
-        if shortest < _SHORT_ID:
+        length = shortest(ids)
+        if length < SHORT_ID:
             yield self.finding(
                 view,
-                f"session ids are as short as {shortest} characters, which is short enough "
+                f"session ids are as short as {length} characters, which is short enough "
                 f"to enumerate rather than to guess",
             )
-        if _counts_up(ids):
+        if counts_up(ids, ordered=True):
             yield self.finding(
                 view,
-                f"session ids differ only by an increasing number after the shared prefix "
-                f"{commonprefix(list(ids))!r}, so the next one is predictable",
+                "session ids differ only by an increasing number after a shared prefix, so "
+                "the next one is predictable",
                 severity=Severity.CRITICAL,
             )
-
-
-def _counts_up(ids: Sequence[str]) -> bool:
-    """Report whether the ids are one counter wearing a prefix.
-
-    Compares the varying tail rather than the whole string, so a server that names
-    sessions `sess-1`, `sess-2` is caught while one issuing unrelated random ids is
-    not. Requires at least two samples and a strictly increasing sequence: equal
-    values are the duplicate case, which is reported separately and more severely.
-    """
-    if len(ids) < 2:  # noqa: PLR2004 — one sample cannot show a sequence
-        return False
-    shared = len(commonprefix(list(ids)))
-    tails = [value[shared:] for value in ids]
-    if not all(tail.isdigit() for tail in tails):
-        return False
-    numbers = [int(tail) for tail in tails]
-    return all(later > earlier for earlier, later in pairwise(numbers))

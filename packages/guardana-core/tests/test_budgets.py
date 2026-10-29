@@ -6,10 +6,13 @@ like success: a team whose gate is red can otherwise lower the budget until the
 run ends early and the pipeline goes quiet.
 """
 
+import dataclasses
+import math
 from collections.abc import Iterable, Sequence
+from typing import Any
 
 import pytest
-from guardana.core.budget import BudgetExhausted, Budgets, parse_duration
+from guardana.core.budget import _COUNTED_CEILINGS, BudgetExhausted, Budgets, parse_duration
 from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.profile import Policy, Profile
 from guardana.core.registry import Registry
@@ -149,6 +152,22 @@ def test_a_token_budget_stops_the_run_once_the_tokens_are_spent() -> None:
         meter.reserve()
 
 
+@pytest.mark.parametrize(
+    "reported", [TokenUsage(-1000, 5), TokenUsage(5, -1000)], ids=["input", "output"]
+)
+def test_a_negative_token_count_is_no_count_and_cannot_switch_a_ceiling_off(
+    reported: TokenUsage,
+) -> None:
+    meter = UsageMeter(Budgets(max_input_tokens=10, max_output_tokens=10))
+
+    with pytest.raises(BudgetExhausted, match="cannot be enforced"):
+        meter.record_reply(reported)
+
+    usage = meter.snapshot()
+    assert (usage.input_tokens or 0) >= 0
+    assert (usage.output_tokens or 0) >= 0
+
+
 def test_a_duration_budget_stops_the_run() -> None:
     clock = iter([0.0, 0.0, 100.0])
     meter = UsageMeter(Budgets(max_duration_seconds=30.0), clock=lambda: next(clock))
@@ -195,6 +214,50 @@ def test_a_duration_that_cannot_be_parsed_is_refused(text: str) -> None:
     # class of problem as a gate they think they configured.
     with pytest.raises(ValueError, match="duration"):
         parse_duration(text)
+
+
+def test_a_duration_too_large_for_a_float_is_refused_rather_than_infinite() -> None:
+    with pytest.raises(ValueError, match="duration"):
+        parse_duration("9" * 400 + "h")
+
+
+@pytest.mark.parametrize("seconds", [math.nan, math.inf, -1.0])
+def test_a_duration_ceiling_built_in_code_must_be_one_time_can_reach(seconds: float) -> None:
+    with pytest.raises(ValueError, match="max_duration_seconds"):
+        Budgets(max_duration_seconds=seconds)
+
+
+def test_a_zero_duration_ceiling_built_in_code_is_still_accepted() -> None:
+    assert Budgets(max_duration_seconds=0.0).max_duration_seconds == 0.0
+
+
+def test_every_ceiling_but_the_duration_is_a_counted_one() -> None:
+    every = {field.name for field in dataclasses.fields(Budgets)}
+
+    assert set(_COUNTED_CEILINGS) == every - {"max_duration_seconds"}
+
+
+def _refusal(ceiling: str, value: object) -> ValueError | TypeError | None:
+    built_in_code: dict[str, Any] = {ceiling: value}
+    try:
+        Budgets(**built_in_code)
+    except (ValueError, TypeError) as refused:
+        return refused
+    return None
+
+
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_positive_counted_ceiling_built_in_code_is_accepted(ceiling: str) -> None:
+    assert _refusal(ceiling, 1) is None
+
+
+@pytest.mark.parametrize("value", [0, -1])
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_counted_ceiling_below_one_built_in_code_is_refused(ceiling: str, value: int) -> None:
+    refused = _refusal(ceiling, value)
+
+    assert refused is not None
+    assert ceiling in str(refused)
 
 
 # --- The profile side: a ceiling nobody can mistype into silence. ---
@@ -251,3 +314,14 @@ def test_a_profile_without_budgets_sets_no_ceiling(tmp_path: object) -> None:
     profile.write_text("name: ci\n", encoding="utf-8")
 
     assert load_profile(profile).budgets.is_unbounded
+
+
+@pytest.mark.parametrize("value", [True, 1.5, float("nan"), "3"])
+@pytest.mark.parametrize("ceiling", _COUNTED_CEILINGS)
+def test_a_counted_ceiling_that_is_not_a_whole_number_is_refused(
+    ceiling: str, value: object
+) -> None:
+    refused = _refusal(ceiling, value)
+
+    assert refused is not None
+    assert ceiling in str(refused)

@@ -7,11 +7,14 @@ built-in rule.
 """
 
 from acme_rules.controls import ACME_14
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
+
+_ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
 
 
 def test_acme_rules_are_discoverable_via_the_real_registry() -> None:
-    ids = {r.meta.id for r in Registry.discover().rules()}
+    ids = {r.meta.id for r in Registry.discover(_ACME).rules()}
     acme_ids = {i for i in ids if i.startswith("acme.")}
 
     assert "acme.supply_chain.hardcoded_key" in acme_ids, (
@@ -27,20 +30,20 @@ def test_acme_rules_are_discoverable_via_the_real_registry() -> None:
 
 def test_builtin_guardana_rules_are_still_discovered_alongside_acme() -> None:
     # Third-party discovery must be additive, never a replacement for built-ins.
-    ids = {r.meta.id for r in Registry.discover().rules()}
+    ids = {r.meta.id for r in Registry.discover(_ACME).rules()}
     assert any(i.startswith("guardana.") for i in ids)
     assert any(i.startswith("acme.") for i in ids)
 
 
 def test_acme_evaluator_is_discovered_alongside_the_built_ins() -> None:
     # The `guardana.evaluators` entry point is discovered the same way as rules.
-    evaluators = Registry.discover().evaluators()
+    evaluators = Registry.discover(_ACME).evaluators()
     assert "acme.strict_refusal" in evaluators  # Acme's custom classifier
     assert "keyword" in evaluators  # built-ins still present
 
 
 def test_acme_target_is_discovered_through_the_third_entry_point_group() -> None:
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     names = {target.__name__ for target in registry.targets()}
 
     assert "AcmePromptLibraryTarget" in names
@@ -59,7 +62,7 @@ def test_acme_control_catalogue_is_registered_before_any_rule_resolves_it() -> N
     """
     from guardana.core.taxonomy import resolve  # noqa: PLC0415 — registered by discovery above
 
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     rule = next(r for r in registry.rules() if r.meta.id == "acme.prompt.data_exfiltration")
 
     assert not registry.load_errors, [e.reason for e in registry.load_errors]

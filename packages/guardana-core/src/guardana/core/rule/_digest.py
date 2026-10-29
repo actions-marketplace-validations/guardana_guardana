@@ -24,11 +24,11 @@ def digest_parts(parts: Iterable[object]) -> str:
     return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:_DIGEST_CHARS]
 
 
-_NOT_THE_TEST = ("taxonomy", "fixtures")
+_NOT_THE_TEST = ("taxonomy", "fixtures", "detection")
 """Declaration keys that say nothing about how this rule behaves against a target.
 
-Both were added after a release proved the cost of leaving one in, and the second
-was added before that cost was paid twice.
+Each describes the rule to a reader — what it maps to, how it was sampled, what its
+findings state — and changing one leaves every prompt and every grade as it was.
 """
 
 
@@ -54,6 +54,9 @@ def declaration_digest(raw: object) -> str:
     in, the release that gave the catalog its fixtures would have announced that
     every rule changed definition, against every saved run from before it: the
     taxonomy mistake repeated with a different key, one release after paying for it.
+
+    **`detection:` is excluded likewise**: it says what a finding states, and
+    labelling a rule leaves what it sends and how it grades unchanged.
 
     This is also what keeps a planted canary out of the digest without anyone
     having to remember to exclude it: the value hashed here is the one the rule

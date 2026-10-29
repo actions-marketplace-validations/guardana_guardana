@@ -9,7 +9,7 @@ held".
 The dimension a rule needs is a *capability*, so the runner skips the rule before it
 runs and records the reason. That is what stops the most dangerous inference a trace
 invites: a producer that does not emit approvals must not have its silence read as
-"nothing was approved". See `docs/design/trace-domain-model.md`.
+"nothing was approved".
 """
 
 from abc import abstractmethod
@@ -21,7 +21,7 @@ from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import Target
 from guardana.core.target.protocols import TraceReader
-from guardana.core.trace import Span, Trace
+from guardana.core.trace import Dimension, Span, Trace
 
 
 class TraceRule(Rule):
@@ -128,3 +128,12 @@ class TraceRule(Rule):
         if span is not None:
             lines.append(span.render())
         return "\n".join(lines)
+
+
+def records_actions(trace: Trace) -> bool:
+    """Whether the producer records tool calls or effects, the two ways an action shows.
+
+    A rule asking whether something happened needs one of the two, which a capability
+    set cannot say, so such a rule asks this in `examine` and declines when it is false.
+    """
+    return trace.records(Dimension.TOOLS) or trace.records(Dimension.EFFECTS)

@@ -17,6 +17,8 @@ from dataclasses import dataclass
 from markdown_it import MarkdownIt
 from markdown_it.token import Token
 
+from sitegen import diagram
+
 _PUNCTUATION = re.compile(r"[^\w\- ]", re.UNICODE)
 
 
@@ -140,7 +142,11 @@ def render(markdown: str, resolve: Callable[[str], str]) -> Rendered:
     md = parser()
     tokens = md.parse(markdown)
     headings = _headings(tokens)
+    drawn = 0
     for index, token in enumerate(tokens):
+        if token.type == "fence" and token.info.strip() == "mermaid":
+            token.type, token.content = "html_block", diagram.figure(token.content, drawn)
+            drawn += 1
         if token.type == "heading_open" and index in headings:
             token.attrSet("id", headings[index])
         for child in _inline_children(token):
@@ -149,6 +155,17 @@ def render(markdown: str, resolve: Callable[[str], str]) -> Rendered:
             elif child.type == "image":
                 child.attrSet("src", resolve(str(child.attrGet("src") or "")))
     return Rendered(md.renderer.render(tokens, md.options, {}), frozenset(headings.values()))
+
+
+def wrap_tables(html: str) -> str:
+    """Wrap every table so a wide one scrolls inside itself instead of the page.
+
+    Substituting on the literal tag is safe only because the parser escapes raw
+    HTML, so no `<table>` an author wrote in prose or a fence can reach this.
+    """
+    return html.replace("<table>", '<div class="table-wrap"><table>').replace(
+        "</table>", "</table></div>"
+    )
 
 
 def _inline_children(token: Token) -> Iterator[Token]:

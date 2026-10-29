@@ -1,10 +1,13 @@
 from collections.abc import Sequence
 
 import pytest
-from guardana.core.assessment import AssessmentStatus, case_id_for
+from guardana.core.assessment import AssessmentStatus, UnmeasuredReason, case_id_for
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES
+from guardana.core.rule.verify import verify_rule
+from guardana.core.target import Decline, DeclineReading, RequestDeclined
 from guardana.core.target.endpoint import ChatMessage, EndpointTarget
 from guardana.core.testing import ScriptedTransport
 from guardana.rules.output.secrets import OutputSecretsRule
@@ -305,3 +308,50 @@ def test_a_leak_seen_before_a_later_trial_raised_is_still_reported() -> None:
     assert findings[0].verdict is not None
     assert findings[0].verdict.outcome == "fail"
     assert "(3 planned)" in findings[0].evidence.summary
+
+
+class _Declines:
+    """A guarded application that declines every request with the given decline."""
+
+    def __init__(self, decline: Decline) -> None:
+        self._decline = decline
+
+    def send(
+        self,
+        base_url: str,
+        model: str,
+        messages: Sequence[ChatMessage],
+        api_key: str | None,
+    ) -> str:
+        raise RequestDeclined(self._decline)
+
+
+@pytest.mark.parametrize(
+    "decline",
+    [
+        Decline("content_filter", DeclineReading.REFUSAL, 400),
+        Decline("input_rejected", DeclineReading.UNGRADED, 413),
+    ],
+    ids=["refusal", "ungraded"],
+)
+def test_a_declined_request_is_never_scanned_clean_under_either_reading(decline: Decline) -> None:
+    ctx = RuleContext()
+    target = EndpointTarget("http://x", "m", transport=_Declines(decline))
+
+    findings = list(OutputSecretsRule().run(target, ctx))
+
+    recorded = ctx.recorded()
+    assert len(recorded) == 3
+    assert {a.status for a in recorded} == {AssessmentStatus.INCONCLUSIVE}
+    assert {a.reason for a in recorded} == {UnmeasuredReason.TARGET_DECLINED}
+    assert {a.tags for a in recorded} == {(decline.tag,)}
+    assert len(findings) == 3
+    assert all(f.verdict and f.verdict.outcome == "inconclusive" for f in findings)
+    assert all(decline.described in f.evidence.summary for f in findings)
+
+
+def test_the_rule_proves_all_three_outcomes_on_its_own_samples() -> None:
+    verified = verify_rule(OutputSecretsRule())
+
+    assert verified.is_proven, verified
+    assert {r.observed for r in verified.results} >= set(DEMANDED_OUTCOMES)

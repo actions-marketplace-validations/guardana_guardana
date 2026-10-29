@@ -6,58 +6,78 @@
 <title>guardana run — Guardana documentation</title>
 <meta name="description" content="guardana run inspect|migrate: reading a saved run and its manifest">
 <link rel="canonical" href="https://guardana.dev/docs/usage-run">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html" aria-current="page">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,89 +98,142 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana run</code> — reading a saved run</h1><p class="lede"><code>guardana run inspect|migrate</code>: reading a saved run and its manifest</p><p>A run saved with <code>--output</code> is not just a list of findings. It carries a <strong>run
-manifest</strong>: what was examined, by which software, under which configuration and
-limits, at what cost, and how it was gated. That is what makes a run evidence
-rather than a screenshot — and what <code>guardana diff</code> compares.</p>
-<pre><code class="language-bash">guardana scan . --format json --output run.json
+<details class="mnav">
+<summary>Menu · <b>guardana run</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html" aria-current="page">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana run</code> — reading a saved run</h1><p class="lede"><code>guardana run inspect|migrate</code>: reading a saved run and its manifest</p><p><code>guardana run inspect</code> shows a saved run when you need to review its manifest or compare it with <code>guardana diff</code>. A run saved with <code>--output</code> records its target, configuration, limits, cost, and gate.</p>
+<pre><code class="language-bash">guardana scan path/to/project --format json --output run.json
 guardana run inspect run.json
 </code></pre>
+<p>A saved run is read only from a regular file of at most 256 MiB. A FIFO, a device or a larger
+file is refused with exit <code>3</code> before any of it is parsed.</p>
 <pre><code class="language-text">run 0191d4c2-8f1a-7c3e-9b21-6f0a2d8e4c11
   started:   2026-08-02 09:14:02+00:00
   completed: 2026-08-02 09:14:03+00:00
   source:    ci (github)
-  guardana:  0.7.0
-  target:    artifact .
+  guardana:  &lt;version&gt;
+  target:    artifact path/to/project
   profile:   ci
   gate:      pass
   findings:  0 (0 unverified, 0 waived, 0 error(s))
   rules run: 19 (0 skipped)
-  trials:    1 per case asked; 0 rule(s) repeated
+  trials:    1 per case asked; 0 rule(s) and 0 suite(s) repeated
   requests:  0
   tokens:    in not recorded, out not recorded
+  judge:     not counted
   wall time: 0.42
-  evidence:  full
+  evidence:  redacted
 </code></pre>
-<p><code>--format json</code> prints the manifest itself, for anything that would rather parse
-than read.</p>
-<p><code>requests: 0</code> above is a <strong>measurement</strong> — a file scan sends nothing. Tokens are
-<code>not recorded</code> because there was no model to report them. The next section is
-about why those two are printed differently.</p>
+<p><code>--format json</code> prints the manifest. <code>requests: 0</code> is measured; tokens are <code>not recorded</code>.
+<code>run inspect</code> accepts only <code>human</code> and <code>json</code>. Any other <code>--format</code>, including
+<code>sarif</code> or <code>junit</code>, exits <code>3</code> before reading the saved run.
+A run started from a recipe adds a <code>recipe:</code> line under <code>target:</code>, such as
+<code>recipe:    checkout (model_harness, from a recording)</code>: the recipe's name, the subject
+it declared and how the run reached it. A run given fixtures adds a <code>fixtures:</code> line, such as
+<code>fixtures:  support-bot (data: synthetic, as declared); tenants acme, globex; 3 document(s), 2 record(s), 0 tool(s)</code> (<a href="usage-fixtures.html"><code>usage-fixtures.md</code></a>).</p>
 <h2 id="what-a-run-costs">What a run costs</h2>
 <p><code>usage</code> carries what the run actually spent: requests sent, tokens in and out,
 and wall time.</p>
@@ -168,18 +242,29 @@ a model is counted whatever transport is in use — a custom adapter, a scripted
 double in a test, or one of the built-ins. A target that does not meter itself
 (anything you wrote yourself, unless you override <code>Target.usage()</code>) reports
 nothing rather than zero.</p>
-<p>Token counts depend on the provider. The built-in OpenAI, Ollama and TGI paths
-read them from the response; a transport that does not implement the optional
+<p>Token counts depend on the provider. The built-in OpenAI and Ollama paths read
+them from the response, and TGI reports none (<a href="providers.html">providers</a>); a transport that does not implement the optional
 <code>UsageReportingTransport</code> protocol leaves them unknown. Where only <em>some</em>
 requests reported tokens, the manifest carries the sum <strong>and</strong>
 <code>requests_missing_token_counts</code>, so the number is never mistaken for the whole
 bill. See <a href="writing-rules.html"><code>docs/writing-rules.md</code></a> for the protocol.</p>
+<p><code>usage.judge</code> counts the judges configured under the profile's <code>evaluators:</code> block,
+each on its own meter and apart from the target: <code>llm_judge</code> (which <code>reference_judge</code>
+shares) and <code>guard</code>. Each entry carries <code>requests</code>, <code>input_tokens</code>, <code>output_tokens</code>,
+<code>requests_missing_token_counts</code> and <code>budget_exhausted</code>, which says that this meter's
+ceiling stopped the run. <code>usage.judge</code> is <code>null</code> when nobody counted judge calls: no
+judge block was configured, or the command never wires a judge (<code>scan</code>). An evaluator
+from a plugin that makes its own network calls is not counted anywhere. <code>inspect</code>
+prints one <code>judge:</code> line per block:</p>
+<pre><code class="language-text">  judge:     llm_judge 36 request(s), tokens in 1440, out 108
+</code></pre>
 <h2 id="what-not-recorded-means">What &quot;not recorded&quot; means</h2>
 <p>It means <strong>nobody measured this</strong>, and it is deliberately not printed as <code>0</code>.
 A file scan that sends zero requests and a run from a version that never counted
 requests are different facts; only one of them lets you budget the next run. The
-same distinction runs through the whole document: <code>null</code> is always &quot;not known&quot;,
-never &quot;not applicable&quot; and never zero.</p>
+same distinction runs through the measured fields (requests, tokens, cost, duration):
+<code>null</code> there is &quot;not known&quot;, never zero. A block that describes a feature, such as
+<code>exchanges</code>, <code>recording</code>, <code>recipe</code> or <code>fixtures</code>, is <code>null</code> when the run did not use it.</p>
 <h2 id="what-a-run-could-check">What a run could check</h2>
 <p><code>coverage</code> is the other half of the promise <code>rules_run</code> started. A run whose corpus
 was trimmed, whose evaluator stopped being installed, whose target lost a capability
@@ -200,51 +285,123 @@ read them, one step at a time, so upgrading Guardana does not strand the evidenc
 already have.</p>
 <p>What an older version never recorded arrives as an explicit unknown rather than as a
 default — version 1 has no usage, no execution settings and <strong>no gate verdict</strong>;
-version 2 has no coverage fingerprint and no declared request counts; version 3 could not
-name a <code>trace</code> target, because that kind did not exist; version 6 made one attempt per
-case, so it arrives with <code>execution.trials: 1</code>, <code>trial: null</code> on every assessment and
-no <code>trial_summary</code> on any rule — the summary is not recomputed from its assessments. Recomputing any
-of them during migration would apply today's build to another build's run, which is
-exactly what storing them as fields exists to prevent. <code>inspect</code> says so at the
-bottom of its output, and <code>diff</code> adds a note.</p>
+version 2 has no coverage fingerprint and no declared request counts; version 3 could
+not name a <code>trace</code> target, because that kind did not exist; version 6 made one attempt
+per case, so it arrives with <code>execution.trials: 1</code>, <code>trial: null</code> on every assessment
+and no <code>trial_summary</code> on any rule — the summary is not recomputed from its
+assessments. Recomputing any of them during migration would apply today's build to
+another build's run, which is exactly what storing them as fields exists to prevent.
+<code>inspect</code> says so at the bottom of its output, and <code>diff</code> adds a note.</p>
+<p>A schema-7 run migrates to schema 8 with the correction fields <code>null</code>; nothing is
+recomputed. Its trials line still prints
+<code>graded by &lt;assessor&gt;, grader error not corrected</code>, as it was written.</p>
+<p>A schema-8 run migrates to schema 9 with <code>suite: null</code> on every rule; nothing is
+recomputed.</p>
+<p>A schema-9 run migrates to schema 10 with <code>usage.judge: null</code>: judge calls were not
+counted, which is not the same as none being made. <code>inspect</code> prints <code>judge: not counted</code>.</p>
+<p>A schema-10 run migrates to schema 11 with <code>target.document: null</code>. No earlier schema
+recorded the digest of the document a run read, so nothing is relabelled, and no older run
+is read as carrying a content digest.</p>
+<p>A schema-11 run migrates to schema 12 with <code>scope: null</code> and <code>configuration.plugins: null</code>:
+no earlier schema recorded which files a run listed or which plugin trust it ran under, so
+both are unknown. <code>diff</code> against a migrated second run cannot tell a file that left the scan
+from a fixed one, and reads a finding that disappeared the way it did before.</p>
+<p>A schema-12 run migrates to schema 13 with <code>exchanges: null</code>, <code>recording: null</code>, <code>judge: null</code>
+on every evaluator and <code>reason: null</code> on every assessment: no earlier schema kept exchanges,
+graded a recording, recorded a judge's identity or said why a trial went unmeasured. A null
+judge is unknown, so <code>diff</code> does not read it as a change of judge.</p>
+<p>A schema-13 run migrates to schema 14 with <code>recipe: null</code> and <code>configuration.provider: null</code>:
+no earlier schema recorded a recipe or the provider wire, so both are unknown, never &quot;no
+recipe&quot; or &quot;the OpenAI wire&quot;. <code>inspect</code> prints no <code>recipe:</code> line for it.</p>
+<p>A schema-14 run migrates to schema 15 with <code>fixtures: null</code>: no earlier schema recorded a fixtures
+file, so the migration represents the run as having none.</p>
+<p>A schema-15 run migrates to schema 16 with <code>execution.max_requests_per_minute: null</code>: no
+earlier schema recorded a request rate, so the migration represents the run as setting no rate.</p>
+<p>A schema-16 run migrates to schema 17 with only its version changed: schema 17 adds the
+<code>not_offered</code> skip reason and the <code>target_changed</code> stop, and no earlier schema recorded either.</p>
+<p>A schema-17 run migrates to schema 18 with <code>scope.kept_models: []</code>, <code>scope.skipped_models: null</code> and <code>file: null</code> on every exclude: no earlier schema recorded kept or skipped models
+or where a pattern came from. A scan that wrote schema 17 kept no file its target's
+<code>.guardanaignore</code> matched, hence <code>[]</code>, and did not search the skipped directories, hence <code>null</code>.</p>
 <p>One thing <em>is</em> recovered: the <strong>title</strong> of a framework reference, which version 3
-onward records beside its framework and id. It is looked up from the installed catalogue for
-the exact <code>(framework, id)</code> pair the document already carries, so nothing is guessed
-and no reference is remapped — a <code>LLM07</code> recorded under <code>OWASP-LLM-2025</code> stays System
-Prompt Leakage. A reference from a rule pack this build does not have stays
-titleless, because nothing here knows what it was called.</p>
+onward records beside its framework and id. It is looked up from the installed
+catalogue for the exact <code>(framework, id)</code> pair the document already carries, so
+nothing is guessed and no reference is remapped — a <code>LLM07</code> recorded under
+<code>OWASP-LLM-2025</code> stays System Prompt Leakage. A reference from a rule pack this build
+does not have stays titleless, because nothing here knows what it was called.</p>
 <p>To rewrite an old file on disk at the current schema:</p>
 <pre><code class="language-bash">guardana run migrate old-run.json --output new-run.json
 guardana run migrate old-run.json          # in place
 </code></pre>
+<p>Migrating to another <code>--output</code> brings the exchanges the run records: their
+<code>&lt;stem&gt;.exchanges.jsonl</code> is copied beside the new output first, identical exchanges
+already there are kept, different ones are refused with exit <code>3</code> and nothing is written,
+and stderr warns when the original sidecar is missing or does not match the recorded
+digest. A run that kept no exchanges removes the ones the saved run it replaces at that
+output recorded by digest, and says so on stderr; exchanges no run saved there recorded
+are kept with a warning. The migrated run's own sidecar stays when migrated in
+place or from <code>run.json</code> to <code>run</code>, which share one. An <code>--output</code> whose sidecar
+path is the input file is refused with exit <code>3</code> before anything is written.</p>
 <p>This is a convenience, not a requirement. Nothing needs migrating to be compared.</p>
-<p><strong>A migration that cannot carry a field refuses, and writes nothing.</strong> The
-default destination is the file itself, so a half-done migration would overwrite
-the only copy of the evidence. In 0.7.0 a version-1 run that never recorded its
-target kind was migrated into the literal string <code>&quot;None&quot;</code> — a document that fails
-this schema, written over the original, with exit <code>0</code>. Every unit test around
-migration passed, because they asserted on the objects the migration loaded and
-the objects were fine; what was published was the file. There is now a test that
-validates the <em>artifact</em>, parametrised over every field a version-1 run could be
-missing.</p>
+<p>A file that says it is already at the current schema is read the way <code>run inspect</code>
+reads it before migrate answers &quot;nothing to do&quot;: an object that only claims the version
+is not a run, and exits <code>3</code>. Given another <code>--output</code>, such a run is copied there byte
+for byte, and stdout says so. Migrate writes a temporary file beside the destination
+and renames it over. A failed write leaves the destination as it was, prints an error
+and exits <code>3</code>; nothing is removed. A destination this process cannot write, a directory
+where it cannot create the temporary file, or an <code>--output</code> that is the input's own
+<code>&lt;stem&gt;.exchanges.jsonl</code> is refused the same way.</p>
+<p><strong>A migration that cannot carry a field refuses, and writes nothing.</strong> The default
+destination is the file itself, so a half-done migration would overwrite the only copy
+of the evidence. <code>run migrate</code> reads the migrated document back before writing; if it would not load, the command exits <code>3</code> and writes nothing.</p>
 <h2 id="the-document">The document</h2>
 <p>The saved-run schema lives at
-<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v7.schema.json"><code>schemas/run-v7.schema.json</code></a>, identified by
-<code>https://guardana.dev/schemas/run/v7.schema.json</code>. The version is in the
-identifier, so a consumer can tell which contract it is holding before parsing
-anything; it changes whenever the change is not backwards-compatible. A test
-validates what Guardana writes against that file, so the schema cannot drift
-away from the tool.</p>
+<a href="https://github.com/guardana/guardana/blob/main/schemas/run-v18.schema.json"><code>schemas/run-v18.schema.json</code></a>, identified by
+<code>https://guardana.dev/schemas/run/v18.schema.json</code>, and the site serves every schema
+at the URL its identifier names. The version is in the identifier,
+so a consumer can tell which contract it is holding before parsing anything; it
+changes whenever the change is not backwards-compatible. A test validates what
+Guardana writes against that file, so the schema cannot drift away from the tool.</p>
 <p>Every superseded version stays published — <code>run-v2</code> and <code>run-v3</code> are still in
-<a href="https://github.com/guardana/guardana/tree/main/schemas"><code>schemas/</code></a> — because a saved run has to keep validating against the schema
-it was written to. Version 4 exists for one reason: it permits a <code>trace</code> target kind.
-Widening version 3's enum in place was the alternative, and it would have changed a
-contract under a name that promised it had not. Version 6 adds the <code>assessments</code>
-channel and <code>run.rules[].origin</code>; a version-5 document migrates forward with the
-first empty and the second <code>null</code>, because that is what it knew. Version 7 records
-repeated trials: <code>run.execution.trials</code>, <code>assessments[].trial</code> and
+<a href="https://github.com/guardana/guardana/tree/main/schemas"><code>schemas/</code></a> — because a saved run has to keep validating against the
+schema it was written to. Version 4 exists for one reason: it permits a <code>trace</code> target
+kind. Widening version 3's enum in place was the alternative, and it would have
+changed a contract under a name that promised it had not. Version 6 adds the
+<code>assessments</code> channel and <code>run.rules[].origin</code>; a version-5 document migrates forward
+with the first empty and the second <code>null</code>, because that is what it knew. Version 7
+records repeated trials: <code>run.execution.trials</code>, <code>assessments[].trial</code> and
 <code>run.rules[].trial_summary</code>, and renames <code>run.rules[].trials</code> to <code>declared_requests</code>,
-which is what it always counted.</p>
+which is what it always counted. Version 8 records the <code>correction</code> block on
+<code>trial_summary</code> and the calibration fields on <code>run.evaluators[]</code>. Version 9 records
+<code>run.rules[].suite</code>, what a quality suite measured and concluded. Version 10 records
+<code>run.usage.judge</code>, what the configured judges spent and whether one of their budgets
+stopped the run. Version 11 records <code>run.target.document</code>, the digest of the document the run
+read and what it covers. Version 12 records <code>scope</code>, every file a file run listed and the
+excludes it applied, <code>run.configuration.plugins</code>, the plugin trust in force, and the
+<code>unexamined_component</code> coverage shortfall. Version 13 records <code>run.exchanges</code>, what a probe
+kept beside the run, <code>run.recording</code>, the recording a graded run answered from,
+<code>run.evaluators[].judge</code>, each judge's identity, <code>assessments[].reason</code>, why a trial was not
+measured, and the <code>not_recorded</code> skip reason. Version 14 records <code>run.recipe</code>, the recipe a
+run was started from and the subject it declared, <code>run.configuration.provider</code>, the provider
+wire the run spoke, and the <code>incomplete_recording</code> and <code>demanded_check</code> coverage shortfalls.
+Version 15 records <code>run.fixtures</code>, the fixtures file a run was given, the
+<code>seed_not_reached</code> coverage shortfall: a seeded item whose control returned no marker for a
+tenant, and <code>run.evaluators[].deterministic</code>, whether an evaluator declares its verdict a
+fact with no error rate to measure. A version-14 run reads every evaluator as not
+deterministic. <code>run inspect</code> prints <code>deterministic — no error rate</code> for such an evaluator
+under <code>graded by:</code>, and <code>confidence not measured</code> for a judge with no calibration.
+Version 16 records <code>target_unavailable</code> in <code>result_summary.stopped_by</code>, a run its target
+stopped part-way; the <code>empty_target</code> coverage shortfall, a file target with no file to scan,
+and <code>ungraded_cases</code>, a rule that graded too few of the cases it attempted;
+<code>target_declined</code> in <code>assessments[].reason</code>, a case the application declined that the
+evaluator cannot grade; <code>target</code> in <code>run.recipe.source</code>, a recipe that named an installed
+target; and <code>run.execution.max_requests_per_minute</code>, the pace a run's requests were held to.
+Version 17 records <code>not_offered</code> in <code>result_summary.rules_skipped[].reason</code>, a rule that
+found while it ran that the target does not offer what it examines, and <code>target_changed</code> in
+<code>result_summary.stopped_by</code>, a run whose target stopped accepting the protocol revision the
+run agreed with it. Version 18 records <code>scope.excludes[].file</code>, the file supplying a
+pattern; <code>scope.kept_models</code>, files a model loader reads that the scan reads despite
+matching the target's <code>.guardanaignore</code>; and <code>scope.skipped_models</code>, model files named
+inside directories every scan skips.</p>
 <p>Top level:</p>
 <div class="table-wrap"><table>
 <thead>
@@ -256,7 +413,11 @@ which is what it always counted.</p>
 <tbody>
 <tr>
 <td><code>schema_version</code></td>
-<td><code>7</code>. Stated once, for the whole document.</td>
+<td><code>18</code>. Stated once, for the whole document.</td>
+</tr>
+<tr>
+<td><code>$schema</code></td>
+<td>the identifier of the schema the document follows, <code>https://guardana.dev/schemas/run/v18.schema.json</code></td>
 </tr>
 <tr>
 <td><code>run</code></td>
@@ -264,11 +425,15 @@ which is what it always counted.</p>
 </tr>
 <tr>
 <td><code>findings</code> / <code>unverified</code> / <code>waived</code> / <code>errors</code> / <code>observations</code></td>
-<td>the problem, evidence and inventory channels</td>
+<td>the problem, evidence and inventory channels — see <a href="#the-finding-channels">the finding channels</a></td>
 </tr>
 <tr>
 <td><code>assessments</code></td>
 <td>what the run <em>measured</em>, pass included — see <a href="#assessments">assessments</a></td>
+</tr>
+<tr>
+<td><code>scope</code></td>
+<td>for a file run, <code>{files, excludes, ignored_directories, kept_models, skipped_models}</code>: every file it listed (so the document grows with the tree), spelled like a finding's location; each exclude pattern with its <code>source</code> (<code>profile</code> for <code>rules.paths_exclude</code>, <code>ignore_file</code> for <code>.guardanaignore</code>) and the <code>file</code> it was read from (<code>null</code> for a profile pattern); the directory names every scan skips; each file a model loader reads that <code>.guardanaignore</code> matched and the scan read anyway, with the pattern (<code>{path, pattern}</code>); and what a name-only search of the skipped directories found (<code>{directories: [{path, model_files}], searched_all}</code>, <code>searched_all</code> false when the search stopped at its bound). <code>null</code> for any other run. <code>excludes</code> is <code>null</code>, and <code>skipped_models</code> is <code>null</code>, when a third-party file target applied filtering it does not report</td>
 </tr>
 </tbody>
 </table></div>
@@ -299,7 +464,7 @@ which is what it always counted.</p>
 </tr>
 <tr>
 <td><code>target</code></td>
-<td>what was examined, with a fingerprint and the fields that fingerprint covers</td>
+<td>what was examined, with a fingerprint, the fields that fingerprint covers, and the digest of the document the run read</td>
 </tr>
 <tr>
 <td><code>deployment</code></td>
@@ -307,7 +472,7 @@ which is what it always counted.</p>
 </tr>
 <tr>
 <td><code>configuration</code></td>
-<td>which settings produced it, <strong>by digest</strong></td>
+<td>which settings produced it, <strong>by digest</strong>: <code>profile_digest</code> covers every setting of the resolved profile except its name, where it was read from, its <code>plugins:</code> and <code>delivery.required</code>; <code>plugins</code> is the trust in force, <code>{mode, allowed}</code>; <code>provider</code> is the provider wire the run spoke to its target, <code>null</code> when it reached none, reached it through an adapter or did not record it; <code>adapter_digest</code> is the SHA-256 of the adapter file as written, and <code>system_prompt_digest</code> of the operator's <code>--system-prompt-file</code>, never of a planted canary, so two runs of one configuration record the same digests</td>
 </tr>
 <tr>
 <td><code>execution</code></td>
@@ -315,11 +480,11 @@ which is what it always counted.</p>
 </tr>
 <tr>
 <td><code>usage</code></td>
-<td>what it actually consumed</td>
+<td>what it actually consumed, the configured judges on their own meters</td>
 </tr>
 <tr>
 <td><code>rules</code> / <code>evaluators</code></td>
-<td>what did the checking, with digests, declared request counts, a <code>trial_summary</code> for each rule that repeated, and calibration</td>
+<td>what did the checking, with digests, declared request counts, a <code>trial_summary</code> for each rule that repeated, a <code>suite</code> summary for each quality suite, calibration, <code>judge</code>: the identity a judge states (its model, endpoint and samples per verdict), <code>null</code> for a deterministic evaluator or when unstated, and <code>deterministic</code>. A suite the budget stopped or that raised is listed with its declined summary, though not in <code>result_summary.rules_run</code></td>
 </tr>
 <tr>
 <td><code>coverage</code></td>
@@ -333,22 +498,156 @@ which is what it always counted.</p>
 <td><code>privacy</code></td>
 <td>which evidence policy was in force</td>
 </tr>
+<tr>
+<td><code>exchanges</code></td>
+<td>for a probe that kept its exchanges (<a href="usage-probe.html#keeping-the-exchanges"><code>probe --keep-exchanges</code></a>), <code>{digest, count, altered}</code>: the SHA-256 of the sidecar file, how many exchanges it holds and how many replies redaction changed; <code>null</code> otherwise</td>
+</tr>
+<tr>
+<td><code>recording</code></td>
+<td>for a run <a href="usage-grade.html"><code>guardana grade</code></a> wrote, what the recording says of itself: <code>{name, version, subject, verbatim, origin}</code>, with <code>origin</code> <code>{run_id, target, started_at, stopped_by, gate}</code> when a probe kept it; declared, not verified. <code>null</code> otherwise</td>
+</tr>
+<tr>
+<td><code>recipe</code></td>
+<td>for a run started from a recipe, <code>{name, digest, lock_digest, kind, source, unpinned}</code>: the recipe's name, the SHA-256 of the recipe file and of the lock the run was held to (<code>null</code> when none was read), what the team declared answered (<code>kind</code>: <code>application</code> or <code>model_harness</code>), how the run reached it (<code>source</code>: <code>connection</code>, <code>recording</code> or <code>target</code>) and the rule ids it ran that the lock does not pin. <code>kind</code> is declared, not verified. <code>null</code> otherwise</td>
+</tr>
+<tr>
+<td><code>fixtures</code></td>
+<td>for a run given a <a href="usage-fixtures.html">fixtures file</a>, <code>{name, digest, data, tenants, counts, markers}</code>: the file's <code>name</code>, the SHA-256 of its bytes, <code>data</code> as <code>{declared: &quot;synthetic&quot;}</code> — the team's statement, recorded and never verified —, the tenants it declares, <code>{documents, records, tools}</code> it declares, and the version of the algorithm that derived its markers. <code>null</code> otherwise</td>
+</tr>
 </tbody>
 </table></div>
-<p>Three conventions hold everywhere in it:</p>
-<p><strong>Timestamps are UTC, RFC 3339.</strong> A local-time timestamp in an evidence record is
-a bug waiting for a timezone.</p>
-<p><strong>Digests name their algorithm</strong> — <code>sha256:…</code>, never a bare hex string, so a
-digest can be migrated when the algorithm moves.</p>
-<p><strong>The target fingerprint says what it covers.</strong> <code>target.fingerprint_inputs</code> lists
-the fields the digest was computed from. A digest of a URL and a model name
-identifies a <em>declared</em> target; it attests nothing about the weights behind it,
-and the document says so rather than leaving a reader to assume the stronger
-reading.</p>
+<h3 id="the-finding-channels">The finding channels</h3>
+<p><code>findings</code>, <code>unverified</code> and <code>waived</code> use the same record structure. A finding failed the check.
+An unverified record describes a check that ran but could not decide. A waived record is a
+finding accepted by a baseline.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>rule_id</code></td>
+<td>string</td>
+<td>the rule that produced it</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td>string</td>
+<td><code>INFO</code>, <code>LOW</code>, <code>MEDIUM</code>, <code>HIGH</code> or <code>CRITICAL</code>, always uppercase</td>
+</tr>
+<tr>
+<td><code>title</code></td>
+<td>string</td>
+<td>the rule's title</td>
+</tr>
+<tr>
+<td><code>taxonomy</code></td>
+<td>list of <code>{framework, id, title}</code></td>
+<td>the framework references the rule maps to; <code>framework</code> and <code>id</code> are the identity, and <code>title</code> is recorded so a reader without that catalogue can still show it</td>
+</tr>
+<tr>
+<td><code>target_ref</code></td>
+<td>string</td>
+<td>where: a file path, with <code>:line</code> when the rule names a line, or the target's reference</td>
+</tr>
+<tr>
+<td><code>evidence</code></td>
+<td><code>{summary, detail}</code>, both strings</td>
+<td>what was seen, redacted under the run's evidence policy; <code>detail</code> may be empty</td>
+</tr>
+<tr>
+<td><code>verdict</code></td>
+<td><code>null</code>, or <code>{outcome, confidence, rationale, evaluator_id}</code></td>
+<td>the evaluator's verdict for a graded check: <code>outcome</code> is <code>pass</code>, <code>fail</code> or <code>inconclusive</code> and <code>confidence</code> is between <code>0</code> and <code>1</code>. <code>null</code> for a check that decides in its own code, such as a file rule</td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="errors-and-observations">Errors and observations</h3>
+<p>Each <code>errors</code> entry is <code>{source, stage, reason}</code>, all strings: what could not run (a rule id
+or a file), the stage where it failed, such as <code>load</code>, <code>run</code> or <code>target</code>, and why. The list of
+stages is open. Each <code>observations</code> entry is <code>{kind, name, ref, attributes}</code>: a component the
+run saw (<code>model</code>, <code>dataset</code>, <code>dependency-manifest</code> or <code>notebook</code>), its name, its location, and
+string attributes such as <code>format</code> and <code>size_bytes</code>.</p>
+<h3 id="result_summary"><code>result_summary</code></h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>findings</code>, <code>unverified</code>, <code>waived</code>, <code>errors</code>, <code>observations</code></td>
+<td>integer</td>
+<td>how many entries each channel holds</td>
+</tr>
+<tr>
+<td><code>rules_run</code></td>
+<td>list of rule ids</td>
+<td>the rules that ran</td>
+</tr>
+<tr>
+<td><code>rules_skipped</code></td>
+<td>list of <code>{rule_id, reason, missing, detail}</code></td>
+<td>the rules that did not run. <code>reason</code> is <code>missing_capability</code>, <code>unsafe_mode</code>, <code>not_applicable</code>, <code>not_recorded</code> or <code>not_offered</code>; <code>missing</code> lists what the target lacked; <code>detail</code> is a sentence for a person. Every reason except <code>not_applicable</code> is a coverage gap</td>
+</tr>
+<tr>
+<td><code>max_severity</code></td>
+<td>string or <code>null</code></td>
+<td>the highest severity in <code>findings</code>, <code>null</code> when there is none</td>
+</tr>
+<tr>
+<td><code>gate</code></td>
+<td><code>pass</code>, <code>fail</code> or <code>indeterminate</code></td>
+<td>the verdict the run's policy reached. It is stored rather than recomputed, so a reader uses this value instead of deriving one</td>
+</tr>
+<tr>
+<td><code>stopped_by</code></td>
+<td><code>null</code>, <code>budget_exhausted</code>, <code>interrupted</code>, <code>target_unavailable</code> or <code>target_changed</code></td>
+<td>why the run ended before its plan finished</td>
+</tr>
+<tr>
+<td><code>assessments</code>, <code>measured</code></td>
+<td>integer</td>
+<td>see <a href="#assessments">assessments</a></td>
+</tr>
+</tbody>
+</table></div>
+<h3 id="coverageshortfall"><code>coverage.shortfall</code></h3>
+<p>Each entry is <code>{kind, name, detail}</code>: the kind of coverage the run lacked, what it concerned,
+and a sentence for a person. <code>kind</code> is <code>missing_dimension</code>, <code>contract_not_applicable</code>,
+<code>unexamined_component</code>, <code>incomplete_recording</code>, <code>demanded_check</code>, <code>seed_not_reached</code>,
+<code>empty_target</code> or <code>ungraded_cases</code>. A shortfall prevents a run from passing regardless of the
+<code>fail_on_*</code> switches. The gate is <code>indeterminate</code> unless a finding or a failed suite makes
+it <code>fail</code>. A stopped run is <code>indeterminate</code> either way.</p>
+<p>These conventions apply throughout the document:</p>
+<p><strong>Timestamps are UTC, RFC 3339.</strong> A local-time timestamp in an evidence record is a
+bug waiting for a timezone.</p>
+<p><strong>Digests of a document or of content name their algorithm</strong> — <code>sha256:…</code> — so a digest
+can be migrated when the algorithm changes. Two fields instead hold a shorter identifier of
+16 bare hex characters: <code>run.rules[].digest</code>, the digest of a rule's declaration, and
+<code>assessments[].dataset</code> when a YAML rule records its declaration digest there.</p>
+<p><strong>The target fingerprint says what it covers.</strong> <code>target.fingerprint_inputs</code> lists the
+fields the digest was computed from. A digest of a URL and a model name identifies a
+<em>declared</em> target; it attests nothing about the weights behind it, and the document
+says so rather than leaving a reader to assume the stronger reading.</p>
+<p><strong>A document digest says how much of the document it covers.</strong> <code>target.document</code> is
+<code>null</code>, or <code>{digest, kind, bytes}</code>: <code>digest</code> is SHA-256 over the first <code>bytes</code> bytes of the
+file the run read, and <code>kind</code> is <code>content</code> when that was the whole file or
+<code>content_prefix</code> when a read ceiling stopped the reader first. <code>analyze-trace</code>,
+<code>import-observations</code> and <code>grade</code> fill it; for <code>grade</code> it is the recording's digest, the
+identity of the execution that was graded. <code>null</code> means no digest was recorded, never that two
+documents matched.</p>
 <h2 id="assessments">Assessments</h2>
 <p>The channel that is not about problems. Every other one — findings, unverified,
 errors, coverage shortfall — records something wrong; a check that ran and was
-satisfied used to leave nothing but its id in <code>rules_run</code>.</p>
+satisfied would otherwise leave nothing but its id in <code>rules_run</code>.</p>
 <p>That is enough to gate a build and not enough to answer <em>did this get better</em>,
 because fewer findings has three causes and the count cannot separate them: the
 system improved, the test got weaker, or the sample changed.</p>
@@ -367,7 +666,8 @@ system improved, the test got weaker, or the sample changed.</p>
   &quot;dataset&quot;: &quot;5435b77094cde319&quot;,
   &quot;rationale&quot;: &quot;Response contains a refusal marker.&quot;,
   &quot;tags&quot;: [],
-  &quot;trial&quot;: 1
+  &quot;trial&quot;: 1,
+  &quot;reason&quot;: null
 }
 </code></pre>
 <div class="table-wrap"><table>
@@ -380,7 +680,7 @@ system improved, the test got weaker, or the sample changed.</p>
 <tbody>
 <tr>
 <td><code>case_id</code></td>
-<td>the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It does not carry the text it was built from, so it is safe in a redacted report</td>
+<td>the identity two runs are paired on. A hash of what distinguishes the case, so reordering prompts changes nothing and rewording one is a new case. It is always <code>&lt;rule id&gt;#&lt;12 hex characters&gt;</code>, using an unsalted SHA-256 digest truncated to 12 hex characters. It does not carry the text it was built from, but its 12-hex digest can confirm a guess at a low-entropy value or private dataset prompt; <code>hash_identifiers</code> changes only redaction placeholders and never <code>case_id</code>, so no setting removes the case digest</td>
 </tr>
 <tr>
 <td><code>assessor</code></td>
@@ -407,6 +707,10 @@ system improved, the test got weaker, or the sample changed.</p>
 <td>which attempt at the case this was, from <code>1</code>, for a rule that can repeat; <code>null</code> for a rule that cannot, and for a run saved before trials existed. Not part of a case's identity: two runs pair on <code>case_id</code></td>
 </tr>
 <tr>
+<td><code>reason</code></td>
+<td>why a trial was not measured: <code>not_recorded</code> (a recording held no reply for it; status <code>error</code>), <code>reply_altered</code> (the recorded reply was changed by redaction or not kept verbatim; status <code>inconclusive</code>) <code>declined</code> (the evaluator returned no verdict; status <code>inconclusive</code>) or <code>target_declined</code> (the application declined the request and the evaluator cannot grade a decline; status <code>inconclusive</code>). <code>null</code> for a measured trial, and for a run saved before schema 13</td>
+</tr>
+<tr>
 <td><code>dataset</code></td>
 <td>which versioned corpus the case came from. For a YAML rule this is its declaration digest, so an edited expectation makes the two runs incomparable rather than making the model look worse</td>
 </tr>
@@ -418,9 +722,8 @@ adds five per case. Their difference is the fact that matters: 40 assessments an
 measured is a pass rate over three cases, and a summary carrying only the pass
 count would present it with the same confidence as a full run.</p>
 <p>An artifact scan records none of these, and that is correct — reading a file and
-finding nothing is not a measurement. See
-<a href="design/assessment-channel.html"><code>design/assessment-channel.md</code></a> for the reasoning,
-and <a href="usage-diff.html"><code>usage-diff.md</code></a> for what a comparison does with them.</p>
+finding nothing is not a measurement. See <a href="usage-diff.html"><code>usage-diff.md</code></a> for
+what a comparison does with them.</p>
 <h2 id="trial-summaries">Trial summaries</h2>
 <p>Each rule that repeated carries what its attempts added up to, over cases, as the engine
 reduced them when the run was written:</p>
@@ -430,7 +733,20 @@ reduced them when the run was written:</p>
   &quot;cases_failed&quot;: 0,
   &quot;cases_incomplete&quot;: 0,
   &quot;bound&quot;: 0.2209,
-  &quot;mean_success_rate&quot;: 0.0
+  &quot;mean_success_rate&quot;: 0.0,
+  &quot;correction&quot;: {
+    &quot;status&quot;: &quot;uncorrected&quot;,
+    &quot;assessor&quot;: &quot;keyword&quot;,
+    &quot;reason&quot;: &quot;judge error not measured: no calibration recorded for keyword&quot;,
+    &quot;rate&quot;: null,
+    &quot;low&quot;: null,
+    &quot;high&quot;: null,
+    &quot;sensitivity&quot;: null,
+    &quot;specificity&quot;: null,
+    &quot;dataset_digest&quot;: null,
+    &quot;positives&quot;: null,
+    &quot;negatives&quot;: null
+  }
 }
 </code></pre>
 <div class="table-wrap"><table>
@@ -459,10 +775,128 @@ reduced them when the run was written:</p>
 </tr>
 </tbody>
 </table></div>
+<p>The <code>correction</code> block records how judge error was handled:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>status</code></td>
+<td><code>deterministic</code>, <code>corrected</code>, or <code>uncorrected</code></td>
+</tr>
+<tr>
+<td><code>assessor</code></td>
+<td>the id carried by the rule's verdicts and used to match the calibration</td>
+</tr>
+<tr>
+<td><code>reason</code></td>
+<td>why a rate stays uncorrected</td>
+</tr>
+<tr>
+<td><code>rate</code>, <code>low</code>, <code>high</code></td>
+<td>corrected <code>ASR@K</code> and its 95% interval; a clean rule has a one-sided interval with <code>low</code> at <code>0</code></td>
+</tr>
+<tr>
+<td><code>sensitivity</code>, <code>specificity</code></td>
+<td>the per-class rates applied to the correction</td>
+</tr>
+<tr>
+<td><code>positives</code>, <code>negatives</code></td>
+<td>the graded class counts behind those rates</td>
+</tr>
+<tr>
+<td><code>dataset_digest</code></td>
+<td>the calibration corpus digest</td>
+</tr>
+</tbody>
+</table></div>
+<p>A corrected block states all these fields. A <code>null</code> <code>correction</code> means the document was
+written before schema 8.</p>
+<p><code>run.evaluators[].calibration</code> also gains <code>assessor</code>, <code>judge_identity</code>,
+<code>starter_corpus</code>, <code>positives</code>, <code>negatives</code>, <code>positives_inconclusive</code>,
+<code>negatives_inconclusive</code>, <code>sensitivity</code> and <code>specificity</code>.</p>
 <p>The summary is stored rather than recomputed by each reader, as the gate verdict is, so
 a later build prints the verdict this run was written with. A rule that stopped part-way
-is not in <code>rules</code>, so it has no summary to misread. <code>run.rules[].declared_requests</code> is the
-number of requests the rule declared, attempts included.</p>
+is not in <code>rules</code>, so it has no summary to misread. <code>run.rules[].declared_requests</code> is
+the number of requests the rule declared, attempts included.</p>
+<h2 id="suite-summaries">Suite summaries</h2>
+<p>Each <a href="usage-suites.html">quality suite</a> carries what it measured over its dataset and what
+its gate concluded, as the suite built it while it ran. A suite has no <code>trial_summary</code>.</p>
+<pre><code class="language-json">&quot;suite&quot;: {
+  &quot;dataset&quot;: &quot;support-golden@2026.09&quot;,
+  &quot;dataset_digest&quot;: &quot;sha256:…&quot;,
+  &quot;sample_size&quot;: 100,
+  &quot;sample_seed&quot;: 7,
+  &quot;trials_per_case&quot;: 3,
+  &quot;cases&quot;: 100,
+  &quot;measured&quot;: 98,
+  &quot;ungraded&quot;: 2,
+  &quot;worst&quot;: 0.9133,
+  &quot;best&quot;: 0.92,
+  &quot;low&quot;: 0.8418,
+  &quot;high&quot;: 0.9589,
+  &quot;min_pass_rate&quot;: 0.9,
+  &quot;min_sample&quot;: 30,
+  &quot;outcome&quot;: &quot;pass&quot;,
+  &quot;reason&quot;: null,
+  &quot;correction&quot;: {&quot;status&quot;: &quot;deterministic&quot;, &quot;assessor&quot;: null, &quot;reason&quot;: null, &quot;worst&quot;: null,
+                 &quot;best&quot;: null, &quot;low&quot;: null, &quot;high&quot;: null, &quot;sensitivity&quot;: null,
+                 &quot;specificity&quot;: null, &quot;dataset_digest&quot;: null, &quot;positives&quot;: null,
+                 &quot;negatives&quot;: null}
+}
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dataset</code>, <code>dataset_digest</code></td>
+<td>the dataset's declared <code>name@version</code> and the digest of its file</td>
+</tr>
+<tr>
+<td><code>sample_size</code>, <code>sample_seed</code></td>
+<td>the subset that ran, or both <code>null</code> when every case did</td>
+</tr>
+<tr>
+<td><code>trials_per_case</code></td>
+<td>the attempts at every case</td>
+</tr>
+<tr>
+<td><code>cases</code>, <code>measured</code>, <code>ungraded</code></td>
+<td>the cases that ran, those whose every attempt was graded, and those with an attempt nobody could grade</td>
+</tr>
+<tr>
+<td><code>worst</code>, <code>best</code></td>
+<td>the pass rate with every ungraded attempt counted failed, and counted passed</td>
+</tr>
+<tr>
+<td><code>low</code>, <code>high</code></td>
+<td>the 95% Wilson limits, at <code>worst</code> and at <code>best</code></td>
+</tr>
+<tr>
+<td><code>min_pass_rate</code>, <code>min_sample</code></td>
+<td>the suite's gate</td>
+</tr>
+<tr>
+<td><code>outcome</code>, <code>reason</code></td>
+<td><code>pass</code>, <code>fail</code> or <code>inconclusive</code>, and why the suite declined when it did</td>
+</tr>
+<tr>
+<td><code>correction</code></td>
+<td><code>deterministic</code>, <code>corrected</code> or <code>uncorrected</code>; when corrected, the pass rates and limits corrected for the judge's error, in pass space, with the sensitivity, specificity, class counts and corpus digest applied</td>
+</tr>
+</tbody>
+</table></div>
+<p>A reader refuses a summary whose outcome its own numbers contradict: a pass below
+<code>min_sample</code> or under the bar, a fail at or over it, a decline without a reason.</p>
 <h2 id="field-names-borrowed-on-purpose">Field names borrowed on purpose</h2>
 <p><code>usage.input_tokens</code> and <code>usage.output_tokens</code> are the OpenTelemetry GenAI
 convention's <a href="https://opentelemetry.io/docs/specs/semconv/registry/attributes/gen-ai/"><code>gen_ai.usage.input_tokens</code> /
@@ -470,9 +904,13 @@ convention's <a href="https://opentelemetry.io/docs/specs/semconv/registry/attri
 without the namespace; <code>execution.seed</code> and <code>execution.temperature</code> match
 <code>gen_ai.request.*</code>. If you already collect those, the manifest needs no
 translation.</p>
-<p>The SARIF output carries the same facts in SARIF's own vocabulary: <code>runs[].invocations[0]</code>
+<p>The SARIF output contains the same facts in SARIF's vocabulary: <code>runs[].invocations[0]</code>
 with <code>startTimeUtc</code>, <code>endTimeUtc</code>, <code>exitCode</code>, <code>exitCodeDescription</code> and
-<code>executionSuccessful</code>.</p>
+<code>executionSuccessful</code>. That flag is not the verdict. It is <code>false</code> for each unresolved question
+named in the run's output, with a notification identifying the question. A rule skipped for
+missing coverage only adds a <code>note</code> unless the gate refused the run because of it. Read
+<code>exitCode</code> for the verdict
+(<a href="reading-results.html#what-sarif-keeps">reading results</a>, <a href="usage-scan.html#other-formats"><code>usage-scan.md</code></a>).</p>
 <h2 id="see-also">See also</h2>
 <ul>
 <li><a href="usage-diff.html"><code>usage-diff.md</code></a> — comparing two saved runs</li>
@@ -482,8 +920,10 @@ with <code>startTimeUtc</code>, <code>endTimeUtc</code>, <code>exitCode</code>, 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-run.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import (
@@ -15,8 +17,9 @@ from guardana.core.taxonomy import (
     OWASP_LLM04_2026,
 )
 from guardana.rules._base import ArtifactRule
-from guardana.rules.supply_chain._leads import lead_verdict
-from guardana.rules.supply_chain._reading import read_text_bounded
+from guardana.rules.supply_chain import _samples
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
 
 # A Hugging Face config that carries `auto_map` (or `custom_pipelines`) is wired to
 # import and run Python that ships in the model repo when it is loaded with
@@ -35,13 +38,37 @@ _CONFIG_NAME_SUFFIX = "config.json"
 # Detection is by *key name*, never by value shape: `_name_or_path` carries an
 # `owner/repo` string in a large share of real configs, so a shape-only rule would
 # flag almost every model on the Hub.
-_INTERNAL_KERNEL_KEY = "_attn_implementation_internal"
-_PUBLIC_KERNEL_KEYS = ("attn_implementation", "_attn_implementation")
-_KERNEL_REFERENCE = re.compile(r"^[A-Za-z0-9][\w.-]*/[A-Za-z0-9][\w.-]*$")
+_INTERNAL_KERNEL_KEYS = ("_attn_implementation_internal", "_attn_implementation")
+_PUBLIC_KERNEL_KEY = "attn_implementation"
+_KERNEL_KEYS = (*_INTERNAL_KERNEL_KEYS, _PUBLIC_KERNEL_KEY)
+# The pattern transformers' `is_kernel` matches: `org/repo`, optionally `@revision`
+# and `:function`, with any prefix such as `paged|` before the owner.
+_KERNEL_REFERENCE = re.compile(r"^[^/:]+/[^/:]+(?:@[^/:]+)?(?::[^/:]+)?$")
 
 
 def _is_config(path: Path) -> bool:
-    return path.name.endswith(_CONFIG_NAME_SUFFIX)
+    return path.name.lower().endswith(_CONFIG_NAME_SUFFIX)
+
+
+def _kernel_references(doc: dict[str, object]) -> Iterator[tuple[str, str, str]]:
+    """Yield `(key, label, reference)` for each kernel reference the config sets.
+
+    The attribute setter takes a dict keyed by sub-config name (`""` for the config
+    itself), and a composite config that builds its sub-configs after its own init
+    keeps the field each sub-config carries, so nested configs are read as well.
+    """
+    pending: list[tuple[str, dict[str, object]]] = [("", doc)]
+    while pending:
+        prefix, config = pending.pop()
+        for key, value in config.items():
+            label = f"{prefix}{key}"
+            if key in _KERNEL_KEYS:
+                entries = value.items() if isinstance(value, dict) else [(None, value)]
+                for sub, reference in entries:
+                    if isinstance(reference, str) and _KERNEL_REFERENCE.match(reference):
+                        yield key, label if sub is None else f'{label}["{sub}"]', reference
+            elif isinstance(value, dict):
+                pending.append((f"{label}.", value))
 
 
 def _module_targets(pointer: object) -> Iterator[str]:
@@ -67,6 +94,9 @@ def _local_module_present(reference: str, directory: Path) -> bool:
     return (directory / f"{filename}.py").is_file()
 
 
+_AUTO_MAP = {"model_type": "custom", "auto_map": {"AutoModel": "modeling_custom.CustomModel"}}
+
+
 class RemoteCodeConfigRule(ArtifactRule):
     """Flags a model config that asks for code to be run when the model loads.
 
@@ -89,44 +119,78 @@ class RemoteCodeConfigRule(ArtifactRule):
             OWASP_ASI05_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
 
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a config pointing at shipped code, a plain one and one past the read bound."""
+        return materialise(
+            (
+                _samples.sample(
+                    "a config whose auto_map points at a module shipped beside it",
+                    FixtureOutcome.FINDING,
+                    {
+                        "config.json": json.dumps(_AUTO_MAP),
+                        "modeling_custom.py": "class CustomModel:\n    pass\n",
+                    },
+                ),
+                _samples.sample(
+                    "a config naming only a built-in architecture",
+                    FixtureOutcome.CLEAN,
+                    {"config.json": json.dumps({"model_type": "bert", "hidden_size": 768})},
+                ),
+                _samples.sample(
+                    "a config padded past the read bound, its auto_map after the padding",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {"config.json": _samples.past_the_scan_bound(json.dumps(_AUTO_MAP))},
+                ),
+            )
+        )
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        """Scan every `*config.json` for an `auto_map`/`custom_pipelines` code pointer."""
+        """Scan every `*config.json` for a code pointer or a Hub kernel reference."""
         if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".json",)):
             if _is_config(path):
-                yield from self._scan(path)
+                yield from self._scan(path, ctx)
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        raw = read_text_bounded(path, errors="ignore")
-        if raw is None:
+    def _scan(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        prefix = read_text_prefix(path, errors="ignore")
+        if prefix is None:
+            yield self._unscanned(path, "the file could not be read", ctx)
+            return
+        raw, truncated = prefix
+        if truncated:
+            # A loader reads the whole file, so a key past the bound still applies.
+            yield self._unscanned(
+                path, f"the file is larger than the {MAX_SCAN_BYTES}-byte read bound", ctx
+            )
             return
         try:
             doc = json.loads(raw)
-        except ValueError:
+        except (ValueError, RecursionError):
+            # A loader cannot parse it either, so it configures nothing; `tsconfig.json`
+            # with comments is the common case.
             return
         if not isinstance(doc, dict):
             return
         for key in _CODE_POINTER_KEYS:
             if key in doc:
                 yield self._finding(path, key, doc[key])
-        for key in (_INTERNAL_KERNEL_KEY, *_PUBLIC_KERNEL_KEYS):
-            reference = doc.get(key)
-            if isinstance(reference, str) and _KERNEL_REFERENCE.match(reference):
-                yield self._kernel_finding(path, key, reference)
+        for key, label, reference in _kernel_references(doc):
+            yield self._kernel_finding(path, key, label, reference)
 
-    def _kernel_finding(self, path: Path, key: str, reference: str) -> Finding:
+    def _kernel_finding(self, path: Path, key: str, label: str, reference: str) -> Finding:
         """Build the finding for a config entry naming a Hub kernel repository.
 
-        Through the private field this is the CVE — code runs on a load the user
+        Through a private field this is the CVE — code runs on a load the user
         believes is sandboxed. Through the documented field it is an opt-in, so it
         is reported the way `trust_remote_code=True` is: a lead, not a compromise.
         """
-        internal = key == _INTERNAL_KERNEL_KEY
+        internal = key in _INTERNAL_KERNEL_KEYS
         summary = (
-            f"'{key}' names the Hub kernel repository '{reference}', "
+            f"'{label}' names the Hub kernel repository '{reference}', "
             "which transformers downloads and imports on load"
         )
         if internal:
@@ -163,4 +227,18 @@ class RemoteCodeConfigRule(ArtifactRule):
                 detail=f"file={path.name}; references={', '.join(references) or '(none)'}",
             ),
             verdict=None if code_present else lead_verdict(summary),
+        )
+
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(self.meta.id, path, reason))
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.LOW,
+            title="Model config not scanned",
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(
+                summary=f"model config not scanned: {reason}", detail=f"file={path.name}"
+            ),
+            verdict=unscanned_verdict("the config could not be read whole, so nothing was cleared"),
         )

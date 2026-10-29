@@ -11,7 +11,6 @@
 # register, so a rule renamed in one place and not the other fails the build.
 #
 # Documentation: docs/usage-pack.md
-# Reasoning:     docs/design/extension-author-tooling.md
 
 schema_version: 2
 name: guardana-rules
@@ -28,6 +27,9 @@ description: >
 
 provides:
   rules:
+    - guardana.a2a.agent_card
+    - guardana.a2a.caller_identity
+    - guardana.a2a.task_visibility
     - guardana.agent.credential_exfiltration
     - guardana.agent.excessive_tool_use
     - guardana.agent.hidden_context.tool_schema
@@ -39,8 +41,10 @@ provides:
     - guardana.mcp.cache_scope
     - guardana.mcp.discovery_target
     - guardana.mcp.issuer_identification
+    - guardana.mcp.registry_entry
     - guardana.mcp.scope_breadth
     - guardana.mcp.session_binding
+    - guardana.mcp.task_identity
     - guardana.mcp.token_audience
     - guardana.mcp.unauthenticated_access
     - guardana.output.secrets
@@ -51,6 +55,7 @@ provides:
     - guardana.prompt.mcp_tool_poisoning
     - guardana.prompt.system_prompt_leak.canary
     - guardana.prompt.unbounded_consumption
+    - guardana.retrieval.poisoned_document
     - guardana.scenario.gradual_jailbreak
     - guardana.scenario.indirect_injection
     - guardana.supply_chain.chat_template
@@ -69,6 +74,7 @@ provides:
     - guardana.supply_chain.remote_code
     - guardana.supply_chain.remote_code_config
     - guardana.supply_chain.saved_model_ops
+    - guardana.tenancy.cross_tenant_answer
     - guardana.trace.consent_scope_exceeded
     - guardana.trace.credential_passthrough
     - guardana.trace.cross_tenant_retrieval
@@ -81,7 +87,12 @@ provides:
     - guardana.training.dataset_integrity
   evaluators:
     - amplification
+    - answered
     - canary
+    - contains
+    - exact_match
+    - json_valid
     - keyword
     - length
+    - regex
     - tool_call

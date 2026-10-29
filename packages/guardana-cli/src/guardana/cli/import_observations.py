@@ -13,14 +13,25 @@ from typing import Annotated
 
 import typer
 from guardana.cli._formats import OutputFormat
-from guardana.cli._output import emit
-from guardana.cli._plugins import resolve_trust
-from guardana.cli._profile import resolve_profile
+from guardana.cli._outputs import (
+    IMPORT_REFUSAL,
+    emit_report,
+    print_verdict,
+    refuse_installed_reporter,
+    warn_without_a_reporter,
+)
+from guardana.cli._profile import PRESET_HELP, resolve_profile
+from guardana.cli._profile_files import profile_file_inputs
 from guardana.cli._reporting import check_reporter_url, submit_safely
 from guardana.cli._run_meta import build_manifest, detect_deployment
+from guardana.cli._sidecar import (
+    refuse_writing_over_an_input,
+    refuse_writing_over_named_inputs,
+)
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.gate import gate_outcome
 from guardana.core.manifest import SourceKind, TargetIdentity
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.registry import Registry
 from guardana.core.report import CheckError, ScanResult
@@ -51,9 +62,7 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
         typer.Option("--target", help="What the other tool was pointed at, if the file omits it."),
     ] = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
-    preset: Annotated[
-        str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
-    ] = None,
+    preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
     format: Annotated[
         OutputFormat, typer.Option(help="human|json|sarif|junit")
     ] = OutputFormat.human,
@@ -82,8 +91,12 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
     actually evaluates a rule takes `--plugins`/`--allow-plugin` instead — see
     `guardana.cli._plugins.resolve_trust`.
     """
+    refuse_installed_reporter(reporter, IMPORT_REFUSAL)
+    refuse_writing_over_an_input(output, [results, profile])
     check_reporter_url(reporter)
     prof = resolve_profile(profile, preset)
+    refuse_writing_over_named_inputs(output, profile_file_inputs(prof))
+    warn_without_a_reporter(prof.delivery_required, reporter)
     read = _read_or_exit(results, producer)
     started_at = datetime.now(UTC)
     reference = target or f"{read.provenance.producer}:{results}"
@@ -104,7 +117,7 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
     outcome = gate_outcome(result, prof.policy)
     deployment = detect_deployment(ai_system, environment, None)
     run = build_manifest(
-        Registry.discover(resolve_trust("disabled", [], no_plugins=False)),
+        Registry.discover(PluginTrust(mode=PluginMode.DISABLED)),
         prof,
         result,
         target_kind=TargetKind.ENDPOINT,
@@ -114,13 +127,28 @@ def import_observations(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI 
         # The identity carries no fingerprint on purpose: Guardana never saw this
         # target, and a digest of a string somebody typed would look like an
         # attestation of what was verified. `fingerprint_inputs=()` says so.
-        identity=TargetIdentity(kind=TargetKind.ENDPOINT, ref=reference, fingerprint_inputs=()),
+        identity=TargetIdentity(
+            kind=TargetKind.ENDPOINT,
+            ref=reference,
+            fingerprint_inputs=(),
+            document=read.provenance.document,
+        ),
         deployment=deployment,
         source_kind=SourceKind.IMPORTED_TRACE,
     )
-    emit(get_renderer(format.value, run=run).render(result), output, format.value)
+    emit_report(get_renderer(format.value, run=run).render(result), output, format.value)
     if reporter:
-        submit_safely(reporter, result, source=str(results), deployment=deployment, run=run)
+        acknowledged = submit_safely(
+            reporter,
+            result,
+            source=str(results),
+            deployment=deployment,
+            run=run,
+            required=prof.delivery_required,
+        )
+        if prof.delivery_required and not acknowledged:
+            print_verdict(outcome, ExitCode.INDETERMINATE)
+            raise typer.Exit(code=ExitCode.OUTPUT_FAILED)
     # Always non-zero, and always this code. No rule ran, so "the policy passed" is a
     # sentence this run is not entitled to — see the module docstring.
     raise typer.Exit(code=ExitCode.INDETERMINATE)

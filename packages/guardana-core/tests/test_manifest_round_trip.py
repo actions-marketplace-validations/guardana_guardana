@@ -22,6 +22,7 @@ from dataclasses import fields, is_dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from guardana.core.fingerprint import DigestKind, DocumentDigest
 from guardana.core.gate import GateOutcome, StopReason
 from guardana.core.manifest.coverage import CoverageRecord, TaxonomyCatalogRecord
 from guardana.core.manifest.identity import (
@@ -35,9 +36,20 @@ from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.records import (
     CalibrationRecord,
+    CorrectionStatus,
     EvaluatorRecord,
+    ExchangesRecord,
+    FixturesRecord,
+    JudgeCorrection,
+    RecipeRecord,
+    RecordingOriginRecord,
+    RecordingRecord,
     ResultSummary,
     RuleRecord,
+    SubjectSource,
+    SuiteCorrection,
+    SuiteOutcome,
+    SuiteSummary,
     TrialSummary,
 )
 from guardana.core.manifest.serialize import manifest_to_dict
@@ -47,9 +59,10 @@ from guardana.core.manifest.settings import (
     ExecutionSettings,
     PrivacyRecord,
 )
-from guardana.core.manifest.usage import RunUsage
+from guardana.core.manifest.usage import JudgeUsage, RunUsage
 from guardana.core.report.shortfall import CoverageShortfall, ShortfallKind
 from guardana.core.report.skipped import SkippedRule, SkipReason
+from guardana.core.subject import SubjectKind
 from guardana.core.target import TargetKind
 
 _NOT_IN_THE_RUN_BLOCK = frozenset({"schema_version"})
@@ -83,6 +96,9 @@ def _fully_populated() -> RunManifest:
             fingerprint="sha256:1111",
             fingerprint_inputs=("url", "model"),
             capabilities=("chat", "plant_system_prompt"),
+            document=DocumentDigest(
+                digest="sha256:" + "cd" * 32, kind=DigestKind.CONTENT_PREFIX, bytes=65536
+            ),
         ),
         configuration=ConfigurationRef(
             profile_name="ci",
@@ -92,6 +108,7 @@ def _fully_populated() -> RunManifest:
             retriever_digest="sha256:5555",
             dataset_digest="sha256:6666",
             adapter_digest="sha256:7777",
+            provider="tgi",
         ),
         execution=ExecutionSettings(
             concurrency=4,
@@ -102,6 +119,7 @@ def _fully_populated() -> RunManifest:
             max_input_tokens=50_000,
             max_output_tokens=25_000,
             max_duration_seconds=90.5,
+            max_requests_per_minute=30,
             trials=3,
         ),
         usage=RunUsage(
@@ -111,6 +129,16 @@ def _fully_populated() -> RunManifest:
             requests_missing_token_counts=3,
             estimated_cost=1.25,
             wall_time_seconds=61.5,
+            judge={
+                "llm_judge": JudgeUsage(
+                    requests=30,
+                    input_tokens=9000,
+                    output_tokens=600,
+                    requests_missing_token_counts=2,
+                    budget_exhausted=True,
+                ),
+                "guard": JudgeUsage(requests=12, requests_missing_token_counts=12),
+            },
         ),
         result_summary=ResultSummary(
             findings=3,
@@ -125,6 +153,12 @@ def _fully_populated() -> RunManifest:
                     reason=SkipReason.MISSING_CAPABILITY,
                     missing=("list_tools",),
                     detail="the target exposes no tool surface",
+                ),
+                SkippedRule(
+                    rule_id="guardana.mcp.task_identity",
+                    reason=SkipReason.NOT_OFFERED,
+                    missing=("tasks",),
+                    detail="http://mcp.invalid/mcp: the server lists no tasks",
                 ),
             ),
             max_severity="HIGH",
@@ -148,6 +182,57 @@ def _fully_populated() -> RunManifest:
                     cases_incomplete=1,
                     bound=None,
                     mean_success_rate=0.25,
+                    correction=JudgeCorrection(
+                        status=CorrectionStatus.CORRECTED,
+                        assessor="llm_judge@2025.1",
+                        rate=0.3,
+                        low=0.05,
+                        high=0.8,
+                        sensitivity=0.9,
+                        specificity=0.95,
+                        dataset_digest="sha256:abab",
+                        positives=120,
+                        negatives=130,
+                    ),
+                ),
+            ),
+            RuleRecord(
+                id="acme.suite.support_answers",
+                digest="sha256:888a",
+                version="1.4.0",
+                origin="acme-quality-pack",
+                maturity="experimental",
+                declared_requests=120,
+                suite=SuiteSummary(
+                    dataset="support-answers@2026.09",
+                    dataset_digest="sha256:adad",
+                    sample_size=40,
+                    sample_seed=11,
+                    trials_per_case=3,
+                    cases=40,
+                    measured=37,
+                    ungraded=3,
+                    worst=0.83,
+                    best=0.9,
+                    low=0.68,
+                    high=0.96,
+                    min_pass_rate=0.85,
+                    min_sample=30,
+                    outcome=SuiteOutcome.INCONCLUSIVE,
+                    reason="3 ungraded cases could carry the rate to either side of 85%",
+                    correction=SuiteCorrection(
+                        status=CorrectionStatus.CORRECTED,
+                        assessor="llm_judge@2025.1",
+                        worst=0.84,
+                        best=0.91,
+                        low=0.7,
+                        high=0.97,
+                        sensitivity=0.9,
+                        specificity=0.95,
+                        dataset_digest="sha256:abab",
+                        positives=120,
+                        negatives=130,
+                    ),
                 ),
             ),
         ),
@@ -161,7 +246,17 @@ def _fully_populated() -> RunManifest:
                     measured_at=datetime(2026, 7, 1, tzinfo=UTC),
                     brier=0.08,
                     ece=0.03,
+                    assessor="llm_judge@2025.1",
+                    judge_identity="model=m;endpoint=sha256:acac;samples=1",
+                    starter_corpus=False,
+                    positives=30,
+                    negatives=31,
+                    positives_inconclusive=2,
+                    negatives_inconclusive=1,
+                    sensitivity=0.9,
+                    specificity=0.95,
                 ),
+                judge="model=m;endpoint=sha256:acac;samples=1",
             ),
         ),
         source=RunSource(kind=SourceKind.CI, provider="github", run_url="https://ci.invalid/run/1"),
@@ -192,7 +287,49 @@ def _fully_populated() -> RunManifest:
                     name="approval",
                     detail="the adapter records no approval spans",
                 ),
+                CoverageShortfall(
+                    kind=ShortfallKind.INCOMPLETE_RECORDING,
+                    name="5d0c8a1b-3e2f-4a6d-9b7c-1f2e3d4c5b6a",
+                    detail="the origin stopped with budget_exhausted",
+                ),
+                CoverageShortfall(
+                    kind=ShortfallKind.SEED_NOT_REACHED,
+                    name="records/orders/G-200 as globex",
+                    detail="globex's own record in orders returned no marker",
+                ),
             ),
+        ),
+        exchanges=ExchangesRecord(digest="sha256:" + "ef" * 32, count=9, altered=1),
+        recording=RecordingRecord(
+            name="support-replies",
+            version="2026.09",
+            subject="checkout-assistant",
+            verbatim=False,
+            origin=RecordingOriginRecord(
+                run_id="5d0c8a1b-3e2f-4a6d-9b7c-1f2e3d4c5b6a",
+                target="http://model.invalid/v1",
+                started_at="2026-08-10T08:00:00Z",
+                stopped_by="budget_exhausted",
+                gate="fail",
+            ),
+        ),
+        recipe=RecipeRecord(
+            name="checkout-assistant",
+            digest="sha256:" + "ab" * 32,
+            lock_digest="sha256:" + "cd" * 32,
+            kind=SubjectKind.APPLICATION,
+            source=SubjectSource.CONNECTION,
+            unpinned=("acme.local.tone",),
+        ),
+        fixtures=FixturesRecord(
+            name="support-bot",
+            digest="sha256:" + "fe" * 32,
+            data="synthetic",
+            tenants=("acme", "globex", "initech"),
+            documents=4,
+            records=3,
+            tools=2,
+            markers=1,
         ),
         migrated_from=4,
     )
@@ -211,6 +348,9 @@ def _leaves(value: object, path: str) -> Iterator[tuple[str, object]]:
     elif isinstance(value, tuple | list):
         for index, item in enumerate(value):
             yield from _leaves(item, f"{path}[{index}]")
+    elif isinstance(value, dict) and value:
+        for key, item in value.items():
+            yield from _leaves(item, f"{path}[{key!r}]")
     else:
         yield path, value
 

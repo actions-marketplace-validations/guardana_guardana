@@ -204,6 +204,23 @@ def test_a_directory_of_contracts_loads_every_file_in_it(tmp_path: Path) -> None
     assert "2 assertion(s) apply" in result.output
 
 
+def test_a_contract_suffix_in_capitals_is_loaded_like_a_lowercase_one(tmp_path: Path) -> None:
+    """Skipping `CHECKOUT.YAML` would grade none of its invariants and say nothing."""
+    directory = tmp_path / "contracts"
+    directory.mkdir()
+    _contract_file(directory, _NEEDS_APPROVAL.replace("approvals", "one"), "one.YAML")
+    _contract_file(directory, _NEEDS_APPROVAL.replace("approvals", "two"), "two.Yml")
+
+    result = _run(
+        str(_trace_file(tmp_path, Dimension.EFFECTS, Dimension.APPROVAL)),
+        "--contract",
+        str(directory),
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "2 assertion(s) apply" in result.output
+
+
 def test_a_directory_with_no_contracts_is_refused(tmp_path: Path) -> None:
     """Loading nothing from a path somebody named is the silent half of a fail-open."""
     directory = tmp_path / "empty"

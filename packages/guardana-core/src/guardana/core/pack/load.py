@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from guardana.core._yaml import load_yaml
 from guardana.core.pack.model import (
     PACK_SCHEMA_VERSION,
     ApiRange,
@@ -30,8 +31,13 @@ MANIFEST_NAME = "guardana-pack.yaml"
 installed cannot be checked at the only moment that matters.
 """
 
-_ALLOWED_KEYS = frozenset({"schema_version", "name", "description", "extension_api", "provides"})
-_ALLOWED_PROVIDES_KEYS = frozenset({"rules", "evaluators", "targets", "taxonomies"})
+_ALLOWED_KEYS = frozenset(
+    {"schema_version", "name", "description", "extension_api", "output_api", "provides"}
+)
+_ALLOWED_PROVIDES_KEYS = frozenset(
+    {"rules", "evaluators", "targets", "taxonomies", "renderers", "reporters"}
+)
+_OUTPUT_KEYS = frozenset({"renderers", "reporters"})
 _V1_PROVIDES_KEYS = frozenset({"rules", "evaluators", "targets"})
 """What `provides:` could name at schema 1 — three groups out of the four that exist.
 
@@ -41,13 +47,17 @@ accept a document that declares a key its own version had not invented, which is
 manifest whose `schema_version` no longer describes it.
 """
 
+_V2_KEYS = _ALLOWED_KEYS - {"output_api"}
+_V2_PROVIDES_KEYS = _ALLOWED_PROVIDES_KEYS - _OUTPUT_KEYS
+"""What a schema 2 manifest could contain: everything but the outputs schema 3 added."""
+
 _RANGE = re.compile(r"^>=\s*(\d+)\s*,\s*<\s*(\d+)$")
 
 
 def load_manifest(path: Path) -> PackManifest:
     """Parse one `guardana-pack.yaml`, or raise `PackError` naming the file and the problem."""
     try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        raw = load_yaml(path.read_text(encoding="utf-8"))
     except (yaml.YAMLError, OSError, UnicodeDecodeError) as exc:
         raise PackError(f"could not read pack manifest {path}: {exc}") from exc
     if not isinstance(raw, dict):
@@ -56,6 +66,8 @@ def load_manifest(path: Path) -> PackManifest:
     declared = _check_version(raw, path)
     raw = _migrated(raw, declared, path)
     provides = _provides(raw.get("provides"), path)
+    renderers = _output_names(provides.get("renderers", ()), "renderers", path)
+    reporters = _output_names(provides.get("reporters", ()), "reporters", path)
     return PackManifest(
         name=_require_str(raw, "name", path),
         extension_api=_api_range(raw.get("extension_api"), path),
@@ -64,9 +76,12 @@ def load_manifest(path: Path) -> PackManifest:
         evaluators=provides.get("evaluators", ()),
         targets=provides.get("targets", ()),
         taxonomies=provides.get("taxonomies", ()),
+        renderers=renderers,
+        reporters=reporters,
+        output_api=_output_api(raw, declares_outputs=bool(renderers or reporters), path=path),
         description=str(raw.get("description", "")),
-        schema_version=PACK_SCHEMA_VERSION,
-        migrated_from=declared if declared != PACK_SCHEMA_VERSION else None,
+        schema_version=declared if declared >= _OLDEST_CURRENT else PACK_SCHEMA_VERSION,
+        migrated_from=declared if declared < _OLDEST_CURRENT else None,
     )
 
 
@@ -125,37 +140,100 @@ def _migrate_v1_to_v2(raw: dict[str, Any], path: Path) -> dict[str, Any]:
     return raw
 
 
+def _migrate_v2_to_v3(raw: dict[str, Any], path: Path) -> dict[str, Any]:
+    """Carry a schema 2 manifest to schema 3, which knows installed outputs.
+
+    A v2 manifest declares no outputs, which is what it meant. A v2 manifest naming
+    `renderers`, `reporters` or `output_api` is refused, as v1 refuses `taxonomies`:
+    a build that predates outputs would read the same file and drop them silently.
+    """
+    _reject_unknown(raw, _V2_KEYS, "schema 2 pack manifest", path)
+    provides = raw.get("provides")
+    if isinstance(provides, dict):
+        _reject_unknown(provides, _V2_PROVIDES_KEYS, "schema 2 provides", path)
+    return raw
+
+
 _MIGRATIONS: dict[int, Callable[[dict[str, Any], Path], dict[str, Any]]] = {
     1: _migrate_v1_to_v2,
+    2: _migrate_v2_to_v3,
 }
 
 _OLDEST_READABLE = min(_MIGRATIONS) if _MIGRATIONS else PACK_SCHEMA_VERSION
 
+_OLDEST_CURRENT = 2
+"""The oldest schema still written: a manifest declaring no output stays at 2, so reading one
+is not a migration and older builds keep reading it."""
 
-def _api_range(raw: object, path: Path) -> ApiRange:
-    """Parse `extension_api: ">=1,<2"`, requiring both ends.
+
+def _api_range(raw: object, path: Path, key: str = "extension_api") -> ApiRange:
+    """Parse `extension_api: ">=1,<2"` (or `output_api`), requiring both ends.
 
     Both ends, because both directions are real failures and an open-ended range
     silently claims compatibility with an API nobody has written yet.
     """
     if not isinstance(raw, str):
         raise PackError(
-            f"invalid pack manifest {path}: 'extension_api' is required and must be a "
+            f"invalid pack manifest {path}: '{key}' is required and must be a "
             f'string like ">=1,<2"'
         )
     match = _RANGE.match(raw.strip())
     if match is None:
         raise PackError(
-            f"invalid pack manifest {path}: 'extension_api' must be a closed range like "
+            f"invalid pack manifest {path}: '{key}' must be a closed range like "
             f'">=1,<2", got {raw!r} — an open end claims compatibility with an API that '
             f"does not exist yet"
         )
     minimum, below = int(match.group(1)), int(match.group(2))
     if minimum >= below:
-        raise PackError(
-            f"invalid pack manifest {path}: 'extension_api' range {raw!r} accepts nothing"
-        )
+        raise PackError(f"invalid pack manifest {path}: '{key}' range {raw!r} accepts nothing")
     return ApiRange(minimum=minimum, below=below)
+
+
+def _output_api(raw: dict[str, Any], *, declares_outputs: bool, path: Path) -> ApiRange | None:
+    """Read `output_api`, required exactly when the manifest provides an output."""
+    if not declares_outputs:
+        if "output_api" in raw:
+            raise PackError(
+                f"invalid pack manifest {path}: 'output_api' is declared and 'provides' "
+                f"names no renderer or reporter — the range would describe nothing"
+            )
+        return None
+    if "output_api" not in raw:
+        raise PackError(
+            f"invalid pack manifest {path}: 'provides' names a renderer or reporter, so "
+            f"'output_api' is required — it says which output contract they were written "
+            f"against"
+        )
+    return _api_range(raw["output_api"], path, "output_api")
+
+
+def _output_names(names: tuple[str, ...], key: str, path: Path) -> tuple[str, ...]:
+    """Refuse an output name that could never be selected: malformed or reserved."""
+    # Imported here: `guardana.core.output` reaches `verify`, which imports this
+    # package, so a module-level import is a cycle.
+    from guardana.core.output import (  # noqa: PLC0415
+        MAX_OUTPUT_NAME_LENGTH,
+        OUTPUT_NAME_PATTERN,
+        is_output_name,
+        is_reserved_renderer_name,
+        is_reserved_reporter_name,
+    )
+
+    reserved = is_reserved_renderer_name if key == "renderers" else is_reserved_reporter_name
+    for name in names:
+        if not is_output_name(name):
+            raise PackError(
+                f"invalid pack manifest {path}: 'provides.{key}' names {name!r}, which is "
+                f"not an output name ({OUTPUT_NAME_PATTERN.pattern}, at most "
+                f"{MAX_OUTPUT_NAME_LENGTH} characters), so it can never be selected"
+            )
+        if reserved(name):
+            raise PackError(
+                f"invalid pack manifest {path}: 'provides.{key}' names {name!r}, which is "
+                f"reserved for Guardana's built-in outputs, so it can never be selected"
+            )
+    return names
 
 
 def _provides(raw: object, path: Path) -> dict[str, tuple[str, ...]]:
@@ -196,7 +274,7 @@ def _require_str(raw: dict[str, Any], key: str, path: Path) -> str:
 
 
 def _reject_unknown(raw: dict[str, Any], allowed: frozenset[str], what: str, path: Path) -> None:
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise PackError(
             f"invalid pack manifest {path}: unknown {what} key(s): {', '.join(unknown)}; "

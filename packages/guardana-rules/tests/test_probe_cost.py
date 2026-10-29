@@ -12,15 +12,34 @@ would grow past the point where anyone leaves it in CI. A scanner that gets
 switched off fails open at a level no rule can defend.
 """
 
-from collections.abc import Sequence
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
+from pathlib import Path
+from typing import TYPE_CHECKING
 
+import pytest
+from guardana.core.evaluator import Evaluator, Expectation, Verdict
+from guardana.core.exchange import Exchange
+from guardana.core.fixtures import DOCUMENTS_CHANNEL, parse_fixtures
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
-from guardana.core.rule import Rule, RuleContext, RuleError
+from guardana.core.rule import NotOffered, Rule, RuleContext, RuleError
 from guardana.core.rule.trajectory_rule import TrajectoryRule
-from guardana.core.target import Capability, EndpointTarget, TargetKind
+from guardana.core.target import (
+    MAX_LISTING_PAGES,
+    Capability,
+    EndpointTarget,
+    SeededTarget,
+    TargetKind,
+)
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
+from guardana.core.testing.seeded import SeededApplication, seeded_target
 from guardana.core.trajectory import MAX_STEPS_CEILING
+
+if TYPE_CHECKING:
+    from guardana.core.target import A2aAgentTarget, McpServerTarget
+    from guardana.core.testing import ScriptedMcpServer
 from guardana.rules import provide_evaluators, provide_rules
 
 _CTX = RuleContext(evaluators={e.id: e for e in provide_evaluators()})
@@ -116,7 +135,11 @@ def test_the_whole_probe_plan_has_a_knowable_ceiling() -> None:
 
 
 def test_agent_rules_are_registered_and_bounded() -> None:
-    ids = {r.meta.id for r in Registry.discover().rules() if isinstance(r, TrajectoryRule)}
+    ids = {
+        r.meta.id
+        for r in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules()
+        if isinstance(r, TrajectoryRule)
+    }
     assert ids, "no agent rules are discoverable, so this gate would measure nothing"
 
 
@@ -179,8 +202,19 @@ def _requests_spent(rule: Rule) -> int:
 
 def test_every_shipped_endpoint_rule_declares_what_it_will_spend() -> None:
     # `plan` reports "N requests, plus M rules of unknown cost". A built-in in the
-    # second group would make our own pre-flight estimate useless.
-    undeclared = [r.meta.id for r in _endpoint_rules() if r.estimated_requests is None]
+    # second group would make our own pre-flight estimate useless. A seeded rule's cost
+    # is the fixtures', so it declares it against the target it is planned for.
+    seeded = {r.meta.id for r in _seeded_rules()}
+    undeclared = [
+        r.meta.id
+        for r in _endpoint_rules()
+        if (
+            r.estimated_requests_for(_seeded_target())
+            if r.meta.id in seeded
+            else r.estimated_requests
+        )
+        is None
+    ]
     assert not undeclared, f"these shipped rules do not declare a request count: {undeclared}"
 
 
@@ -245,16 +279,16 @@ def test_a_rule_that_repeats_declares_and_spends_the_same_at_one_trial() -> None
         assert _requests_spent(once) == _requests_spent(rule), rule.meta.id
 
 
-def test_every_rule_that_repeats_is_measured_by_the_chat_gate() -> None:
-    # The gate above runs repeated rules against a chat endpoint. A rule of the MCP
-    # shape that started repeating would be measured refusing to run, not spending.
-    chat = {r.meta.id for r in _chat_rules()}
-    outside = [r.meta.id for r in _repeated(_endpoint_rules(), 3) if r.meta.id not in chat]
+def test_every_rule_that_repeats_is_measured_by_the_chat_or_the_seeded_gate() -> None:
+    # The gates run repeated rules against a chat endpoint or a seeded target. A rule of
+    # the MCP shape that started repeating would be measured refusing to run, not spending.
+    measured = {r.meta.id for r in _chat_rules()} | {r.meta.id for r in _seeded_rules()}
+    outside = [r.meta.id for r in _repeated(_endpoint_rules(), 3) if r.meta.id not in measured]
     assert not outside, f"these rules repeat but no gate measures their trials: {outside}"
 
 
 def test_applying_trials_to_the_registry_reaches_the_python_built_ins() -> None:
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     registry.apply_trials(4)
 
     by_id = {r.meta.id: r for r in registry.rules()}
@@ -272,19 +306,39 @@ def _mcp_rules() -> list[Rule]:
     Split from the chat rules because the two sets never run together: an MCP
     target declares neither `chat` nor `plant_system_prompt`, and a chat endpoint
     declares neither `list_tools` nor `inspect_authorization`. Summing both into
-    one ceiling would price a run nobody can execute.
+    one ceiling would price a run nobody can execute. `registry_entry` belongs here:
+    an MCP target declares it whenever the operator supplies an entry.
     """
-    reachable = {Capability.LIST_TOOLS, Capability.INSPECT_AUTHORIZATION}
+    reachable = {
+        Capability.LIST_TOOLS,
+        Capability.INSPECT_AUTHORIZATION,
+        Capability.REGISTRY_ENTRY,
+    }
     return [r for r in _endpoint_rules() if not r.meta.required_capabilities - reachable]
 
 
-def test_every_endpoint_rule_belongs_to_one_of_the_two_run_shapes() -> None:
+def _a2a_rules() -> list[Rule]:
+    """Endpoint rules an A2A agent can satisfy: the run shape `probe --a2a` has."""
+    return [
+        r
+        for r in _endpoint_rules()
+        if r.meta.required_capabilities
+        and not r.meta.required_capabilities - {Capability.INSPECT_A2A}
+    ]
+
+
+def test_every_endpoint_rule_belongs_to_one_of_the_run_shapes() -> None:
     # The split above is only trustworthy while it is exhaustive: a rule needing
-    # capabilities from both sets would be priced by neither ceiling and skipped by
-    # every real target, which is lost coverage nobody would notice.
-    accounted = {r.meta.id for r in _chat_rules()} | {r.meta.id for r in _mcp_rules()}
+    # capabilities from two sets would be priced by no ceiling and skipped by every
+    # real target, which is lost coverage nobody would notice.
+    accounted = (
+        {r.meta.id for r in _chat_rules()}
+        | {r.meta.id for r in _mcp_rules()}
+        | {r.meta.id for r in _seeded_rules()}
+        | {r.meta.id for r in _a2a_rules()}
+    )
     orphans = [r.meta.id for r in _endpoint_rules() if r.meta.id not in accounted]
-    assert not orphans, f"these rules can run against neither a chat endpoint nor MCP: {orphans}"
+    assert not orphans, f"these rules can run against no chat, MCP, seeded or A2A target: {orphans}"
 
 
 def test_a_chat_probe_has_a_knowable_ceiling() -> None:
@@ -300,48 +354,184 @@ def test_an_mcp_probe_has_a_knowable_ceiling_and_actually_spends_far_less() -> N
     # would spend *alone*, which is what `plan` has to sum because it cannot know
     # which rule runs first; the observation is bought once and shared, so a real
     # run spends a fraction of it. The ceiling stays honest — it is an upper bound —
-    # and this pins how loose it is allowed to get.
+    # and this pins how loose it is allowed to get. Every accepted handshake is
+    # followed by a metered `notifications/initialized`, which every rule that may
+    # open a session counts once more, and every rule reading the tool listing counts
+    # each page a server may name.
     ceiling = sum(r.estimated_requests or 0 for r in _mcp_rules())
-    assert ceiling <= 60, (
+    assert ceiling <= 118, (
         f"a full MCP probe can cost {ceiling} requests, which is too many to default to"
     )
 
-    from guardana.core.target import McpServerTarget  # noqa: PLC0415
-    from guardana.core.testing import ScriptedMcpServer  # noqa: PLC0415
-
-    url = "https://93.184.215.14/mcp"
-    server = ScriptedMcpServer(
-        url,
-        tools=[{"name": "read", "description": "reads"}],
-        credential="t",
-        challenge=f'Bearer resource_metadata="{url[:24]}/.well-known/oauth-protected-resource"',
-        resource_metadata={"resource": url[:24], "authorization_servers": [url[:24]]},
-        authorization_metadata={"code_challenge_methods_supported": ["S256"]},
-        session_ids=["a" * 32, "b" * 32, "c" * 32],
-    )
-    target = McpServerTarget(url, credential="t", sender=server)
+    target = _mcp_target(_mcp_server())
     for rule in _mcp_rules():
-        list(rule.run(target, _CTX))
+        with suppress(NotOffered):
+            list(rule.run(target, _CTX))
 
     spent = target.usage().requests
     assert spent < ceiling, "the observation is not being shared between rules"
     assert spent <= 20, f"a whole MCP probe spent {spent} requests"
 
 
-def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
+_MCP_URL = "https://93.184.215.14/mcp"
+_MODERN = "2026-07-28"
+_LEGACY = "2025-11-25"
+_LONGEST_LISTING = [
+    [{"name": f"t{page}", "description": "reads"}] for page in range(MAX_LISTING_PAGES)
+]
+"""A listing with exactly as many pages as a run reads, the longest a rule pays for."""
+
+
+def _mcp_server(**era: object) -> "ScriptedMcpServer":
+    """A server answering every request a rule may send, so each rule spends all it would."""
+    from guardana.core.testing import ScriptedMcpServer  # noqa: PLC0415
+
+    origin = _MCP_URL[:24]
+    settings: dict[str, object] = {
+        "tools": [{"name": "read", "description": "reads"}],
+        "credential": "t",
+        "challenge": f'Bearer resource_metadata="{origin}/.well-known/oauth-protected-resource"',
+        "resource_metadata": {"resource": origin, "authorization_servers": [origin]},
+        "authorization_metadata": {
+            "issuer": origin,
+            "code_challenge_methods_supported": ["S256"],
+        },
+        "session_ids": ["a" * 32, "b" * 32, "c" * 32],
+        "tasks": ["d" * 32],
+        "tasks_owner_bound": True,
+        "tasks_unguarded": True,
+        "task_declaration": "listing",
+        **era,
+    }
+    return ScriptedMcpServer(_MCP_URL, **settings)  # type: ignore[arg-type]
+
+
+def _mcp_target(server: "ScriptedMcpServer") -> "McpServerTarget":
+    from guardana.core.target import McpServerTarget, RegistryEntry  # noqa: PLC0415
+
+    entry = RegistryEntry("io.example/read", "0", (_MCP_URL,))
+    return McpServerTarget(
+        _MCP_URL, credential="t", sender=server, discovery_sender=server, registry_entry=entry
+    )
+
+
+@pytest.mark.parametrize(
+    "era",
+    [
+        {},
+        {"protocol_versions": [_MODERN]},
+        {"protocol_versions": [_MODERN, _LEGACY]},
+        {"protocol_versions": [_MODERN, _LEGACY], "discovers": [_MODERN]},
+        {"tool_pages": _LONGEST_LISTING},
+        {"tool_pages": _LONGEST_LISTING, "protocol_versions": [_MODERN, _LEGACY]},
+        {"tool_pages": _LONGEST_LISTING, "expire_session_on_page": MAX_LISTING_PAGES - 1},
+    ],
+    ids=[
+        "legacy",
+        "modern-only",
+        "dual-era",
+        "dual-era-listing-only-modern",
+        "legacy-longest-listing",
+        "dual-era-longest-listing",
+        "legacy-longest-listing-with-a-session-reopened",
+    ],
+)
+def test_no_mcp_rule_spends_more_than_it_declared(era: dict[str, object]) -> None:
+    for rule in _mcp_rules():
+        target = _mcp_target(_mcp_server(**era))
+        with suppress(NotOffered):
+            list(rule.run(target, _CTX))
+        declared = rule.estimated_requests
+        assert declared is not None
+        assert target.usage().requests <= declared, rule.meta.id
+
+
+def _a2a_target() -> "A2aAgentTarget":
+    """An agent that answers every read it may, so each rule spends all it would."""
+    from guardana.core.target import A2aAgentTarget  # noqa: PLC0415
+    from guardana.core.testing import ScriptedA2aAgent  # noqa: PLC0415
+    from guardana.core.testing.a2a import agent_card  # noqa: PLC0415
+
+    url = "https://93.184.215.14/"
+    agent = ScriptedA2aAgent(
+        url,
+        card=agent_card(f"{url}a2a", extended=True),
+        callers={"a": "alice", "b": "bob"},
+        tasks={"alice": ["t-1", "t-2", "t-3", "t-4"]},
+        owner_bound=False,
+    )
+    return A2aAgentTarget(url, credential="a", other_credential="b", sender=agent)
+
+
+def test_the_a2a_rules_are_registered_and_measured() -> None:
+    assert {r.meta.id for r in _a2a_rules()} == {
+        "guardana.a2a.agent_card",
+        "guardana.a2a.caller_identity",
+        "guardana.a2a.task_visibility",
+    }
+
+
+def test_no_a2a_rule_spends_more_than_it_declared() -> None:
+    for rule in _a2a_rules():
+        target = _a2a_target()
+        list(rule.run(target, _CTX))
+        declared = rule.estimated_requests
+        assert declared is not None
+        assert target.usage().requests <= declared, rule.meta.id
+
+
+def test_an_a2a_probe_has_a_knowable_ceiling_and_shares_its_observation() -> None:
+    ceiling = sum(r.estimated_requests or 0 for r in _a2a_rules())
+    assert ceiling <= 20, f"a full A2A probe can cost {ceiling} requests"
+
+    target = _a2a_target()
+    for rule in _a2a_rules():
+        list(rule.run(target, _CTX))
+
+    spent = target.usage().requests
+    assert spent == 9, (
+        "the card, three anonymous reads, one listing, three cross reads and one anonymous "
+        "read of a listed task"
+    )
+    assert spent < ceiling, "the observation is not being shared between rules"
+
+
+def test_no_a2a_rule_grades_with_an_evaluator() -> None:
+    for rule in _a2a_rules():
+        tally: Counter[str] = Counter()
+        list(rule.run(_a2a_target(), _counting_context(tally)))
+        assert rule.graded_verdicts == {}
+        assert not tally, rule.meta.id
+
+
+def test_the_mcp_rule_declares_the_longest_listing_it_reads() -> None:
     """Measured against the target it is written for, not against a chat endpoint."""
     from collections.abc import Mapping  # noqa: PLC0415
+    from http.client import HTTPMessage  # noqa: PLC0415
 
+    from guardana.core.target._mcp_client import SessionExpired  # noqa: PLC0415
     from guardana.core.target.mcp import McpServerTarget  # noqa: PLC0415
 
     class _Manifest:
+        expired = False
+
         def speak(self, wire: object) -> None:
             pass
 
         def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
             if method == "initialize":
-                return {"protocolVersion": "x"}
-            return {"tools": [{"name": "read", "description": "reads a file"}]}
+                return {"protocolVersion": "2025-11-25"}
+            page = int(str(params.get("cursor", "1")))
+            if page == MAX_LISTING_PAGES and not self.expired:
+                self.expired = True
+                raise SessionExpired("http://mcp", 404, "Not Found", HTTPMessage(), None)
+            listed: dict[str, object] = {"tools": [{"name": f"read{page}", "description": "r"}]}
+            if page < MAX_LISTING_PAGES:
+                listed["nextCursor"] = str(page + 1)
+            return listed
+
+        def notify(self, method: str) -> None:
+            pass
 
         def close(self) -> None:
             return None
@@ -352,6 +542,170 @@ def test_the_mcp_rule_declares_the_one_listing_it_makes() -> None:
     list(rule.run(target, _CTX))
 
     assert target.usage().requests == rule.estimated_requests
+
+
+# --- The third run shape: a target seeded from a fixtures file. ---
+#
+# A seeded rule asks through one endpoint per tenant, so the count that matters is
+# every request any tenant sent, and it is taken from the meter they share. The
+# application answers every tenant every item and obeys every poisoned document,
+# which is the most a seeded rule can be made to spend.
+
+
+def _seeded_rules() -> list[Rule]:
+    """Endpoint rules that need seeded data, which only a target built with `--fixtures` has."""
+    return [r for r in _endpoint_rules() if Capability.SEEDED_DATA in r.meta.required_capabilities]
+
+
+_SEEDED_FIXTURES = """\
+schema_version: 1
+name: cost-gate
+data: synthetic
+tenants:
+  acme: {api_key_env: ACME_KEY}
+  globex: {api_key_env: GLOBEX_KEY}
+  initech: {api_key_env: INITECH_KEY}
+documents:
+  - {id: a-1, tenant: acme, topic: "the loyalty programme"}
+  - {id: a-2, tenant: acme, topic: "returning an order", poisoned: true}
+  - {id: g-1, tenant: globex, topic: "shipping times", poisoned: true}
+  - {id: i-1, tenant: initech, topic: "office hours"}
+records:
+  orders:
+    - {id: A-100, tenant: acme}
+    - {id: G-200, tenant: globex}
+    - {id: I-300, tenant: initech}
+"""
+
+
+def _seeded_target() -> SeededTarget:
+    fixtures = parse_fixtures(_SEEDED_FIXTURES.encode("utf-8"), Path("guardana-fixtures.yaml"))
+    talkative = SeededApplication(
+        fixtures, leaking={DOCUMENTS_CHANNEL, "records/orders"}, obeys=True
+    )
+    return seeded_target(fixtures, talkative)
+
+
+def _seeded_spent(rule: Rule) -> tuple[int, int | None]:
+    """Run one rule against a fresh seeded target; return what the meter counted and the bound."""
+    target = _seeded_target()
+    list(rule.run(target, _CTX))
+    return target.usage().requests, rule.estimated_requests_for(target)
+
+
+def test_the_seeded_rules_are_registered_and_measured() -> None:
+    assert {r.meta.id for r in _seeded_rules()} == {
+        "guardana.tenancy.cross_tenant_answer",
+        "guardana.retrieval.poisoned_document",
+    }
+
+
+def test_a_seeded_rule_spends_exactly_what_it_declared_against_the_target() -> None:
+    # Exact: every item is asked as every tenant, and every poisoned document as its
+    # owner, whatever the replies hold. Seven items, three tenants, two poisoned.
+    spent = {r.meta.id: _seeded_spent(r) for r in _seeded_rules()}
+    assert spent == {
+        "guardana.tenancy.cross_tenant_answer": (21, 21),
+        "guardana.retrieval.poisoned_document": (2, 2),
+    }
+
+
+def test_a_seeded_rule_spends_exactly_what_it_declared_for_every_trial() -> None:
+    repeated = _repeated(_seeded_rules(), 3)
+    assert len(repeated) == len(_seeded_rules())
+    for rule in repeated:
+        spent, declared = _seeded_spent(rule)
+        assert rule.trials_per_case == 3
+        assert spent == declared, f"{rule.meta.id} sent {spent} of {declared} at K = 3"
+
+
+def test_a_seeded_rule_without_seeded_data_declares_no_cost_rather_than_zero() -> None:
+    # `None` is reported as unknown; zero would price a run against fixtures as free.
+    for rule in _seeded_rules():
+        assert rule.estimated_requests is None
+
+
+# --- What a rule grades, measured the same way. ---
+#
+# `guardana plan probe` prices judge calls as the verdicts each rule declares per
+# evaluator times what one verdict costs. The counting wrapper below stands in for
+# every evaluator a rule can reach, so a rule that grades more than it declares is
+# caught here rather than in a judge-graded run that stops early.
+
+
+class _CountingEvaluator(Evaluator):
+    """Delegates to a real evaluator and counts every verdict it is asked for."""
+
+    def __init__(self, inner: Evaluator, tally: Counter[str]) -> None:
+        self.id = inner.id
+        self._inner = inner
+        self._tally = tally
+
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -> Verdict:
+        self._tally[self.id] += 1
+        return self._inner.evaluate(exchange, expectation)
+
+
+def _counting_context(tally: Counter[str]) -> RuleContext:
+    return RuleContext(
+        evaluators={e.id: _CountingEvaluator(e, tally) for e in provide_evaluators()}
+    )
+
+
+def _verdicts_graded(rule: Rule) -> Counter[str]:
+    """Run one rule against a maximally talkative model and count the verdicts it graded."""
+    tally: Counter[str] = Counter()
+    target = EndpointTarget("http://x", "m", system_prompt="s", transport=_AlwaysAnswers())
+    with suppress(RuleError):
+        list(rule.run(target, _counting_context(tally)))
+    return tally
+
+
+def _over(declared: Mapping[str, int] | None, graded: Counter[str]) -> dict[str, int]:
+    """The evaluators graded more often than declared, with how often they were."""
+    allowed = declared or {}
+    return {e: n for e, n in graded.items() if n > allowed.get(e, 0)}
+
+
+def test_every_shipped_endpoint_rule_declares_what_it_grades() -> None:
+    undeclared = [r.meta.id for r in _endpoint_rules() if r.graded_verdicts is None]
+    assert not undeclared, f"these shipped rules do not declare what they grade: {undeclared}"
+
+
+def test_no_shipped_rule_grades_more_verdicts_than_it_declared() -> None:
+    measured = 0
+    for rule in [*_chat_rules(), *_repeated(_chat_rules(), 3)]:
+        graded = _verdicts_graded(rule)
+        measured += sum(graded.values())
+        over = _over(rule.graded_verdicts, graded)
+        assert not over, (
+            f"{rule.meta.id} (K = {rule.trials_per_case}) graded {over} against a "
+            f"declaration of {rule.graded_verdicts}"
+        )
+    assert measured, "no rule graded anything, so this gate measured nothing"
+
+
+def test_no_seeded_rule_grades_with_an_evaluator_it_did_not_declare() -> None:
+    for rule in _seeded_rules():
+        tally: Counter[str] = Counter()
+        list(rule.run(_seeded_target(), _counting_context(tally)))
+        assert rule.graded_verdicts == {}
+        assert not _over(rule.graded_verdicts, tally), rule.meta.id
+
+
+def test_no_mcp_rule_grades_with_an_evaluator_it_did_not_declare() -> None:
+    from guardana.core.target import McpServerTarget, RegistryEntry  # noqa: PLC0415
+    from guardana.core.testing import ScriptedMcpServer  # noqa: PLC0415
+
+    url = "https://93.184.215.14/mcp"
+    server = ScriptedMcpServer(url, tools=[{"name": "read", "description": "reads"}])
+    entry = RegistryEntry("io.example/read", "0", (url,))
+    for rule in _mcp_rules():
+        tally: Counter[str] = Counter()
+        target = McpServerTarget(url, sender=server, discovery_sender=server, registry_entry=entry)
+        with suppress(RuleError, NotOffered):
+            list(rule.run(target, _counting_context(tally)))
+        assert not _over(rule.graded_verdicts, tally), rule.meta.id
 
 
 def test_every_endpoint_rule_declares_at_least_active_impact() -> None:

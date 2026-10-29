@@ -13,13 +13,14 @@ from guardana.cli.exit_codes import ExitCode
 from guardana.core.budget import Budgets, parse_duration
 
 
-def override(
+def override(  # noqa: PLR0913 — one keyword per budget flag
     budgets: Budgets,
     *,
     max_requests: int | None = None,
     max_input_tokens: int | None = None,
     max_output_tokens: int | None = None,
     max_duration: str | None = None,
+    max_requests_per_minute: int | None = None,
 ) -> Budgets:
     """Apply the ceilings a user passed on the command line, leaving the rest alone."""
     seconds = budgets.max_duration_seconds
@@ -39,4 +40,9 @@ def override(
             budgets.max_output_tokens if max_output_tokens is None else max_output_tokens
         ),
         max_duration_seconds=seconds,
+        max_requests_per_minute=(
+            budgets.max_requests_per_minute
+            if max_requests_per_minute is None
+            else max_requests_per_minute
+        ),
     )

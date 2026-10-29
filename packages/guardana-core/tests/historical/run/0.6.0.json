@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "run": {
+    "tool_version": "0.6.0",
+    "target_kind": "artifact",
+    "target_ref": "subject",
+    "profile": "default",
+    "rules": {
+      "guardana.supply_chain.pickle_opcode": "40ba80c5d068902c",
+      "guardana.supply_chain.dependency_risk": "708b4cf67265c04d",
+      "guardana.supply_chain.remote_code": "3e99383c4b390532",
+      "guardana.supply_chain.remote_code_config": "c5fce4b8a6696e66",
+      "guardana.supply_chain.code_execution": "a56f28fc3b1b48af",
+      "guardana.supply_chain.insecure_transport": "135a6584b17c3d77",
+      "guardana.supply_chain.keras_lambda": "28d660e73e8aeaba",
+      "guardana.supply_chain.saved_model_ops": "8143f185882caa98",
+      "guardana.supply_chain.malicious_dependency": "c4beaa4ca733f688",
+      "guardana.supply_chain.hallucinated_package": "59782d3c5c398025",
+      "guardana.supply_chain.hardcoded_secret": "8300ba4640909b70",
+      "guardana.supply_chain.model_format": "494d66b4cda6c019",
+      "guardana.supply_chain.chat_template": "e1fab74859a5f853",
+      "guardana.supply_chain.onnx_graph": "87081733e68383e4",
+      "guardana.supply_chain.notebook_payload": "498f6a807cc9ab95",
+      "guardana.supply_chain.provenance": "f9d6ed5ce78402b8",
+      "guardana.prompt.mcp_tool_poisoning": "c21c1d172d9ea01b",
+      "guardana.prompt.hidden_instructions": "ca4ef59d72eb45e2",
+      "guardana.training.dataset_integrity": "81375a1c05f877c9"
+    },
+    "rules_skipped": [],
+    "started_at": "2026-10-04T14:06:55.222948+00:00"
+  },
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        },
+        {
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI05"
+        }
+      ],
+      "target_ref": "subject/model.pkl",
+      "evidence": {
+        "summary": "unpickling imports non-allowlisted callable: os.system",
+        "detail": "file=model.pkl"
+      },
+      "verdict": null
+    }
+  ],
+  "unverified": [],
+  "errors": [],
+  "waived": [],
+  "observations": [
+    {
+      "kind": "model",
+      "name": "model.pkl",
+      "ref": "subject/model.pkl",
+      "attributes": {
+        "format": "pickle",
+        "size_bytes": "41"
+      }
+    }
+  ],
+  "summary": {
+    "rules_run": 19,
+    "rules_skipped": [],
+    "unverified": 0,
+    "errors": 0,
+    "waived": 0,
+    "observations": 1,
+    "max_severity": "CRITICAL"
+  }
+}

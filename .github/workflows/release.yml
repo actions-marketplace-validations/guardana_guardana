@@ -1,6 +1,8 @@
 # Publishes all five packages to PyPI on a version tag push (v0.1.0, v0.1.1, ...).
-# The maintainer runbook for cutting a release is RELEASING.md; the one-time repo
-# and PyPI setup is docs/maintainers/github-setup.md.
+# The reference pack (`examples/reference_pack`, versioned on its own) is built in a job
+# of its own after that publish and attached to every GitHub Release, and published to
+# PyPI by a further job only once the repository variable REFERENCE_PACK_PYPI is `true`
+# and PyPI does not already serve the same files.
 #
 # Steady-state: this builds all five packages and uploads them via OIDC trusted
 # publishing behind the "pypi" environment's approval gate — no API token in CI.
@@ -10,8 +12,7 @@
 # NOTE on first-time setup: you cannot pre-register five *pending* publishers with
 # this one shared (repo, workflow, environment) config — PyPI allows only one
 # pending publisher per config. Bootstrap the projects once with a token upload,
-# then add a normal trusted publisher to each. Full runbook + the one-time
-# new-project rate-limit caveat: RELEASING.md. `skip-existing` below keeps re-runs
+# then add a normal trusted publisher to each. `skip-existing` below keeps re-runs
 # idempotent.
 
 name: Release
@@ -22,9 +23,48 @@ on:
     # Marketplace Action (v0.1, v1) don't re-trigger a publish when they move.
     tags: ["v*.*.*"]
 
+# Every job states the scopes it needs; nothing else in this file may write.
+permissions:
+  contents: read
+
 jobs:
+  # A tag publishes only a commit CI has passed. `release.py` waits for that before
+  # it creates the tag; this job holds the same line for a tag pushed any other way.
+  # No run, a run that did not succeed, or a `gh` that cannot answer all stop here,
+  # before the `pypi` approval is requested.
+  ci-passed:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      actions: read        # read the CI runs for this commit, nothing else
+    steps:
+      - name: CI passed on the tagged commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          run=$(gh run list --workflow ci.yml --commit "$SHA" --event push --limit 1 \
+            --json databaseId,status,conclusion \
+            --jq '.[0] | select(.) | "\(.databaseId) \(.status) \(.conclusion)"')
+          if [ -z "$run" ]; then
+            echo "::error::No CI run exists for $SHA; a tag publishes only a commit CI has passed."
+            exit 1
+          fi
+          read -r id status conclusion <<< "$run"
+          if [ "$status" != "completed" ]; then
+            gh run watch "$id" --exit-status > /dev/null || true
+            conclusion=$(gh run view "$id" --json conclusion --jq .conclusion)
+          fi
+          if [ "$conclusion" != "success" ]; then
+            echo "::error::CI run $id for $SHA concluded '${conclusion:-unknown}', not success."
+            exit 1
+          fi
+          echo "CI run $id passed on $SHA."
+
   publish:
-    runs-on: ubuntu-latest
+    needs: ci-passed
+    runs-on: ubuntu-24.04
     environment: pypi
     permissions:
       id-token: write      # OIDC trusted publishing, and signing the provenance
@@ -35,9 +75,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # Every later step names the release after the tag, so a tag that differs from the
+      # packaged version (a typo, another spelling of a pre-release) stops before a build.
+      - name: The tag names the version the packages carry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          packaged=$(sed -n 's/^version = "\(.*\)"$/\1/p' packages/guardana-core/pyproject.toml)
+          if [ -z "$packaged" ] || [ "${TAG#v}" != "$packaged" ]; then
+            echo "::error::The tag $TAG does not name the packaged version '${packaged:-unreadable}'."
+            exit 1
+          fi
+
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
+          version: "0.13.6"
           python-version: "3.12"
 
       # The last gate, and the only one that runs where a user runs: an empty
@@ -66,28 +119,48 @@ jobs:
       # to "was this wheel built from that source, by that workflow". PyPI gets its
       # own PEP 740 attestation from the publish step below; this one is for the
       # artifacts attached to the GitHub Release and for anyone re-checking a wheel
-      # they already have.
+      # they already have. Named by extension: `uv build` also leaves a
+      # `.gitignore` in `dist/`, which is not something this workflow ships.
       - name: Attest what built these distributions
+        id: attest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
         with:
-          subject-path: "dist/*"
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      # Before the publish, which cannot be undone: the Release step below attaches this bundle.
+      - name: Refuse to publish without an attestation bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}'."
+            exit 1
+          fi
+
+      # `skip-existing` keeps a re-run idempotent, and this keeps it honest: a file PyPI
+      # already serves under the same name must be these bytes, or the SBOMs, the
+      # attestation and the images that follow would describe something else.
+      - name: Refuse to skip a file PyPI holds with other bytes
+        run: python3 scripts/check_pypi_digests.py dist/
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
         with:
           packages-dir: dist/
-          # Idempotent re-runs: a version already on PyPI (e.g. bootstrapped by a
-          # one-time token upload, or a re-tagged release) is skipped, not failed.
           skip-existing: true
 
       # After a successful publish, create the GitHub Release from the tag's
       # CHANGELOG section — so the Releases page (and the Marketplace listing) never
-      # lags PyPI. Idempotent: the release is created if missing, and the SBOMs are
-      # uploaded either way, so a re-run repairs a release whose assets are absent.
+      # lags PyPI. Idempotent: the release is created if missing, and the SBOMs and the
+      # attestation bundle are uploaded either way, so a re-run repairs absent assets.
+      # The bundle is named `.sigstore.json`, the suffix verifiers look for on a Release.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
         run: |
           version="${TAG#v}"
           awk -v v="$version" '
@@ -98,16 +171,190 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "release $TAG already exists — leaving its notes as they are"
           else
-            gh release create "$TAG" --title "Guardana $TAG" --notes-file notes.md --verify-tag
+            # A PEP 440 pre-release (aN, bN, rcN, .devN) must not become the release the
+            # Releases page and the Marketplace call latest; a .postN release may.
+            flags=()
+            case "$version" in *a[0-9]*|*b[0-9]*|*rc[0-9]*|*.dev[0-9]*) flags+=(--prerelease) ;; esac
+            gh release create "$TAG" --title "Guardana $TAG" --notes-file notes.md --verify-tag "${flags[@]}"
           fi
           gh release upload "$TAG" sbom/*.cdx.json --clobber
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}' to attach to $TAG."
+            exit 1
+          fi
+          cp "$BUNDLE" "guardana-$version.sigstore.json"
+          gh release upload "$TAG" "guardana-$version.sigstore.json" --clobber
+
+  # The reference pack in a job of its own, after the five packages are on PyPI and the
+  # GitHub Release exists; the clean-install check in `publish` has already built and
+  # checked it. It needs no `pypi` approval, because it publishes nowhere but the Release.
+  reference-pack:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write      # attach the pack to the GitHub Release
+      id-token: write      # sign the provenance
+      attestations: write  # store the build provenance for the pack
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.6"
+          python-version: "3.12"
+
+      - name: Build the reference pack
+        run: uv build examples/reference_pack --out-dir dist-reference/
+
+      - name: Attest what built the reference pack
+        id: attest
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-path: |
+            dist-reference/*.whl
+            dist-reference/*.tar.gz
+
+      - name: Keep the attested reference pack for the PyPI job
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: reference-pack-dist
+          path: |
+            dist-reference/*.whl
+            dist-reference/*.tar.gz
+          if-no-files-found: error
+
+      # A re-run keeps the first upload, as PyPI's skip-existing does, and only when it
+      # is these bytes: an asset already attached under the same name with other bytes
+      # is somebody else's file, and the release stops rather than keep it.
+      - name: Attach the reference pack to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          attached=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          held=$(mktemp -d)
+          for file in dist-reference/*.whl dist-reference/*.tar.gz; do
+            name=$(basename "$file")
+            if printf '%s\n' "$attached" | grep -qxF "$name"; then
+              gh release download "$TAG" --pattern "$name" --dir "$held"
+              if ! cmp -s "$file" "$held/$name"; then
+                echo "::error::$name is already attached to $TAG with other bytes than this build"
+                exit 1
+              fi
+              echo "::notice::$name is already attached to $TAG with these bytes"
+            else
+              gh release upload "$TAG" "$file"
+            fi
+          done
+
+      # Named by the pack's own version, which moves apart from the release tag. Replaced
+      # on a re-run: the step above has already refused a pack with other bytes.
+      - name: Upload the reference pack's attestation bundle to the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' examples/reference_pack/pyproject.toml)
+          if [ -z "$version" ]; then
+            echo "::error::The reference pack's version is unreadable."
+            exit 1
+          fi
+          if [ -z "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "::error::The attestation step left no bundle at '${BUNDLE}' to attach to $TAG."
+            exit 1
+          fi
+          cp "$BUNDLE" "guardana-reference-pack-$version.sigstore.json"
+          gh release upload "$TAG" "guardana-reference-pack-$version.sigstore.json" --clobber
+
+  # Whether PyPI already serves the attested reference pack, decided outside the `pypi`
+  # environment: the pack's version moves only when its content does, so most releases
+  # upload nothing and need no approval for it. Differing bytes stop the release here.
+  reference-pack-on-pypi:
+    needs: reference-pack
+    if: vars.REFERENCE_PACK_PYPI == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read       # check out the digest check
+    outputs:
+      result: ${{ steps.compare.outputs.result }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Take the attested reference pack
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: reference-pack-dist
+          path: dist-reference
+
+      - name: Compare the attested reference pack with PyPI
+        id: compare
+        run: |
+          set +e
+          python3 scripts/check_pypi_digests.py --classify dist-reference/
+          code=$?
+          set -e
+          case $code in
+            0) result=new ;;
+            3) result=identical ;;
+            1) result=differ ;;
+            *) result=unreadable ;;
+          esac
+          echo "result=$result" >> "$GITHUB_OUTPUT"
+          if [[ $result == differ ]]; then
+            echo "::error::PyPI serves a reference pack file with other bytes; nothing is published."
+            exit 1
+          fi
+
+  # The reference pack on PyPI, from the files the reference-pack job built and
+  # attested, so what PyPI receives is what was attested. Off until the owner registers the pending
+  # trusted publisher for `guardana-reference-pack` and sets REFERENCE_PACK_PYPI. It asks
+  # for approval when a file is new to PyPI or PyPI could not be read; the digest check
+  # inside it runs again, so an unreadable PyPI still uploads nothing.
+  publish-reference-pack:
+    needs: [reference-pack, reference-pack-on-pypi]
+    if: >-
+      vars.REFERENCE_PACK_PYPI == 'true' &&
+      (needs.reference-pack-on-pypi.outputs.result == 'new' ||
+      needs.reference-pack-on-pypi.outputs.result == 'unreadable')
+    runs-on: ubuntu-24.04
+    environment: pypi
+    permissions:
+      contents: read       # check out the digest check
+      id-token: write      # OIDC trusted publishing
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The files the previous job built and attested, not whatever the Release holds
+      # by the time this job is approved: a Release asset can be replaced in between.
+      - name: Take the attested reference pack
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: reference-pack-dist
+          path: dist-reference
+
+      - name: Refuse to skip a file PyPI holds with other bytes
+        run: python3 scripts/check_pypi_digests.py dist-reference/
+
+      - name: Publish the reference pack to PyPI
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # release/v1
+        with:
+          packages-dir: dist-reference/
+          skip-existing: true
 
   # The two official images, published to the GitHub Container Registry after the
   # packages and behind the same single approval: an image tagged 0.10.0 that PyPI
   # never received is a version that exists in one place and not the other.
   images:
     needs: publish
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
       packages: write       # push to ghcr.io
@@ -119,10 +366,16 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up QEMU (so the arm64 image is not an emulated afterthought)
-        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a # v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
 
+      # Pulls go through Google's mirror of Docker Hub, whose anonymous limit a shared
+      # runner address often exhausts; the digest-pinned base images cannot change.
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+        with:
+          buildkitd-config-inline: |
+            [registry."docker.io"]
+              mirrors = ["mirror.gcr.io"]
 
       - name: Log in to the GitHub Container Registry
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
@@ -134,14 +387,16 @@ jobs:
       # Tag maths belongs in a tool, not in shell: `latest` and the moving
       # `X.Y` tag must not move for a prerelease, which is exactly the case a
       # hand-rolled `${TAG#v}` gets wrong once and nobody notices until it has.
+      # `pep440`, not `semver`: a tag like v1.0.0rc1 is not semver, and a semver
+      # rule would give the image no tag at all.
       - name: Work out the CLI image's tags
         id: cli-meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6
         with:
           images: ghcr.io/guardana/guardana
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=pep440,pattern={{version}}
+            type=pep440,pattern={{major}}.{{minor}}
 
       - name: Work out the collector image's tags
         id: collector-meta
@@ -149,13 +404,16 @@ jobs:
         with:
           images: ghcr.io/guardana/guardana-collector
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            type=pep440,pattern={{version}}
+            type=pep440,pattern={{major}}.{{minor}}
 
       # `sbom` and `provenance` are what make these images answerable in somebody
       # else's audit: both attestations are pushed alongside the image and can be
-      # read back with `docker buildx imagetools inspect` or `gh attestation verify`.
+      # read back with `docker buildx imagetools inspect`. They are unsigned, so the
+      # attest steps below sign a provenance statement per image digest, which is
+      # what `gh attestation verify oci://…` checks.
       - name: Build and push the CLI image
+        id: cli-build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
@@ -169,6 +427,7 @@ jobs:
           provenance: mode=max
 
       - name: Build and push the collector image
+        id: collector-build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
           context: .
@@ -180,3 +439,17 @@ jobs:
           labels: ${{ steps.collector-meta.outputs.labels }}
           sbom: true
           provenance: mode=max
+
+      - name: Attest what built the CLI image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-name: ghcr.io/guardana/guardana
+          subject-digest: ${{ steps.cli-build.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest what built the collector image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4
+        with:
+          subject-name: ghcr.io/guardana/guardana-collector
+          subject-digest: ${{ steps.collector-build.outputs.digest }}
+          push-to-registry: true

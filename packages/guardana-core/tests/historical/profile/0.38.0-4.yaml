@@ -1,0 +1,51 @@
+name: pre-deploy               # free-form label, shown nowhere but reports/logs
+
+rules:
+  include: ["guardana.*", "acme.*"]   # glob patterns; rule matches if it matches
+                                      # any include AND no exclude
+  exclude: ["guardana.output.*"]     # optional; defaults to []
+  paths: ["./team-rules"]            # optional; directories/files of custom
+                                      # YAML rules to load — see writing-rules.md
+  paths_exclude: ["data/*", "archive"]  # optional; globs (matched relative to the
+                                         # scan root) of files/dirs to skip. A
+                                         # `.guardanaignore` file at the root adds
+                                         # more, one glob per line.
+
+plugins:                        # optional; which installed plugins a run imports
+  mode: allowlist               # all | builtins | allowlist | disabled
+  allow: [acme-guardana-rules]  # distributions to admit; only with mode: allowlist
+
+fail_on:
+  severity: high                # one of: info | low | medium | high | critical
+                                 # (case-insensitive); defaults to "high"
+  min_confidence: 0.7           # 0.0-1.0; defaults to 0.0
+  fail_on_inconclusive: false   # true: unverified checks also fail the gate
+  fail_on_error: true           # false: a check that could not run stops blocking
+  fail_on_skipped: false        # true: a selected rule the target cannot run is a gap
+  min_graded_share: 0.8         # optional, (0, 1]; least share of its cases a rule grades
+
+trace:                          # only ever governs `analyze-trace` / `trace inspect`
+  require: [identity, approval, effects]   # optional; evidence this run demands. A
+                                            # producer that does not record one of
+                                            # these makes the run indeterminate —
+                                            # with no fail_on_* in front of it
+
+contracts:                      # optional; security contracts to load, files or
+  - ./contracts/checkout.yaml   # directories — see usage-contracts.md
+
+trials: 1                       # optional; attempts per case for rules that grade a
+                                # sampled reply — see usage-probe.md#repeated-trials
+
+calibrations: []                # optional; calibration files, beside this profile
+
+evaluators:                     # config-wired evaluators — see the section below
+  llm_judge:
+    endpoint: "http://localhost:11434"   # any OpenAI-compatible server
+    model: "llama3"
+    api_key_env: "JUDGE_API_KEY"         # optional; env var holding the key
+    provider: "openai"                   # optional; openai | ollama | tgi
+    prompt_version: "2025.1"             # optional; versioned judging rubric
+    min_agreement: 3                     # optional; samples per verdict (default 1)
+  guard:                                 # optional safety-classifier evaluator
+    endpoint: "http://localhost:8000"
+    model: "llama-guard-3"

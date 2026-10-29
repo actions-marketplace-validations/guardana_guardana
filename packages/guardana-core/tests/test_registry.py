@@ -209,6 +209,44 @@ def test_two_targets_cannot_claim_one_locator_scheme() -> None:
         reg.register_target(_OtherCliTarget, Origin(distribution="other-targets", version="2.0"))
 
 
+def _same_name_from_elsewhere() -> type[Target]:
+    """A different class answering to `_DummyTarget`'s name, as another package would ship it."""
+
+    class _Shadow(_DummyTarget):
+        pass
+
+    _Shadow.__name__ = _DummyTarget.__name__
+    return _Shadow
+
+
+def test_a_second_distribution_cannot_register_a_target_under_a_name_another_holds() -> None:
+    """A lock and the origin record key a target by class name, so one name is one origin."""
+    reg = Registry()
+    reg.register_target(_DummyTarget, Origin(distribution="acme-targets", version="1.0"))
+
+    with pytest.raises(RegistryConflictError) as refused:
+        reg.register_target(
+            _same_name_from_elsewhere(), Origin(distribution="other-targets", version="2.0")
+        )
+
+    assert "acme-targets 1.0" in str(refused.value)
+    assert "other-targets 2.0" in str(refused.value)
+    assert reg.targets() == (_DummyTarget,)
+    assert reg.target_origin(_DummyTarget).distribution == "acme-targets"
+
+
+def test_one_distribution_may_register_two_targets_of_one_name() -> None:
+    """The refusal is about two origins sharing a name, not about the name repeating."""
+    reg = Registry()
+    origin = Origin(distribution="acme-targets", version="1.0")
+    shadow = _same_name_from_elsewhere()
+
+    reg.register_target(_DummyTarget, origin)
+    reg.register_target(shadow, origin)
+
+    assert reg.targets() == (_DummyTarget, shadow)
+
+
 def test_load_yaml_rule_dirs_loads_valid_rule(tmp_path: Path) -> None:
     (tmp_path / "demo.yaml").write_text(_KEYWORD_RULE_YAML)
     reg = Registry()

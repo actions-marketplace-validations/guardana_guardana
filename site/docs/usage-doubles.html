@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stateful tool doubles — Guardana documentation</title>
+<meta name="description" content="guardana.core.doubles serves the tools your fixtures file declares from an in-memory copy of its records, inside your application&#x27;s process, enforcing tenancy as row-level security does, and writes every call into a trace you grade with guardana analyze-trace">
+<link rel="canonical" href="https://guardana.dev/docs/usage-doubles">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html" aria-current="page">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>Stateful tool doubles</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html" aria-current="page">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Stateful tool doubles — the tools your application calls in CI<span class="status beta">beta</span></h1><p class="lede"><code>guardana.core.doubles</code> serves the tools your fixtures file declares from an in-memory copy of its records, inside your application's process, enforcing tenancy as row-level security does, and writes every call into a trace you grade with <code>guardana analyze-trace</code></p><p>In CI your application should not reach a real order system, mailbox or payment provider.
+<code>guardana.core.doubles</code> serves the <code>tools:</code> of your <a href="usage-fixtures.html">fixtures file</a> from
+an in-memory copy of its <code>records:</code>, inside your application's own process, and writes every
+call into a trace. The doubles behave as a backend that enforces tenancy: a call acts for
+one tenant and sees only that tenant's records.</p>
+<pre><code class="language-python">from pathlib import Path
+
+from guardana.core.doubles import open_doubles
+
+doubles = open_doubles(Path(&quot;guardana-fixtures.yaml&quot;), trace=Path(&quot;artifacts/doubles.jsonl&quot;))
+
+
+def handle(request):
+    tenant = resolve_tenant(request)  # however your application decides who is asking
+    with doubles.acting_as(tenant):
+        return agent.run(
+            request.message,
+            tools={
+                &quot;lookup_order&quot;: doubles.tool(&quot;lookup_order&quot;),
+                &quot;refund_order&quot;: doubles.tool(&quot;refund_order&quot;),
+            },
+        )
+</code></pre>
+<p>Open the doubles once, at startup, where your application would build its real tool
+clients, and only in CI. <code>doubles.call(name, **arguments)</code> calls a tool by name;
+<code>doubles.tool(name)</code> returns it as a callable taking keyword arguments. Close them with
+<code>doubles.close()</code> or by leaving a <code>with open_doubles(...) as doubles:</code> block; at interpreter
+exit they close themselves.</p>
+<p><code>open_doubles</code> fails the application at startup, before anything is served, when:</p>
+<ul>
+<li>the fixtures file does not load (<code>FixturesError</code>, from <code>guardana.core.fixtures</code>), a tool's
+<code>sink</code> that a trace does not record included;</li>
+<li>the file declares no <code>tools:</code> (<code>DoublesError</code>);</li>
+<li>the trace path already exists. A file left by an earlier job, or one another process is
+writing, is never continued: give every job a fresh path.</li>
+</ul>
+<h2 id="who-acts-acting_as">Who acts: <code>acting_as</code></h2>
+<p>Every call acts for the tenant named by the innermost <code>with doubles.acting_as(tenant):</code>.
+A call with no acting tenant, or naming a tenant the fixtures file does not declare, raises
+<code>DoublesError</code> before anything is written, so an application that never says who is asking
+fails its own tool call instead of reading someone's data.</p>
+<p>The tenant is held in a context variable, so concurrent requests on different threads or
+<code>asyncio</code> tasks each keep their own; a task created inside the block inherits it. A context
+variable does not follow work into a <code>ThreadPoolExecutor</code>. Submit the work through a copy of
+the current context, or enter <code>acting_as</code> inside the worker:</p>
+<pre><code class="language-python">import contextvars
+from concurrent.futures import ThreadPoolExecutor
+
+with doubles.acting_as(tenant), ThreadPoolExecutor() as pool:
+    context = contextvars.copy_context()
+    future = pool.submit(context.run, doubles.call, &quot;lookup_order&quot;, id=order_id)
+</code></pre>
+<h2 id="what-each-tool-does">What each tool does</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th><code>op</code></th>
+<th>Arguments</th>
+<th>Returns</th>
+<th>Changes</th>
+<th>In the trace</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>get</code></td>
+<td><code>id</code></td>
+<td>the acting tenant's record with that <code>id</code>, or <code>None</code></td>
+<td>nothing</td>
+<td>the call, no effect</td>
+</tr>
+<tr>
+<td><code>search</code></td>
+<td><code>query</code></td>
+<td>a list of the acting tenant's records whose retrieval term or any field value contains <code>query</code>, both case-folded</td>
+<td>nothing</td>
+<td>the call, no effect</td>
+</tr>
+<tr>
+<td><code>create</code></td>
+<td><code>id</code> and the fields</td>
+<td>the new record, owned by the acting tenant, or <code>None</code> when the <code>id</code> is taken in the collection</td>
+<td>adds the record</td>
+<td>the call and its effect, <code>failed</code> when refused</td>
+</tr>
+<tr>
+<td><code>update</code></td>
+<td><code>id</code> and at least one field</td>
+<td>the record as changed, or <code>None</code> when the acting tenant owns no record with that <code>id</code></td>
+<td>merges the fields</td>
+<td>the call and its effect, <code>failed</code> when nothing was changed</td>
+</tr>
+<tr>
+<td><code>delete</code></td>
+<td><code>id</code></td>
+<td>the removed record, or <code>None</code> when the acting tenant owns no record with that <code>id</code></td>
+<td>removes the record</td>
+<td>the call and its effect, <code>failed</code> when nothing was removed</td>
+</tr>
+<tr>
+<td><code>send</code></td>
+<td>any JSON arguments</td>
+<td><code>{&quot;sent&quot;: true}</code></td>
+<td>nothing</td>
+<td>the call and its outbound effect</td>
+</tr>
+</tbody>
+</table></div>
+<ul>
+<li><strong>A record comes back as its fields and its <code>id</code>.</strong> A seeded record also carries
+<code>reference_code</code>, the presence marker Guardana derived for it
+(<a href="usage-fixtures.html#markers">markers</a>); a record added by <code>create</code> has none. A field value
+is a string, a number or true/false; a call cannot write <code>reference_code</code>.</li>
+<li><strong>Another tenant's record is invisible</strong>, exactly as one that does not exist, the way
+row-level security makes it. An <code>update</code> of another tenant's order returns <code>None</code> and
+changes nothing.</li>
+<li><strong>Arguments a tool does not take raise <code>DoublesError</code></strong> before anything is written: a
+missing or empty <code>id</code> or <code>query</code>, an extra argument to <code>get</code>, <code>search</code> or <code>delete</code>, an
+<code>update</code> that names no field, a field that is not a string, number or true/false, and a
+<code>send</code> whose arguments are not JSON data.</li>
+<li><strong>State lives as long as the process</strong> and is shared by every call in it. It is never
+reset between cases: an order one case refunds stays refunded for the next.</li>
+</ul>
+<p>A tenant leak through the doubles therefore needs your application to name the wrong
+tenant. That is the bug to look for in the replies, where Guardana knows which tenant it
+asked as; this trace cannot show it.</p>
+<h2 id="the-trace">The trace</h2>
+<pre><code class="language-bash">guardana analyze-trace artifacts/doubles.jsonl
+</code></pre>
+<ul>
+<li><strong>The file is created when the doubles open, and stays empty until the first call.</strong> The
+header goes down with the first call's span in one write, so the file is either empty or
+holds a call, never a header alone that declares tools and effects over nothing. Doubles
+that were never called leave an empty file, which <code>analyze-trace</code> refuses with exit <code>3</code>:
+an application that never reached its tools is not a clean run.</li>
+<li><strong>Every span is flushed as it is written.</strong> Closing the doubles, or the interpreter
+exiting, writes the footer that counts them. A process that is killed, or a call that could
+not be written, leaves no footer, and the trace reads as <code>unterminated</code>, so a rule that
+found nothing declines instead of passing. After a call that could not be written, the
+doubles refuse every further call.</li>
+<li><strong>A forked process refuses to write.</strong> The doubles record the process that opened them; a
+call or a close from a child raises <code>DoublesError</code>, and a child that exits writes nothing.
+Open the doubles after forking, in each process, with a trace of its own.</li>
+<li><strong>The header</strong> names the producer <code>guardana.doubles</code> and its version, declares <code>tools</code> and
+<code>effects</code> only, and carries the attributes <code>fixtures</code> (the file's <code>name</code>) and
+<code>fixtures_digest</code>.</li>
+<li><strong>Each call</strong> is a <code>tool_execution</code> span named after the tool, whose <code>tool.arguments</code> is
+the call's arguments as JSON and whose status is <code>succeeded</code> or <code>failed</code>. A change or a send
+adds one effect on the tool's declared <code>sink</code>, with its declared <code>reversible</code>, the tool's
+name as <code>action</code>, <code>collection/id</code> as <code>target</code> (none for a send) and the status <code>executed</code> or
+<code>failed</code>. A read records no effect.</li>
+</ul>
+<p><code>analyze-trace</code> runs the rules that read tool calls and effects, such as a secret passed in
+a tool argument, and skips those that need approvals, identity or retrieval, which this trace
+does not record (<a href="usage-analyze-trace.html"><code>usage-analyze-trace.md</code></a>).</p>
+<h2 id="evidence-not-the-tenant-verdict">Evidence, not the tenant verdict</h2>
+<p>The trace shows what your application did with its tools, for a reviewer and for the rules
+that read tool calls and effects. It decides no tenant verdict: the tenant behind each call is
+your application's own claim, and an application that named the wrong tenant would record a
+call that looks correct. The trace records no tenant, no identity and no retrieval, because
+every record a double returns belongs to the tenant the application named, so a cross-tenant
+retrieval rule over it would run and could never fire.</p>
+<h2 id="what-guardana-cannot-see">What Guardana cannot see</h2>
+<p>Guardana sees only the calls that go through the doubles. When your application also calls a
+real tool beside them, an HTTP client left wired or a second SDK, nothing records it. Run the
+application in CI without production credentials and without egress to production hosts, so
+a real call fails loudly instead of succeeding unseen.</p>
+<h2 id="porting-the-doubles-to-another-language">Porting the doubles to another language</h2>
+<p>The doubles are a convenience in Python, not the only way in. A port behaves as the table
+above, reads the records with their markers from <code>guardana.core.fixtures</code>
+(<code>load_fixtures(path).records</code>, each with <code>served_fields()</code>), and writes the native trace
+(<a href="https://github.com/guardana/guardana/blob/main/schemas/trace-v3.schema.json"><code>trace-v3.schema.json</code></a>,
+<a href="writing-an-integrator.html">writing an integrator</a>) under the same contract:</p>
+<ol>
+<li>create the trace file exclusively, refusing one that exists;</li>
+<li>hold the header back, declaring <code>terminated: true</code> and <code>instrumented: [&quot;effects&quot;, &quot;tools&quot;]</code>,
+and write it with the first span in one write;</li>
+<li>refuse a call with no tenant, or an undeclared one, and arguments the tool does not take,
+before anything is written;</li>
+<li>flush every span; write the footer <code>{&quot;guardana_trace_end&quot;: 3, &quot;spans&quot;: N}</code> on close and
+at process exit, and never after a call that could not be written;</li>
+<li>refuse to write from a process other than the one that opened the file.</li>
+</ol>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-doubles.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

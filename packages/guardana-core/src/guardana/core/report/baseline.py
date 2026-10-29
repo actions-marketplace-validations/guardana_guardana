@@ -64,14 +64,25 @@ class Waiver:
 
     @property
     def is_unreviewed(self) -> bool:
-        """Whether this waiver still carries the placeholders `--write-baseline` wrote.
+        """Whether this waiver has a placeholder or a blank where its reason or approver belongs.
 
         An accepted risk nobody wrote a reason for is not an accepted risk; it is
         a finding somebody silenced in a hurry. Reported rather than refused,
         because refusing would make the generated file unusable until edited —
         but never invisible.
         """
-        return _REASON_PLACEHOLDER in self.reason or _APPROVER_PLACEHOLDER in self.approved_by
+        return self.lacks_review(approver_required=True)
+
+    def lacks_review(self, *, approver_required: bool) -> bool:
+        """Whether no reason, or no approver when one is required, was written for this waiver.
+
+        Placeholder text and whitespace both count as nothing written.
+        """
+        if _REASON_PLACEHOLDER in self.reason or not self.reason.strip():
+            return True
+        if _APPROVER_PLACEHOLDER in self.approved_by:
+            return True
+        return approver_required and not self.approved_by.strip()
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,8 +110,12 @@ class Baseline:
 
     @property
     def unreviewed(self) -> tuple[Waiver, ...]:
-        """Waivers still carrying the generated placeholders."""
-        return tuple(w for w in self.waivers if w.is_unreviewed)
+        """Waivers with a placeholder or a blank where a reason or an approver belongs.
+
+        Version 1 had no approver field, so a waiver read from it is asked only for its reason.
+        """
+        required = self.version >= BASELINE_VERSION
+        return tuple(w for w in self.waivers if w.lacks_review(approver_required=required))
 
 
 def load_baseline(path: Path) -> frozenset[str]:
@@ -136,7 +151,11 @@ def read_baseline(path: Path) -> Baseline:
     if not isinstance(entries, list):
         raise BaselineError(f"invalid baseline {path}: 'waivers' must be a list")
     version = raw.get("version", 1)
-    if not isinstance(version, int) or version > BASELINE_VERSION:
+    if isinstance(version, bool) or not isinstance(version, int):
+        raise BaselineError(f"invalid baseline {path}: version must be an integer")
+    if version < 1:
+        raise BaselineError(f"invalid baseline {path}: version {version} does not exist")
+    if version > BASELINE_VERSION:
         raise BaselineError(
             f"invalid baseline {path}: version {version!r} is newer than this build reads "
             f"({BASELINE_VERSION}) — upgrade Guardana rather than ignoring waivers it "

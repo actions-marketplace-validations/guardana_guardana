@@ -4,14 +4,21 @@ this test locates them relative to `guardana-core` — the version-of-record the
 bump script reads."""
 
 import importlib.util
+import os
 import re
+import subprocess
 import sys
+import tomllib
 import types
+from fnmatch import fnmatch
 from pathlib import Path
+from typing import Any
 
 import guardana.core
 import pytest
 import yaml
+from _release_series import stable_series
+from packaging.version import Version
 
 
 def _repo_root() -> Path:
@@ -33,6 +40,12 @@ def _load_script(name: str) -> types.ModuleType:
 _BUMP = _load_script("bump_version")
 
 
+def _next_final_minor() -> str:
+    """A final version after the current one, valid whether or not the tree is a candidate."""
+    major, minor, _patch = _BUMP._core(_BUMP._current_version())
+    return f"{major}.{minor + 1}.0"
+
+
 def test_release_notes_exclude_the_real_dependabot_login() -> None:
     # Dependabot authors PRs as the login `dependabot[bot]`; a bare `dependabot`
     # exclusion never matches, so dependency bumps still leak into the notes.
@@ -42,8 +55,8 @@ def test_release_notes_exclude_the_real_dependabot_login() -> None:
 
 
 def test_core_dunder_version_matches_the_package_version() -> None:
-    # `guardana --version` prints `guardana.core.__version__`; the bump script
-    # rewrites pyproject versions. If the two drift, the CLI lies about what is
+    # Embedding code reads `guardana.core.__version__`; the bump script
+    # rewrites pyproject versions. If the two drift, the attribute lies about what is
     # installed — this pins them together.
 
     pyproject = (_repo_root() / "packages" / "guardana-core" / "pyproject.toml").read_text(
@@ -65,12 +78,73 @@ def test_rewrite_dunder_refuses_a_file_with_no_version_line() -> None:
         _BUMP._rewrite_dunder("nothing to see\n", "0.2.0")
 
 
+_SIBLINGS = (
+    "guardana-core",
+    "guardana-rules",
+    "guardana-report",
+    "guardana-cli",
+    "guardana-server",
+)
+
+
+def test_rewrite_pins_every_sibling_to_the_exact_release() -> None:
+    """A range let a fresh install pair this CLI with a later engine nobody tested it with."""
+    text = (
+        'version = "0.1.0"\n'
+        'dependencies = ["guardana-core>=0.1.0,<0.2", "guardana-rules==0.1.0", "pyyaml>=6.0"]\n'
+    )
+
+    rewritten = _BUMP._rewrite(text, "0.2.0rc1")
+
+    assert rewritten == (
+        'version = "0.2.0rc1"\n'
+        'dependencies = ["guardana-core==0.2.0rc1", "guardana-rules==0.2.0rc1", "pyyaml>=6.0"]\n'
+    )
+
+
+def test_every_package_pins_its_siblings_to_its_own_version_exactly() -> None:
+    for package in _SIBLINGS:
+        project = tomllib.loads(
+            (_repo_root() / "packages" / package / "pyproject.toml").read_text(encoding="utf-8")
+        )["project"]
+        siblings = [dep for dep in project["dependencies"] if dep.startswith("guardana-")]
+        assert all(dep.split("==")[0] in _SIBLINGS for dep in siblings), (package, siblings)
+        assert siblings == [f"{dep.split('==')[0]}=={project['version']}" for dep in siblings], (
+            f"{package} pins its siblings as {siblings}; the release is tested only as one set"
+        )
+
+
 def test_main_dry_run_lists_the_core_dunder_file(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "patch", "--dry-run"])
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
     assert _BUMP.main() == 0
     assert "src/guardana/core/__init__.py" in capsys.readouterr().out
+
+
+def test_main_dry_run_lists_the_citation(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
+    assert _BUMP.main() == 0
+    assert "would update CITATION.cff" in capsys.readouterr().out
+
+
+def test_the_citation_names_the_package_version() -> None:
+    citation = yaml.safe_load((_repo_root() / "CITATION.cff").read_text(encoding="utf-8"))
+
+    assert str(citation["version"]) == _BUMP._current_version()
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(citation["date-released"]))
+
+
+def test_a_bump_moves_the_citation_version_and_release_date() -> None:
+    text = "license: Apache-2.0\nversion: 1.0.0\ndate-released: '2026-10-27'\n"
+
+    marked = _marked("CITATION.cff", text, "1.0.1")
+
+    assert "version: 1.0.1\n" in marked
+    assert "date-released: '2026-10-27'" not in marked
+    assert re.search(r"^date-released: '\d{4}-\d{2}-\d{2}'$", marked, re.MULTILINE)
 
 
 def test_rewrite_action_pin_follows_the_released_minor() -> None:
@@ -169,12 +243,237 @@ def test_the_release_writes_an_sbom_and_attests_the_distributions() -> None:
     assert build < attest < publish, "the provenance does not cover what is published"
 
 
+def test_the_provenance_names_only_the_distributions() -> None:
+    """A subject is a claim that this workflow built that file.
+
+    `uv build` also writes `dist/.gitignore`, so a bare `dist/*` signs a file that
+    nobody downloads; every subject must be a wheel or an sdist.
+    """
+    for job, directory in (("publish", "dist"), ("reference-pack", "dist-reference")):
+        steps = _steps(_workflow("release.yml"), job)
+        attest = steps[_index_of(steps, "actions/attest-build-provenance")]
+        options = attest["with"]
+        assert isinstance(options, dict)
+        patterns = str(options["subject-path"]).split()
+
+        assert sorted(patterns) == [f"{directory}/*.tar.gz", f"{directory}/*.whl"], patterns
+
+
 def test_the_sboms_are_attached_to_the_release() -> None:
     """An SBOM nobody can download is a file on a runner that no longer exists."""
     steps = _steps(_workflow("release.yml"), "publish")
     release_step = steps[_index_of(steps, "gh release create")]
 
     assert "sbom/" in str(release_step["run"]), "the release carries no SBOM assets"
+
+
+def test_the_five_packages_are_published_without_the_reference_pack() -> None:
+    """A pack that fails to build can hold back neither their upload nor the GitHub Release.
+
+    The publish job never touches the pack, and the images wait on that job alone.
+    """
+    workflow = _workflow("release.yml")
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    publish = yaml.safe_dump(jobs["publish"])
+
+    assert "reference_pack" not in publish
+    assert "dist-reference" not in publish
+    assert jobs["images"]["needs"] == "publish"
+
+
+def test_the_reference_pack_is_built_attested_and_attached_after_the_publish() -> None:
+    """The pack ships on every GitHub Release, from a job of its own that needs `publish`.
+
+    It publishes nowhere but the Release, so it holds no `pypi` approval and no token
+    beyond attaching an asset and signing its provenance.
+    """
+    jobs = _workflow("release.yml")["jobs"]
+    assert isinstance(jobs, dict)
+    job = jobs["reference-pack"]
+    steps = _steps(_workflow("release.yml"), "reference-pack")
+    build = _index_of(steps, "uv build examples/reference_pack --out-dir dist-reference/")
+    attest = _index_of(steps, "actions/attest-build-provenance")
+    upload = _index_of(steps, "gh release upload")
+    command = str(steps[upload]["run"])
+
+    assert job["needs"] == "publish"
+    assert "environment" not in job
+    assert job["permissions"] == {"contents": "write", "id-token": "write", "attestations": "write"}
+    assert build < attest < upload
+    assert "dist-reference/*.whl" in command
+    assert "dist-reference/*.tar.gz" in command
+    assert "--clobber" not in command, "a re-run would replace what PyPI kept from the first"
+    assert "gh release view" in command
+
+
+def test_the_reference_pack_reaches_pypi_only_when_the_owner_turns_it_on() -> None:
+    """A separate job, behind the same approval, that the release and the images never wait on."""
+    name = "publish-reference-pack"
+    jobs = _workflow("release.yml")["jobs"]
+    assert isinstance(jobs, dict)
+    job = jobs[name]
+    steps = _steps(_workflow("release.yml"), name)
+    publish = steps[_index_of(steps, "pypa/gh-action-pypi-publish")]
+
+    assert job["needs"] == ["reference-pack", "reference-pack-on-pypi"]
+    assert job["environment"] == "pypi"
+    assert str(job["if"]).startswith("vars.REFERENCE_PACK_PYPI == 'true' && ")
+    assert jobs["reference-pack-on-pypi"]["if"] == "vars.REFERENCE_PACK_PYPI == 'true'"
+    assert job["permissions"]["id-token"] == "write"
+    assert isinstance(publish["with"], dict)
+    assert publish["with"]["packages-dir"] == "dist-reference/"
+    assert publish["with"]["skip-existing"] is True
+    waiting = [other for other, spec in jobs.items() if name in str(spec.get("needs"))]
+    assert waiting == []
+
+
+_BUNDLE_UPLOADS = [
+    ("publish", "gh release create", "guardana-1.2.3.sigstore.json"),
+    ("reference-pack", ".sigstore.json", "guardana-reference-pack-0.4.5.sigstore.json"),
+]
+
+_FAKE_GH = """#!/bin/sh
+echo "$*" >> "$GH_LOG"
+if [ "$1 $2" = "release view" ] && [ -z "$RELEASE_EXISTS" ]; then exit 1; fi
+exit 0
+"""
+
+
+def _bundle_step(job: str, needle: str) -> dict[str, object]:
+    steps = _steps(_workflow("release.yml"), job)
+    return steps[_index_of(steps, needle)]
+
+
+def _run_bundle_step(
+    job: str, needle: str, bundle: str, tmp_path: Path, *, release_exists: bool = True
+) -> tuple[int, list[str]]:
+    """Run the step with a `gh` that records its calls; return the exit code and those calls."""
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    gh = bin_dir / "gh"
+    gh.write_text(_FAKE_GH, encoding="utf-8")
+    gh.chmod(0o755)
+    (tmp_path / "CHANGELOG.md").write_text("## [1.2.3]\n\nNotes.\n", encoding="utf-8")
+    pack = tmp_path / "examples" / "reference_pack"
+    pack.mkdir(parents=True)
+    (pack / "pyproject.toml").write_text('[project]\nversion = "0.4.5"\n', encoding="utf-8")
+    log = tmp_path / "gh.log"
+    log.touch()
+    script = str(_bundle_step(job, needle)["run"])
+    done = subprocess.run(  # noqa: S603 — bash runs the workflow's own step
+        ["/bin/bash", "-eo", "pipefail", "-c", script],
+        cwd=tmp_path,
+        env={
+            "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+            "GH_LOG": str(log),
+            "TAG": "v1.2.3",
+            "BUNDLE": bundle,
+            "RELEASE_EXISTS": "yes" if release_exists else "",
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode, log.read_text(encoding="utf-8").splitlines()
+
+
+@pytest.mark.parametrize("job", ["publish", "reference-pack"])
+def test_the_attestation_bundle_is_handed_to_the_release_upload(job: str) -> None:
+    """The bundle is read from the attest step's own output, not guessed from a runner path."""
+    steps = _steps(_workflow("release.yml"), job)
+    attest = steps[_index_of(steps, "actions/attest-build-provenance")]
+    upload_needle = next(needle for name, needle, _ in _BUNDLE_UPLOADS if name == job)
+    upload = _index_of(steps, upload_needle)
+    environment = steps[upload]["env"]
+
+    assert attest.get("id"), "the attest step has no id to read its bundle path from"
+    assert isinstance(environment, dict)
+    assert environment["BUNDLE"] == f"${{{{ steps.{attest['id']}.outputs.bundle-path }}}}"
+    assert steps.index(attest) < upload
+
+
+@pytest.mark.parametrize(("job", "needle", "asset"), _BUNDLE_UPLOADS)
+def test_the_attestation_bundle_is_attached_as_a_sigstore_json_asset(
+    job: str, needle: str, asset: str, tmp_path: Path
+) -> None:
+    """OpenSSF Scorecard counts a release as signed by an asset ending in `.sigstore.json`.
+
+    A re-run replaces the asset, so it repairs a bundle the first run failed to attach.
+    """
+    bundle = tmp_path / "attestation.json"
+    bundle.write_text('{"mediaType": "application/vnd.dev.sigstore.bundle+json"}\n', "utf-8")
+
+    code, calls = _run_bundle_step(job, needle, str(bundle), tmp_path)
+
+    assert code == 0, calls
+    upload = f"release upload v1.2.3 {asset} --clobber"
+    assert upload in calls, calls
+    assert (tmp_path / asset).read_bytes() == bundle.read_bytes()
+
+
+def test_the_bundle_is_uploaded_only_once_the_release_exists(tmp_path: Path) -> None:
+    bundle = tmp_path / "attestation.json"
+    bundle.write_text("{}\n", encoding="utf-8")
+
+    code, calls = _run_bundle_step(
+        "publish", "gh release create", str(bundle), tmp_path, release_exists=False
+    )
+
+    assert code == 0, calls
+    created = next(i for i, call in enumerate(calls) if call.startswith("release create"))
+    uploaded = next(i for i, call in enumerate(calls) if ".sigstore.json" in call)
+    assert created < uploaded, calls
+
+
+@pytest.mark.parametrize(("job", "needle", "asset"), _BUNDLE_UPLOADS)
+@pytest.mark.parametrize("bundle", ["", "absent.json", "empty.json"])
+def test_a_missing_attestation_bundle_fails_the_release(
+    job: str, needle: str, asset: str, bundle: str, tmp_path: Path
+) -> None:
+    """A release that silently lacks its signature bundle would read as signed elsewhere."""
+    if bundle == "empty.json":
+        (tmp_path / bundle).touch()
+    path = str(tmp_path / bundle) if bundle else ""
+
+    code, calls = _run_bundle_step(job, needle, path, tmp_path)
+
+    assert code != 0, calls
+    assert not any(".sigstore.json" in call for call in calls), calls
+    assert not (tmp_path / asset).exists()
+
+
+_PUBLISH_CHECK = "left no bundle at '${BUNDLE}'.\""
+
+
+def test_a_missing_attestation_bundle_stops_the_release_before_pypi() -> None:
+    """The publish cannot be undone, so the bundle the Release needs is checked before it."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    attest = steps[_index_of(steps, "actions/attest-build-provenance")]
+    check = _index_of(steps, _PUBLISH_CHECK)
+    environment = steps[check]["env"]
+
+    assert isinstance(environment, dict)
+    assert environment["BUNDLE"] == f"${{{{ steps.{attest['id']}.outputs.bundle-path }}}}"
+    assert steps.index(attest) < check < _index_of(steps, "pypa/gh-action-pypi-publish")
+
+
+@pytest.mark.parametrize(
+    ("bundle", "passes"), [("", False), ("empty.json", False), ("ok.json", True)]
+)
+def test_the_pre_publish_check_passes_only_a_written_bundle(
+    bundle: str, passes: bool, tmp_path: Path
+) -> None:
+    if bundle == "empty.json":
+        (tmp_path / bundle).touch()
+    if bundle == "ok.json":
+        (tmp_path / bundle).write_text("{}\n", encoding="utf-8")
+
+    code, _ = _run_bundle_step(
+        "publish", _PUBLISH_CHECK, str(tmp_path / bundle) if bundle else "", tmp_path
+    )
+
+    assert (code == 0) is passes
 
 
 def test_ci_writes_the_sboms_on_every_push() -> None:
@@ -187,6 +486,14 @@ def test_ci_builds_and_runs_both_images_on_every_push() -> None:
     """An image first built at the tag is an image first tested at the worst moment."""
     steps = _steps(_workflow("ci.yml"), "images")
     _index_of(steps, "scripts/image_smoke.py")
+
+
+def test_ci_checks_the_image_requirements_against_the_lock_before_building() -> None:
+    """An image built from a stale export runs versions the test job never ran."""
+    steps = _steps(_workflow("ci.yml"), "images")
+    check = _index_of(steps, "scripts/export_image_requirements.py --check")
+
+    assert check < _index_of(steps, "scripts/image_smoke.py")
 
 
 def test_the_release_publishes_both_images_with_an_sbom_and_provenance() -> None:
@@ -240,6 +547,21 @@ def test_pin_discovery_finds_every_file_carrying_a_tag() -> None:
     assert Path("packages/guardana-core/tests/test_release_tooling.py") not in found
 
 
+def test_a_note_keeps_the_pin_of_the_release_it_ran_against(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pinned = ("notes/a-proof.md", "site/notes/a-proof.html", "docs/install.md")
+    for relative in pinned:
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / relative).write_text(
+            "image: ghcr.io/guardana/guardana-collector:1.0.0rc5\n", encoding="utf-8"
+        )
+    monkeypatch.setattr(_BUMP, "_REPO", tmp_path)
+    monkeypatch.setattr(_BUMP, "_tracked_text_files", lambda: tuple(Path(p) for p in pinned))
+
+    assert _BUMP.pin_bearing_files(_BUMP._IMAGE_PIN_RE) == (Path("docs/install.md"),)
+
+
 def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
     """`latest` and the moving tag are not pushed for a prerelease, so nor is the doc."""
     text = "docker run ghcr.io/guardana/guardana:0.9 scan ."
@@ -249,6 +571,46 @@ def test_a_prerelease_does_not_move_the_documented_image_tag() -> None:
         _BUMP._rewrite_image_pin(text, "0.10.0")
         == "docker run ghcr.io/guardana/guardana:0.10 scan ."
     )
+
+
+@pytest.mark.parametrize("step", ["cli-meta", "collector-meta"])
+def test_image_tags_are_worked_out_from_the_pep440_version(step: str) -> None:
+    """A release tag such as v1.0.0rc1 is PEP 440 and not semver; a semver rule tags nothing."""
+    steps = _steps(_workflow("release.yml"), "images")
+    meta = next(s for s in steps if s.get("id") == step)
+    options = meta["with"]
+    assert isinstance(options, dict)
+    rules = [line.strip() for line in str(options["tags"]).splitlines() if line.strip()]
+
+    assert rules, f"{step} works out no tags"
+    assert all(rule.startswith("type=pep440,") for rule in rules), rules
+
+
+def test_a_tag_publishes_only_the_version_the_packages_carry() -> None:
+    """The release is named after the tag, so a tag naming another version stops first."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    check = _index_of(steps, "packages/guardana-core/pyproject.toml")
+    command = str(steps[check]["run"])
+
+    assert check < _index_of(steps, "uv build")
+    assert check < _index_of(steps, "pypa/gh-action-pypi-publish")
+    assert '"${TAG#v}" != "$packaged"' in command
+    assert '[ -z "$packaged" ]' in command
+    assert "exit 1" in command
+
+
+def test_a_prerelease_tag_creates_a_github_prerelease() -> None:
+    """The Releases page and the Marketplace must not call a candidate the latest release."""
+    steps = _steps(_workflow("release.yml"), "publish")
+    command = str(steps[_index_of(steps, "gh release create")]["run"])
+
+    assert "--prerelease" in command
+    marked = re.search(r'case "\$version" in (\S+)\)', command)
+    assert marked is not None, "no pre-release pattern"
+    for version in ("1.0.0a1", "1.0.0b2", "1.0.0rc1", "1.0.0.dev3"):
+        assert any(fnmatch(version, p) for p in marked.group(1).split("|")), version
+    for version in ("1.0.0", "0.41.0", "1.0.0.post1"):
+        assert not any(fnmatch(version, p) for p in marked.group(1).split("|")), version
 
 
 def test_every_required_action_pin_file_actually_carries_a_pin() -> None:
@@ -267,10 +629,10 @@ def test_documented_versions_match_the_released_one() -> None:
     # release — the same staleness the pin check was added to prevent, one file
     # over. Every one of these is rewritten by `bump_version.py`.
     current = _BUMP._current_version()
-    major, minor, _ = _BUMP._core(current)
+    major, minor = stable_series()
     for relative, pattern, expected in (
         (Path("site/index.html"), _BUMP._SITE_VERSION_RE, f"v{current}"),
-        (Path("SECURITY.md"), _BUMP._SECURITY_VERSION_RE, f"({major}.{minor}.x)"),
+        (Path("SECURITY.md"), _BUMP._SECURITY_VERSION_RE, _BUMP._security_line(major, minor)),
         # The sentence beside the moving Action pin. 0.5.0 shipped with the pin
         # rewritten to @v0.5 and the prose next to it still saying "the latest
         # 0.3.x" — the pin automation moved the tag and left its explanation.
@@ -283,6 +645,95 @@ def test_documented_versions_match_the_released_one() -> None:
         assert expected in found.group(0), (
             f"{relative} says {found.group(0)!r}, expected {expected}"
         )
+
+
+def _marked(path: str, text: str, new: str) -> str:
+    """Apply every version marker `bump_version` keeps for `path` to `text`."""
+    for relative, pattern, replacement in _BUMP._documented_versions(new):
+        if relative == Path(path):
+            text = pattern.sub(replacement, text)
+    return text
+
+
+def test_a_prerelease_keeps_the_series_the_stable_pins_follow() -> None:
+    """The moving pin stays on the last final release, so the prose beside it does too."""
+    security = "Guardana is pre-1.0 (0.41.x). Security fixes land"
+    prose = "uses: guardana/guardana@v0.41   # moving tag → latest 0.41.x"
+
+    assert _marked("SECURITY.md", security, "1.0.0rc1") == security
+    assert _marked("README.md", prose, "1.0.0rc1") == prose
+    assert _marked("README.md", prose, "1.0.0") == prose.replace("latest 0.41.x", "latest 1.0.x")
+
+
+_SECURITY_PRE_1 = "Guardana is pre-1.0 (0.41.x). Security fixes land"
+
+
+def _supported(major: int, series: str) -> str:
+    """The security policy's supported line for a final 1.x release, from the script's template."""
+    template: str = _BUMP._SECURITY_LINE
+    return template.format(major=major, series=series)
+
+
+def test_the_first_final_1x_bump_writes_the_1x_security_line() -> None:
+    marked = _marked("SECURITY.md", _SECURITY_PRE_1, "1.0.0")
+
+    assert marked == f"{_supported(1, '1.0')}. Security fixes land"
+    assert "pre-1.0" not in marked
+
+
+def test_a_later_final_bump_rewrites_the_series_in_the_1x_security_line() -> None:
+    first = _marked("SECURITY.md", _SECURITY_PRE_1, "1.0.0")
+
+    assert _marked("SECURITY.md", first, "1.1.0") == f"{_supported(1, '1.1')}. Security fixes land"
+    assert _marked("SECURITY.md", first, "1.1.0rc1") == first
+
+
+def test_a_release_candidate_keeps_the_pre_1_security_line() -> None:
+    assert _marked("SECURITY.md", _SECURITY_PRE_1, "1.0.0rc2") == _SECURITY_PRE_1
+
+
+def test_the_marker_check_accepts_either_security_line() -> None:
+    for text in (_SECURITY_PRE_1, _marked("SECURITY.md", _SECURITY_PRE_1, "1.0.0")):
+        assert _BUMP._SECURITY_VERSION_RE.search(text) is not None, text
+    assert _BUMP._SECURITY_VERSION_RE.search("Guardana is supported.") is None
+
+
+def _security_line_mismatch(version: str, text: str) -> str | None:
+    """Say why `text` is the wrong supported line for a repository at `version`, or None."""
+    major, _, _ = _BUMP._core(version)
+    if major >= 1 and not Version(version).is_prerelease and "pre-1.0" in text:
+        return f"SECURITY.md still says pre-1.0 at the final release {version}"
+    supported = re.compile(_BUMP._line_pattern(_BUMP._SECURITY_LINE))
+    if major == 0 and supported.search(text) is not None:
+        return f"SECURITY.md announces a supported 1.x line at {version}"
+    return None
+
+
+def test_the_security_policy_names_the_line_the_version_belongs_to() -> None:
+    text = (_repo_root() / "SECURITY.md").read_text(encoding="utf-8")
+    assert _security_line_mismatch(_BUMP._current_version(), text) is None
+
+
+def test_the_security_line_check_refuses_a_line_from_the_other_side_of_1_0() -> None:
+    supported = _marked("SECURITY.md", _SECURITY_PRE_1, "1.0.0")
+
+    assert _security_line_mismatch("1.0.0", _SECURITY_PRE_1) is not None
+    assert _security_line_mismatch("0.42.0", supported) is not None
+    assert _security_line_mismatch("1.0.0rc2", _SECURITY_PRE_1) is None
+    assert _security_line_mismatch("1.0.0", supported) is None
+    assert _security_line_mismatch("0.42.0", _SECURITY_PRE_1) is None
+
+
+def test_a_version_marker_naming_a_prerelease_is_replaced_whole() -> None:
+    """The next candidate must not read `v1.0.0rc2rc1`."""
+    site = '<span class="ver mono">v1.0.0rc1</span>'
+    roadmap = "## What ships today (1.0.0rc1)\n"
+
+    assert _marked("site/index.html", site, "1.0.0rc2") == '<span class="ver mono">v1.0.0rc2</span>'
+    assert _marked("ROADMAP.md", roadmap, "1.0.0") == "## What ships today (1.0.0)\n"
+    assert _marked("ROADMAP.md", "## What ships today (0.41.0)\n", "1.0.0rc1") == (
+        "## What ships today (1.0.0rc1)\n"
+    )
 
 
 def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -302,7 +753,7 @@ def test_a_missing_pin_aborts_before_anything_is_written(monkeypatch: pytest.Mon
 def test_main_dry_run_lists_the_action_pin_files(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "minor", "--dry-run"])
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", _next_final_minor(), "--dry-run"])
     assert _BUMP.main() == 0
     assert "README.md" in capsys.readouterr().out
 
@@ -314,10 +765,27 @@ def test_next_version_bumps_the_numeric_core() -> None:
 
 
 def test_next_version_passes_through_a_pep440_prerelease() -> None:
-    # RELEASING.md documents `bump_version.py 1.0.0rc1`; the explicit form must
+    # A release candidate is cut as `bump_version.py 1.0.0rc1`; the explicit form must
     # accept a PEP 440 pre-release verbatim, not reject it as non-numeric.
     assert _BUMP._next_version("0.1.0", "1.0.0rc1") == "1.0.0rc1"
     assert _BUMP._next_version("0.9.0", "1.0.0b2") == "1.0.0b2"
+
+
+@pytest.mark.parametrize("bump", ["patch", "minor", "major"])
+def test_a_named_bump_from_a_candidate_is_refused(bump: str) -> None:
+    # `patch` from 1.0.0rc2 would otherwise give 1.0.1 and skip the final 1.0.0.
+    with pytest.raises(SystemExit, match="not a final release"):
+        _BUMP._next_version("1.0.0rc2", bump)
+    with pytest.raises(SystemExit, match="not a final release"):
+        _load_script("release")._target_version(bump, "1.0.0rc2")
+
+
+def test_an_explicit_version_after_a_candidate_is_accepted() -> None:
+    release = _load_script("release")
+    assert _BUMP._next_version("1.0.0rc2", "1.0.0rc3") == "1.0.0rc3"
+    assert _BUMP._next_version("1.0.0rc2", "1.0.0") == "1.0.0"
+    assert release._target_version("1.0.0", "1.0.0rc2") == "1.0.0"
+    assert release._target_version("patch", "1.0.0") == "1.0.1"
 
 
 def test_next_version_rejects_a_non_version_argument() -> None:
@@ -333,9 +801,11 @@ def test_core_ignores_a_prerelease_suffix() -> None:
 def test_main_accepts_a_pep440_prerelease_in_dry_run(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    monkeypatch.setattr(sys, "argv", ["bump_version.py", "1.0.0rc1", "--dry-run"])
+    major, _, _ = _BUMP._core(_BUMP._current_version())
+    candidate = f"{major + 1}.0.0rc1"
+    monkeypatch.setattr(sys, "argv", ["bump_version.py", candidate, "--dry-run"])
     assert _BUMP.main() == 0
-    assert "1.0.0rc1" in capsys.readouterr().out
+    assert candidate in capsys.readouterr().out
 
 
 def test_main_refuses_a_downgrade(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -406,6 +876,27 @@ def test_no_workflow_calls_an_action_by_a_moving_tag(workflow: str) -> None:
 @pytest.mark.parametrize(
     "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
 )
+def test_no_workflow_runs_on_a_moving_runner_label(workflow: str) -> None:
+    """A `-latest` label changes image under a job without a commit.
+
+    GitHub moves such a label over several weeks, so the CI run on a commit and the
+    release run on its tag can land on different systems; a runner change must be a
+    reviewed diff.
+    """
+    config = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    )
+    moving = {
+        name: job["runs-on"]
+        for name, job in config.get("jobs", {}).items()
+        if "latest" in str(job.get("runs-on", ""))
+    }
+    assert not moving, f"{workflow}: jobs on a moving runner label: {moving}"
+
+
+@pytest.mark.parametrize(
+    "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
+)
 def test_every_workflow_declares_the_token_it_needs(workflow: str) -> None:
     """A workflow with no `permissions:` inherits whatever the repository default is.
 
@@ -430,6 +921,24 @@ def test_every_workflow_declares_the_token_it_needs(workflow: str) -> None:
         f"{workflow}: jobs with no declared token scope, so they inherit the "
         f"repository default: {undeclared}"
     )
+
+
+@pytest.mark.parametrize(
+    "workflow", sorted(p.name for p in (Path(__file__).parents[3] / ".github/workflows").iterdir())
+)
+def test_no_workflow_grants_a_write_scope_to_all_of_its_jobs(workflow: str) -> None:
+    """A write scope belongs to the job that needs it, never to the whole file.
+
+    A top-level grant reaches every job, including one added later that only lints, and
+    OpenSSF Scorecard's Token-Permissions check scores the file by it.
+    """
+    config = yaml.safe_load(
+        (_repo_root() / ".github" / "workflows" / workflow).read_text(encoding="utf-8")
+    )
+    top = config.get("permissions")
+    assert isinstance(top, dict), f"{workflow}: no top-level permissions block"
+    writes = sorted(scope for scope, level in top.items() if level == "write")
+    assert not writes, f"{workflow}: grants {writes} to every job"
 
 
 def test_the_no_cache_job_says_so_instead_of_relying_on_a_default() -> None:
@@ -458,6 +967,26 @@ def test_the_no_cache_job_says_so_instead_of_relying_on_a_default() -> None:
     )
 
 
+def test_no_two_ci_jobs_save_one_uv_cache() -> None:
+    """Two jobs that compute one cache key race to save it, and the loser warns.
+
+    The key is the runner, the Python version, the lock-file hash and the suffix, so
+    every job that caches states a suffix or a Python version no other job uses.
+    """
+    config = yaml.safe_load((_repo_root() / ".github" / "workflows" / "ci.yml").read_text("utf-8"))
+    keys: dict[tuple[str, str], str] = {}
+    for name, job in config["jobs"].items():
+        for step in job.get("steps", []):
+            if "setup-uv" not in str(step.get("uses", "")):
+                continue
+            options = step.get("with", {})
+            if options.get("enable-cache") is False:
+                continue
+            key = (str(options.get("python-version")), str(options.get("cache-suffix", "")))
+            assert key not in keys, f"{name} and {keys[key]} save the same uv cache {key}"
+            keys[key] = name
+
+
 def test_codeql_runs_on_every_push_and_on_a_schedule() -> None:
     """ruff's bandit rules do not do taint tracking; a security product carries both."""
     workflow = (_repo_root() / ".github" / "workflows" / "codeql.yml").read_text(encoding="utf-8")
@@ -468,3 +997,123 @@ def test_codeql_runs_on_every_push_and_on_a_schedule() -> None:
     assert "cron:" in workflow
     assert "security-events: write" in workflow
     assert "languages: python" in workflow
+
+
+def _reproducibility() -> dict[Any, Any]:
+    path = _repo_root() / ".github" / "workflows" / "reproducibility.yml"
+    loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+    assert isinstance(loaded, dict)
+    return loaded
+
+
+def test_the_reproducibility_check_runs_after_a_release_and_on_demand_never_on_a_push() -> None:
+    """The files it compares exist on PyPI only once a release has published them."""
+    workflow = _reproducibility()
+    # PyYAML reads the bare key `on` as the boolean true.
+    triggers = workflow["on"] if "on" in workflow else workflow[True]
+
+    assert set(triggers) == {"workflow_run", "workflow_dispatch"}
+    assert triggers["workflow_run"] == {"workflows": ["Release"], "types": ["completed"]}
+    assert _workflow("release.yml")["name"] == "Release"
+    assert triggers["workflow_dispatch"]["inputs"]["version"]["required"] is True
+
+
+def test_the_reproducibility_check_follows_only_a_release_run_that_succeeded() -> None:
+    condition = _reproducibility()["jobs"]["reproduce"]["if"]
+
+    assert "github.event.workflow_run.conclusion == 'success'" in condition
+    assert "github.event_name == 'workflow_dispatch'" in condition
+
+
+def _version_step(environment: dict[str, str], tmp_path: Path) -> tuple[int, str]:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    script = next(step["run"] for step in steps if step.get("id") == "version")
+    output = tmp_path / "output"
+    output.touch()
+    done = subprocess.run(  # noqa: S603 — bash runs the workflow's own step
+        ["/bin/bash", "-c", script],
+        env={"PATH": os.environ["PATH"], "GITHUB_OUTPUT": str(output), **environment},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return done.returncode, output.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("environment", "version"),
+    [
+        ({"TAG": "v1.0.0rc1", "DISPATCHED": ""}, "1.0.0rc1"),
+        ({"TAG": "", "DISPATCHED": "1.2.3"}, "1.2.3"),
+        ({"TAG": "", "DISPATCHED": "v1.2.3.post1"}, "1.2.3.post1"),
+    ],
+)
+def test_the_version_comes_from_the_release_tag_or_the_dispatch(
+    environment: dict[str, str], version: str, tmp_path: Path
+) -> None:
+    assert _version_step(environment, tmp_path) == (0, f"version={version}\n")
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {"TAG": "main", "DISPATCHED": ""},
+        {"TAG": "v1.0", "DISPATCHED": ""},
+        {"TAG": "v1.0.0; echo hi", "DISPATCHED": ""},
+        {"TAG": "", "DISPATCHED": ""},
+        {"TAG": "", "DISPATCHED": "1.2.3\nversion=9.9.9"},
+        {"TAG": "", "DISPATCHED": "1.2.3\n"},
+    ],
+)
+def test_a_run_that_names_no_version_is_refused(
+    environment: dict[str, str], tmp_path: Path
+) -> None:
+    code, output = _version_step(environment, tmp_path)
+
+    assert code != 0
+    assert output == ""
+
+
+def test_the_reproducibility_check_is_read_only() -> None:
+    workflow = _reproducibility()
+
+    assert workflow["permissions"] == {"contents": "read", "actions": "read"}
+    assert all("permissions" not in job for job in workflow["jobs"].values())
+    steps = workflow["jobs"]["reproduce"]["steps"]
+    checkouts = [step for step in steps if "actions/checkout" in str(step.get("uses"))]
+    assert checkouts
+    assert all(step["with"]["persist-credentials"] is False for step in checkouts)
+
+
+def test_the_reproducibility_check_pins_every_action_by_commit() -> None:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    uses = [str(step["uses"]) for step in steps if "uses" in step]
+
+    assert uses
+    assert all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", ref) for ref in uses), uses
+
+
+def test_the_reproducibility_check_builds_the_release_tag_with_the_script() -> None:
+    steps = _reproducibility()["jobs"]["reproduce"]["steps"]
+    refs = [str(step.get("with", {}).get("ref", "")) for step in steps]
+    run = steps[_index_of(steps, "scripts/reproduce_release.py")]
+
+    assert "refs/tags/v${{ steps.version.outputs.version }}" in refs
+    assert '"$VERSION" --source release' in str(run["run"])
+
+
+def test_every_package_builds_with_one_exactly_pinned_backend() -> None:
+    """A backend resolved fresh at build time makes a rebuild from the tag a different build."""
+    pyprojects = sorted((_repo_root() / "packages").glob("*/pyproject.toml"))
+    pyprojects += sorted((_repo_root() / "examples").glob("*/pyproject.toml"))
+    backends = {
+        str(path.relative_to(_repo_root())): tomllib.loads(path.read_text(encoding="utf-8"))[
+            "build-system"
+        ]["requires"]
+        for path in pyprojects
+    }
+    assert {f"packages/{package}/pyproject.toml" for package in _SIBLINGS} <= set(backends)
+    assert "examples/reference_pack/pyproject.toml" in backends
+
+    assert all(re.fullmatch(r"hatchling==[\d.]+", r) for (r,) in backends.values()), backends
+    assert len({requires[0] for requires in backends.values()}) == 1, backends

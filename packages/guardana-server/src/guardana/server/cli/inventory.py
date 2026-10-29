@@ -120,11 +120,11 @@ def _print_runs(entries: tuple[RunEntry, ...]) -> int:
     for entry in entries:
         # A run that did not say is printed as unknown, never blank and never as a
         # pass: a fleet with one old agent must not read as green.
-        gate = entry.gate or "unknown"
-        where = "/".join(part for part in (entry.ai_system, entry.environment) if part)
+        gate = _shown(entry.gate or "unknown")
+        where = _shown("/".join(part for part in (entry.ai_system, entry.environment) if part))
         print(
-            f"{entry.received_at}  {gate:13} {entry.project_ref:20} "
-            f"{where or '-':28} {entry.source}"
+            f"{entry.received_at}  {gate:13} {_shown(entry.project_ref):20} "
+            f"{where or '-':28} {_shown(entry.source)}"
         )
     return EXIT_OK
 
@@ -138,22 +138,21 @@ def _print_findings(entries: tuple[TrackedFinding, ...]) -> int:
         return EXIT_OK
     for entry in entries:
         print(
-            f"{entry.identity[7:15]}  {entry.severity:9} {entry.status:15} "
-            f"{entry.rule_id:44} {entry.runs:4} runs  "
-            f"{entry.first_seen} → {entry.last_seen}  {entry.target_ref}"
+            f"{_shown(entry.identity[7:15])}  {_shown(entry.severity):9} {entry.status:15} "
+            f"{_shown(entry.rule_id):44} {entry.runs:4} runs  "
+            f"{entry.first_seen} → {entry.last_seen}  {_shown(entry.target_ref)}"
         )
+        waived_by = _shown(entry.waived_by or "")
+        reason = _shown(entry.waiver_reason or "")
         if entry.waiver_lapsed:
             # Loud, because this is the moment a team's accepted risk stopped being
             # accepted and nothing ran to make that happen.
             print(
-                f"          waiver by {entry.waived_by} expired on {entry.waiver_expires} "
-                f"— open again ({entry.waiver_reason})"
+                f"          waiver by {waived_by} expired on {entry.waiver_expires} "
+                f"— open again ({reason})"
             )
         elif entry.waived_by:
-            print(
-                f"          waived by {entry.waived_by} until {entry.waiver_expires} "
-                f"({entry.waiver_reason})"
-            )
+            print(f"          waived by {waived_by} until {entry.waiver_expires} ({reason})")
     return EXIT_OK
 
 
@@ -162,5 +161,20 @@ def _print(entries: tuple[InventoryEntry, ...], plural: str, flag: str) -> int:
         print(_NOTHING_YET.format(plural=plural, flag=flag))
         return EXIT_OK
     for entry in entries:
-        print(f"{entry.project_ref:24} {entry.name:28} {entry.runs:5} runs  last {entry.last_seen}")
+        print(
+            f"{_shown(entry.project_ref):24} {_shown(entry.name):28} {entry.runs:5} runs  "
+            f"last {entry.last_seen}"
+        )
     return EXIT_OK
+
+
+def _shown(text: str) -> str:
+    """Escape every non-printable character so submitted text cannot drive the terminal.
+
+    Whoever holds an ingest key chooses these strings, and an escape sequence
+    printed raw can clear the screen or repaint the verdict an operator reads.
+    """
+    return "".join(
+        character if character.isprintable() else character.encode("unicode_escape").decode()
+        for character in text
+    )

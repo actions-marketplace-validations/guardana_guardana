@@ -9,8 +9,8 @@ color: cyan
 You answer one lookup question about this repository and stop.
 
 - Read-only. Bash is for `git log/show/diff/blame`, `ls`, `wc`, `rg` and nothing else. Never run
-  a script from `scripts/` — four of them run for real when handed `--help` (one fetches from
-  origin and runs the whole gate, one builds container images) — and never run `guardana probe`,
+  a script from `scripts/` — `release.py` fetches from origin and runs the whole gate, and
+  `image_smoke.py` builds container images — and never run `guardana probe`,
   `monitor` or `target inspect`, which contact a live endpoint.
 - Read excerpts, not whole files. Stop as soon as the question is answered.
 - Reply in at most 15 lines: the answer first, then `path:line` anchors. No preamble, no advice,

@@ -10,9 +10,12 @@ from pathlib import Path
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
+from guardana.core.testing import fake_aws_key
 from guardana.rules._base import ArtifactRule
 from guardana.rules._secrets import (
     FILE_SECRET_PATTERNS,
@@ -20,7 +23,9 @@ from guardana.rules._secrets import (
     is_scannable_text,
     redact,
 )
-from guardana.rules.supply_chain._reading import read_bytes_bounded
+from guardana.rules.supply_chain import _samples
+from guardana.rules.supply_chain._leads import unscanned_verdict
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_bytes_bounded
 
 _RULE_ID = "guardana.supply_chain.hardcoded_secret"
 
@@ -35,8 +40,10 @@ _SENSITIVE = (
     r"secret|passwd|password|pwd|token|api[_-]?key|access[_-]?key|"
     r"auth[_-]?key|private[_-]?key|client[_-]?secret|credential"
 )
+# The name around the sensitive word is bounded: two unbounded runs of the same class
+# on either side of it retry every split of a long name, which is quadratic in it.
 _ASSIGNMENT = re.compile(
-    rf"(?i)([A-Za-z0-9_.\-]*(?:{_SENSITIVE})[A-Za-z0-9_.\-]*)\s*[:=]\s*"
+    rf"(?i)([A-Za-z0-9_.\-]{{0,64}}(?:{_SENSITIVE})[A-Za-z0-9_.\-]{{0,64}})\s*[:=]\s*"
     r"[\"']([^\"'\n]{12,120})[\"']"
 )
 # Values that are plainly not real secrets: placeholders, env indirection, examples.
@@ -167,6 +174,9 @@ def _scan_entropy(text: str) -> Iterator[tuple[_Where, str, str]]:
         yield cursor.at(match.start()), name, value
 
 
+_FROM_THE_ENVIRONMENT = "aws_region: eu-west-1\naws_access_key_id: ${AWS_ACCESS_KEY_ID}\n"
+
+
 class HardcodedSecretRule(ArtifactRule):
     """Scans repository files for hardcoded secrets.
 
@@ -186,7 +196,30 @@ class HardcodedSecretRule(ArtifactRule):
             OWASP_LLM02_2026,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a key in a config, a config naming none and a file past the read bound."""
+        return materialise(
+            (
+                _samples.sample(
+                    "an AWS access key id in a YAML config",
+                    FixtureOutcome.FINDING,
+                    {"config.yaml": f"aws_access_key_id: {fake_aws_key()}\n"},
+                ),
+                _samples.sample(
+                    "a YAML config reading its key from the environment",
+                    FixtureOutcome.CLEAN,
+                    {"config.yaml": _FROM_THE_ENVIRONMENT},
+                ),
+                _samples.sample(
+                    "an .env padded past the read bound, its key after the padding",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {".env": _samples.past_the_scan_bound(f"AWS_KEY={fake_aws_key()}")},
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every text-like file under the target for secret shapes."""
@@ -200,8 +233,10 @@ class HardcodedSecretRule(ArtifactRule):
     def _scan(self, path: Path, *, entropy: bool) -> Iterator[Finding]:
         prefix = read_bytes_bounded(path)
         if prefix is None:
+            yield self._unscanned(path, "the file could not be read")
             return
-        text = prefix[0].decode("utf-8", errors="ignore")
+        raw, truncated = prefix
+        text = raw.decode("utf-8", errors="ignore")
         for where, label, secret in _scan_prefixed(text):
             yield self._finding(
                 path,
@@ -219,6 +254,21 @@ class HardcodedSecretRule(ArtifactRule):
                     rationale="high-entropy value assigned to a secret-named variable",
                     confidence=0.75,
                 )
+        if truncated:
+            yield self._unscanned(
+                path, f"only the first {MAX_SCAN_BYTES} bytes were read (the read bound)"
+            )
+
+    def _unscanned(self, path: Path, reason: str) -> Finding:
+        return Finding(
+            rule_id=self.meta.id,
+            severity=Severity.LOW,
+            title="File not scanned for secrets",
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(summary=f"not scanned for secrets: {reason}", detail=path.name),
+            verdict=unscanned_verdict("the file was not read whole, so nothing in it was cleared"),
+        )
 
     def _finding(
         self, path: Path, where: _Where, *, summary: str, rationale: str, confidence: float

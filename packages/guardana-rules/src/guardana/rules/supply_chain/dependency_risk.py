@@ -3,12 +3,16 @@ from collections.abc import Iterable, Iterator
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules._base import ArtifactRule
-from guardana.rules.supply_chain._ast_names import import_aliases, resolved_call_name
+from guardana.rules.supply_chain import _samples
+from guardana.rules.supply_chain._ast_names import NameResolver, import_aliases
+from guardana.rules.supply_chain._unread_python import unread_python
 
 _SAFE_YAML_LOADERS = frozenset({"SafeLoader", "CSafeLoader"})
 
@@ -83,9 +87,9 @@ def _yaml_load_finding(node: ast.Call) -> tuple[str, Severity] | None:
 
 
 def _sinks(source: PythonSource) -> Iterator[tuple[int, str, Severity]]:
-    aliases = import_aliases(source)
+    resolver = NameResolver(import_aliases(source))
     for node in source.nodes(ast.Call):
-        name = resolved_call_name(node, aliases)
+        name = resolver.call_name(node)
         if name in _PICKLE_FAMILY_LOADERS:
             yield node.lineno, f"{name} on possibly-untrusted data", Severity.HIGH
         elif name == "torch.load":
@@ -106,6 +110,9 @@ def _sinks(source: PythonSource) -> Iterator[tuple[int, str, Severity]]:
             )
 
 
+_LOAD = "import torch\n\nmodel = torch.load('model.pt'{})\n"
+
+
 class DependencyRiskRule(ArtifactRule):
     """Flags calls that deserialize untrusted data (pickle family, `torch.load`, `yaml.load`)."""
 
@@ -120,7 +127,30 @@ class DependencyRiskRule(ArtifactRule):
             NIST_SUPPLY_CHAIN,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a bare `torch.load`, one restricted to weights and one the scan could not read."""
+        return materialise(
+            (
+                _samples.sample(
+                    "torch.load without weights_only",
+                    FixtureOutcome.FINDING,
+                    {"load.py": _LOAD.format("")},
+                ),
+                _samples.sample(
+                    "torch.load restricted to weights",
+                    FixtureOutcome.CLEAN,
+                    {"load.py": _LOAD.format(", weights_only=True")},
+                ),
+                _samples.past_the_source_limit(
+                    "a loader padded past the read limit, so nobody read it",
+                    "load.py",
+                    _LOAD.format(""),
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan every `.py` file under the target for deserialization sinks."""
@@ -128,7 +158,9 @@ class DependencyRiskRule(ArtifactRule):
             return
         for path in target.iter_files((".py",)):
             source = target.python_source(path)
-            if source is not None:
+            if source is None:
+                yield from unread_python(self.meta, target, path, ctx)
+            else:
                 yield from self._scan(source)
 
     def _scan(self, source: PythonSource) -> Iterator[Finding]:

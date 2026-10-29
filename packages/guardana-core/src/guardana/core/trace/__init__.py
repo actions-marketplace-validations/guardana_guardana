@@ -26,10 +26,9 @@ would be a cycle that only shows up when somebody runs the command. The two adap
 that *do* reach into those layers are deliberately not re-exported here and are
 imported from their own modules: `guardana.core.trace.bridge.as_trajectory` and
 `guardana.core.trace.claims.claims_of`. A test pins the direction.
-
-See `docs/design/trace-domain-model.md`.
 """
 
+from guardana.core.fingerprint import DigestKind, DocumentDigest
 from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.authorization import (
     Approval,
@@ -84,6 +83,7 @@ from guardana.core.trace.tool import ToolDeclaration, ToolExecution, ToolStatus
 from guardana.core.trace.writer import (
     TraceWriteError,
     TraceWriter,
+    create_trace,
     open_trace,
     resume_trace,
 )
@@ -107,8 +107,10 @@ __all__ = [
     "CredentialRef",
     "Delegation",
     "Dialect",
+    "DigestKind",
     "Dimension",
     "DimensionCoverage",
+    "DocumentDigest",
     "EffectStatus",
     "Handoff",
     "Identity",
@@ -143,6 +145,7 @@ __all__ = [
     "TraceWriteError",
     "TraceWriter",
     "UnreadableRecord",
+    "create_trace",
     "detect_dialect",
     "detect_observation_dialect",
     "evidence_matrix",

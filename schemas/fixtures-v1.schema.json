@@ -1,0 +1,252 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/fixtures/v1.schema.json",
+  "title": "Guardana Fixtures v1",
+  "description": "guardana-fixtures.yaml: the synthetic data an application runs with in CI. The team seeds the rendered documents into its own index and serves the records through stateful doubles; Guardana derives each item's retrieval term and markers from the item and `name`. Hand-written; relative paths are read beside the file. The loader also refuses what a schema cannot say: fewer than two tenants, a tenant owning no document while documents are declared, a collection in which a tenant owns no record, two tenants with the same credentials, two documents with the same topic, a duplicated id or key, and a tool naming a collection that is not declared.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "data",
+    "tenants"
+  ],
+  "additionalProperties": false,
+  "anyOf": [
+    {
+      "required": [
+        "documents"
+      ]
+    },
+    {
+      "required": [
+        "records"
+      ]
+    }
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "name": {
+      "$ref": "#/$defs/text",
+      "description": "Part of every marker's derivation, so renaming the file's fixtures re-derives them all."
+    },
+    "data": {
+      "const": "synthetic",
+      "description": "A statement the team signs in review; Guardana records it as declared and cannot check it."
+    },
+    "tenants": {
+      "type": "object",
+      "minProperties": 2,
+      "description": "Each tenant's own credentials. The URL, model and provider are the run's; the run's own connection is not a tenant.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "maxProperties": 1,
+        "properties": {
+          "api_key_env": {
+            "$ref": "#/$defs/text",
+            "description": "The environment variable holding this tenant's key."
+          },
+          "adapter": {
+            "$ref": "#/$defs/text",
+            "description": "An adapter file for the run's URL, carrying this tenant's credentials in its headers. Required for every tenant when the run itself sends through an adapter."
+          }
+        }
+      }
+    },
+    "documents": {
+      "type": "array",
+      "minItems": 1,
+      "description": "Seeded by the team into the application's own index, from `guardana fixtures render`.",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "tenant",
+          "topic"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/text"
+          },
+          "tenant": {
+            "$ref": "#/$defs/text"
+          },
+          "topic": {
+            "$ref": "#/$defs/text",
+            "description": "What the document is about, in the team's words; unique across documents once case and punctuation are ignored."
+          },
+          "poisoned": {
+            "type": "boolean",
+            "description": "When true, the rendered document also asks the model to join two marker halves."
+          }
+        }
+      }
+    },
+    "records": {
+      "type": "object",
+      "description": "Collections served by the stateful doubles; every record also carries its presence marker in `reference_code`.",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": [
+            "id",
+            "tenant"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "$ref": "#/$defs/text"
+            },
+            "tenant": {
+              "$ref": "#/$defs/text"
+            },
+            "fields": {
+              "type": "object",
+              "propertyNames": {
+                "not": {
+                  "const": "reference_code"
+                }
+              },
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "description": "The tools the doubles serve. A change or a send declares the sink it reaches and whether it is reversible; a read declares neither.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "op"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "op": {
+            "enum": [
+              "get",
+              "search",
+              "create",
+              "update",
+              "delete",
+              "send"
+            ]
+          },
+          "collection": {
+            "$ref": "#/$defs/text"
+          },
+          "sink": {
+            "description": "Where the tool's effect lands, as a trace records it.",
+            "enum": [
+              "sql",
+              "shell",
+              "filesystem",
+              "http",
+              "messaging",
+              "email",
+              "payment",
+              "cloud_api",
+              "code_execution",
+              "other"
+            ]
+          },
+          "reversible": {
+            "type": "boolean"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "enum": [
+                    "get",
+                    "search"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "collection"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sink"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "reversible"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "enum": [
+                    "create",
+                    "update",
+                    "delete"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "collection",
+                "sink",
+                "reversible"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "op": {
+                  "const": "send"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "sink",
+                "reversible"
+              ],
+              "not": {
+                "required": [
+                  "collection"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    }
+  }
+}

@@ -6,6 +6,7 @@ definitions of "worse" in one project would drift apart, and the one that drifte
 would be the one nobody was reading.
 """
 
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import PurePosixPath
@@ -13,6 +14,7 @@ from pathlib import PurePosixPath
 from guardana.core.diff.errors import IncomparableRunsError
 from guardana.core.diff.measurement import measure
 from guardana.core.diff.model import Change, ChangeKind, CheckState, Outcome, RunDiff
+from guardana.core.redaction import is_redaction_of
 from guardana.core.report import Finding, ScanResult, StopReason, split_ref
 
 _NO_VERDICT_CONFIDENCE = 1.0
@@ -28,14 +30,15 @@ def finding_identity(finding: Finding, root: str) -> Identity:
     to empty — which is what lets a model swap (`…#llama3` to `…#llama4`) compare
     at all instead of reading as every check vanishing and every check appearing.
     Against files it is the path, with the line dropped, so an edit above a
-    finding is not a new finding.
+    finding is not a new finding. A location the run's privacy policy redacted still
+    names the target it was redacted from: the run records the target unredacted.
 
     Deliberately not `Finding.fingerprint`: that one includes the evidence summary,
     which for a dynamic finding is the evaluator's rationale — and three built-in
     evaluators quote the model verbatim in it. Comparing on that would report
     movement on every re-run of an unchanged system.
     """
-    if finding.target_ref == root:
+    if finding.target_ref == root or is_redaction_of(finding.target_ref, root):
         return (finding.rule_id, "")
     path, _line = split_ref(finding.target_ref)
     return (finding.rule_id, _within(path, root))
@@ -57,6 +60,20 @@ def _within(path: str, root: str) -> str:
         return str(PurePosixPath(path).relative_to(PurePosixPath(root_path)))
     except ValueError:
         return path
+
+
+@dataclass(frozen=True, slots=True)
+class Grader:
+    """One evaluator a rule graded with, as its run recorded it; None where nothing was.
+
+    Each field is compared only when both runs recorded it: a migrated run, or an
+    evaluator that states no judge, is unknown rather than different.
+    """
+
+    version: str | None = None
+    digest: str | None = None
+    judge: str | None = None
+    """The judge identity the evaluator stated: model, endpoint, samples per verdict."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +103,22 @@ class RunContext:
     changed, and a note that asserted the first would be confidently wrong every
     time the second happened."""
 
+    grading: Mapping[str, Mapping[str, Grader]] = field(default_factory=dict)
+    """Each rule that graded something, mapped to the assessors its verdicts name.
+
+    A rule absent here graded nothing on record, which is unknown rather than
+    unchanged; the monitor leaves it empty because one process grades both cycles."""
+
+    fixtures: str | None = None
+    """The digest of the fixtures file the run was given; None when it was given none.
+
+    The monitor leaves it None on both sides, since one process runs both cycles."""
+
+    markers: int | None = None
+    """The algorithm the run's seeded markers were derived with; None without fixtures.
+
+    The same file under another algorithm seeds other markers, so it asks other questions."""
+
 
 _NO_CONTEXT = RunContext()
 """What the monitor gets: two cycles of one process, one target, one rule set."""
@@ -111,7 +144,14 @@ def compare(
     digests_before = before_context.rules
     digests_after = after_context.rules
 
-    retried = _trials_changed(before, after, ran_before & ran_after)
+    shared = ran_before & ran_after
+    retried = _trials_changed(before, after, shared)
+    regraded = _grading_changed(shared, before_context.grading, after_context.grading)
+    excluded = retried.keys() | regraded
+    listed_after = _listed(after, after_context.root)
+    # Two file scans read the same bytes the same way every time, so a count that rose
+    # there is a new problem, not sampling.
+    static = before.scope is not None and after.scope is not None
 
     changes: list[Change] = []
     unchanged = 0
@@ -124,11 +164,21 @@ def compare(
             continue
         # Nor where the two runs made a different number of attempts at each case:
         # a failure found in five tries and missed in one is more sampling, not a
-        # regression, and the refusal below says so instead.
-        if rule_id in retried:
+        # regression. Nor where another evaluator or judge graded it: a verdict that
+        # moved with the grader says nothing about the system. The refusals below
+        # name both.
+        if rule_id in excluded:
             continue
         was, now = before_states.get(identity), after_states.get(identity)
-        kind, detail = _classify(was, now)
+        kind, detail = (
+            _left_scan(after, location)
+            if was is not None
+            and now is None
+            and listed_after is not None
+            and location
+            and not _is_listed(location, listed_after)
+            else _classify(was, now, static=static)
+        )
         if kind is None:
             unchanged += 1
             continue
@@ -145,8 +195,8 @@ def compare(
         )
     changes.extend(_coverage_changes(ran_before, ran_after))
     measurement = measure(
-        [a for a in before.assessments if a.rule_id not in retried],
-        [a for a in after.assessments if a.rule_id not in retried],
+        [a for a in before.assessments if a.rule_id not in excluded],
+        [a for a in after.assessments if a.rule_id not in excluded],
         before_trials=before.trials_per_case,
         after_trials=after.trials_per_case,
     )
@@ -154,18 +204,53 @@ def compare(
         changes=tuple(changes),
         unchanged=unchanged,
         notes=(
-            *_notes(ran_before & ran_after, before_context, after_context),
+            *_notes(shared, before_context, after_context),
             *measurement.notes(),
         ),
         measurement=measurement,
         incomplete=(
             *_incomplete(before, after),
+            *_fixtures_changed(before_context, after_context),
             *(
                 f"{rule_id}: trials changed {was} → {now}, so its results are not answers "
                 f"to one question and it was not compared"
                 for rule_id, (was, now) in sorted(retried.items())
             ),
+            *_regraded_reason(regraded),
         ),
+    )
+
+
+def _listed(result: ScanResult, root: str) -> frozenset[str] | None:
+    """Every file the run listed, keyed like a finding's location; None when it did not say."""
+    if result.scope is None:
+        return None
+    return frozenset(_within(path, root) for path in result.scope.files)
+
+
+def _is_listed(location: str, listed: frozenset[str]) -> bool:
+    """Whether the file a location names was listed, a cell or fragment after it allowed.
+
+    A notebook rule names `nb.ipynb:cell3`, which `split_ref` keeps because the part
+    after the colon is not a line number.
+    """
+    head = location.split("#", 1)[0]
+    return location in listed or head in listed or head.rsplit(":", 1)[0] in listed
+
+
+def _left_scan(after: ScanResult, location: str) -> tuple[ChangeKind, str]:
+    scope = after.scope
+    reason = None if scope is None else scope.exclusion_of(location.split("#", 1)[0])
+    if reason is not None:
+        return (
+            ChangeKind.LEFT_SCAN,
+            f"the second run did not list this file ({reason}), so whether the problem "
+            f"remains is unknown rather than resolved",
+        )
+    return (
+        ChangeKind.LEFT_SCAN,
+        "the second run did not list this file — it was deleted, moved, renamed or left the "
+        "scanned tree — so whether the problem went with it is unknown rather than resolved",
     )
 
 
@@ -186,6 +271,49 @@ def _trials_changed(
     return moved
 
 
+def _grading_changed(
+    shared: frozenset[str],
+    before: Mapping[str, Mapping[str, Grader]],
+    after: Mapping[str, Mapping[str, Grader]],
+) -> frozenset[str]:
+    """Return the rules both runs ran whose grading is known on both sides and differs."""
+    return frozenset(
+        rule_id
+        for rule_id in shared
+        if _graded_differently(before.get(rule_id, {}), after.get(rule_id, {}))
+    )
+
+
+def _graded_differently(before: Mapping[str, Grader], after: Mapping[str, Grader]) -> bool:
+    """Whether one rule's graders moved between two runs.
+
+    A grader one run has and the other lacks is not enough on its own: a scenario
+    that stopped early graded fewer steps, so one side's set inside the other's is
+    the system's doing. Each side holding a grader the other lacks is a swap.
+    """
+    if not before or not after:
+        return False
+    if before.keys() - after.keys() and after.keys() - before.keys():
+        return True
+    return any(_differs(before[name], after[name]) for name in before.keys() & after.keys())
+
+
+def _differs(was: Grader, now: Grader) -> bool:
+    pairs = ((was.version, now.version), (was.digest, now.digest), (was.judge, now.judge))
+    return any(a is not None and b is not None and a != b for a, b in pairs)
+
+
+def _regraded_reason(regraded: frozenset[str]) -> tuple[str, ...]:
+    if not regraded:
+        return ()
+    ordered = sorted(regraded)
+    named = f"{', '.join(ordered[:3])}{'…' if len(ordered) > 3 else ''}"  # noqa: PLR2004
+    return (
+        f"{len(ordered)} rule(s) were graded differently ({named}) — a different evaluator "
+        f"or judge — so their findings and measurements are not compared",
+    )
+
+
 _STOP_EXPLANATIONS = {
     StopReason.BUDGET_EXHAUSTED: (
         "ran out of its budget and stopped early, so what it did not reach is unknown "
@@ -193,6 +321,14 @@ _STOP_EXPLANATIONS = {
     ),
     StopReason.INTERRUPTED: (
         "was interrupted, so what it did not reach is unknown rather than absent"
+    ),
+    StopReason.TARGET_UNAVAILABLE: (
+        "stopped because the target became unavailable, so what it did not reach is unknown "
+        "rather than absent — make the target answer before reading this comparison"
+    ),
+    StopReason.TARGET_CHANGED: (
+        "stopped because the target changed under it, no longer accepting the protocol "
+        "revision the run agreed, so what it did not reach is unknown rather than absent"
     ),
 }
 
@@ -205,12 +341,18 @@ def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
     naming the fact: the remedy for a spent budget is a bigger budget, not a
     re-enabled rule.
 
-    **Coverage the operator demanded and did not get counts here too**, and it is the
+    **Coverage the run's verdict needs and did not get counts here too**, and it is the
     case a comparison hides most quietly. A run that could not check the contract
     somebody wrote produces the same finding list as one where the contract held, so
     subtracting them yields no change at all — and `diff` would report "no
     regression" over a run that is `indeterminate` on its own. That is the false
     green this project refuses from every direction, including from a comparison.
+
+    **So does a recorded error**, with no policy switch in front of it: a refused pack
+    or a rule that raised left its findings out of the run, and the comparison cannot
+    tell those absent findings from fixed ones. **And so does a run whose every rule
+    declined**: it executed rules, so it passes the "executed nothing" refusal, and it
+    established exactly as much as a run that did not.
     """
     sides = (("first", before), ("second", after))
     return (
@@ -220,13 +362,61 @@ def _incomplete(before: ScanResult, after: ScanResult) -> tuple[str, ...]:
             if result.stopped_by is not None
         ),
         *(
-            f"the {label} run did not get coverage it demanded "
+            f"the {label} run is missing coverage its verdict needs "
             f"({', '.join(gap.name for gap in result.coverage_shortfall)}), so what needed "
             f"that evidence is unknown rather than clean"
             for label, result in sides
             if result.coverage_shortfall
         ),
+        *(
+            f"the {label} run recorded {len(result.errors)} error(s) "
+            f"({_error_sources(result)}), so what those checks would have found is unknown "
+            f"rather than clean"
+            for label, result in sides
+            if result.errors
+        ),
+        *(
+            f"every rule the {label} run executed declined, so it verified nothing and "
+            f"an unchanged result is unknown rather than clean"
+            for label, result in sides
+            if result.rules_run and result.verified_nothing
+        ),
     )
+
+
+def _fixtures_changed(before_context: RunContext, after_context: RunContext) -> tuple[str, ...]:
+    """Say when the two runs asked about different seeded data.
+
+    An item one fixtures file declares and the other does not was asked about by one
+    run only, so a finding on it that disappears reads as a fixed leak when it was
+    never asked again. The same file under another markers algorithm seeds other
+    markers, which an index seeded for one run does not hold for the other.
+    """
+    before, after = before_context.fixtures, after_context.fixtures
+    if before == after:
+        if before is None or before_context.markers == after_context.markers:
+            return ()
+        return (
+            f"the runs derived the markers of the same fixtures with different algorithms "
+            f"({before_context.markers} and {after_context.markers}), so they asked about "
+            f"different seeded text and are not comparable",
+        )
+    if before is None or after is None:
+        given = "first" if after is None else "second"
+        return (
+            f"only the {given} run was given fixtures, so the checks they feed asked about "
+            f"seeded data the other run never had and are not comparable",
+        )
+    return (
+        f"the runs were given different fixtures ({before} and {after}), so an item one "
+        f"declares and the other does not was asked about by one run only, and its "
+        f"absence is unknown rather than fixed",
+    )
+
+
+def _error_sources(result: ScanResult) -> str:
+    sources = sorted({error.source for error in result.errors})
+    return f"{', '.join(sources[:3])}{'…' if len(sources) > 3 else ''}"  # noqa: PLR2004
 
 
 def _executed(result: ScanResult) -> frozenset[str]:
@@ -291,6 +481,8 @@ def _state(entries: list[tuple[Finding, bool, Outcome]]) -> CheckState:
         confidence=max(_confidence(f) for f, _w in relevant),
         count=len(relevant),
         waived=all(w for _f, w in relevant),
+        unwaived=sum(1 for _f, w in relevant if not w),
+        evidence=tuple(sorted((f.evidence.summary, w) for f, w in relevant)),
     )
 
 
@@ -298,13 +490,15 @@ def _confidence(finding: Finding) -> float:
     return _NO_VERDICT_CONFIDENCE if finding.verdict is None else finding.verdict.confidence
 
 
-def _classify(was: CheckState | None, now: CheckState | None) -> tuple[ChangeKind | None, str]:
+def _classify(
+    was: CheckState | None, now: CheckState | None, *, static: bool
+) -> tuple[ChangeKind | None, str]:
     if was is None and now is not None:
         return _appeared(now)
     if was is not None and now is None:
         return _cleared(was)
     if was is not None and now is not None:
-        return _moved(was, now)
+        return _moved(was, now, static=static)
     # Unreachable: an identity is only in the map because one run or the other put
     # it there. Returned rather than asserted — an assert disappears under -O.
     return None, ""
@@ -322,22 +516,33 @@ def _cleared(was: CheckState) -> tuple[ChangeKind, str]:
     return ChangeKind.CLARIFIED, "a check that could not grade now comes back clean"
 
 
-def _moved(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, str]:
+def _moved(was: CheckState, now: CheckState, *, static: bool) -> tuple[ChangeKind | None, str]:
     """Classify a check that is present in both runs."""
     if was.outcome == "unverified" and now.outcome == "fail":
         return ChangeKind.PROVEN, "a check that could not grade now proves the problem"
     if was.outcome == "fail" and now.outcome == "unverified":
         return ChangeKind.BLINDED, "a proven problem can no longer be graded, not fixed"
-    return _same_outcome(was, now)
+    return _same_outcome(was, now, static=static)
 
 
-def _same_outcome(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, str]:
-    """Classify a check whose verdict held, by whatever else moved around it."""
+def _same_outcome(
+    was: CheckState, now: CheckState, *, static: bool
+) -> tuple[ChangeKind | None, str]:
+    """Classify a check whose verdict held, by whatever else moved around it.
+
+    Between two file scans, more findings in one place than before, more of them
+    unwaived, is a new problem there: `APPEARED`, whatever the waiver flag says. So is
+    an unwaived finding whose evidence the earlier run never reported there, which is
+    how a new secret that replaced a removed one keeps the count.
+    """
     if now.severity > was.severity:
         return (
             ChangeKind.ESCALATED,
             f"severity rose from {was.severity.name} to {now.severity.name}",
         )
+    appeared = _new_here(was, now) if static and now.outcome == "fail" else None
+    if appeared is not None:
+        return ChangeKind.APPEARED, appeared
     if now.severity < was.severity:
         return (
             ChangeKind.DE_ESCALATED,
@@ -349,6 +554,23 @@ def _same_outcome(was: CheckState, now: CheckState) -> tuple[ChangeKind | None, 
     if now.count != was.count:
         return ChangeKind.COUNT_CHANGED, f"{was.count} finding(s) became {now.count}"
     return None, ""
+
+
+def _new_here(was: CheckState, now: CheckState) -> str | None:
+    """Say what is new in one place between two file scans, or None when nothing is."""
+    if now.count > was.count and now.unwaived > was.unwaived:
+        return (
+            f"{now.count - was.count} more {now.severity.name} finding(s) of this rule here "
+            f"than before ({was.count} became {now.count}, {now.unwaived} not waived)"
+        )
+    reported = Counter(summary for summary, _waived in was.evidence)
+    new = Counter(summary for summary, waived in now.evidence if not waived) - reported
+    if new:
+        return (
+            f"{new.total()} {now.severity.name} finding(s) of this rule here that the earlier "
+            f"run did not report, though the count stayed {now.count}"
+        )
+    return None
 
 
 def _coverage_changes(before: frozenset[str], after: frozenset[str]) -> list[Change]:

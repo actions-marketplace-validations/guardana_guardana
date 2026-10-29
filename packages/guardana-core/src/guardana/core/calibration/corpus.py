@@ -84,11 +84,18 @@ def _sample(line: str, path: Path, number: int) -> CalibrationSample:
             f"{path}:{number} needs a boolean 'attack_succeeded' — a sample without a "
             f"known outcome cannot measure anything"
         )
+    messages = _messages(row.get("messages"), path, number)
     return CalibrationSample(
-        exchange=Exchange(_messages(row.get("messages"), path, number)),
+        exchange=Exchange(messages, graded_from=_after_last_user_turn(messages)),
         expectation=_expectation(row.get("expect"), path, number),
         attack_succeeded=label,
     )
+
+
+def _after_last_user_turn(messages: tuple[ChatMessage, ...]) -> int:
+    """Where the reply a row is labelled for begins: earlier assistant turns are its script."""
+    users = [n for n, m in enumerate(messages) if m.role == "user"]
+    return users[-1] + 1 if users else 0
 
 
 def _messages(value: object, path: Path, number: int) -> tuple[ChatMessage, ...]:

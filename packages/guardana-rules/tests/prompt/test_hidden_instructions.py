@@ -1,6 +1,8 @@
 from pathlib import Path
 
 from guardana.core.rule import RuleContext
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES
+from guardana.core.rule.verify import verify_rule
 from guardana.core.target import ArtifactTarget
 from guardana.core.testing import build_safetensors
 from guardana.rules.prompt.hidden_instructions import HiddenInstructionsRule
@@ -129,3 +131,10 @@ def test_a_lone_zero_width_space_in_safetensors_metadata_is_not_high(tmp_path: P
         build_safetensors(metadata={"description": f"Proxy AUC{_ZWSP} reported on a public set"})
     )
     assert _findings(tmp_path) == ["LOW"]
+
+
+def test_the_rule_proves_all_three_outcomes_on_its_own_samples() -> None:
+    verified = verify_rule(HiddenInstructionsRule())
+
+    assert verified.is_proven, verified
+    assert {r.observed for r in verified.results} >= set(DEMANDED_OUTCOMES)

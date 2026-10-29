@@ -10,8 +10,14 @@ from guardana.core.evaluator import (
     LengthEvaluator,
     ToolCallEvaluator,
 )
+from guardana.core.evaluator.answered import AnsweredEvaluator
+from guardana.core.evaluator.contains import ContainsEvaluator
+from guardana.core.evaluator.exact_match import ExactMatchEvaluator
+from guardana.core.evaluator.json_valid import JsonValidEvaluator
+from guardana.core.evaluator.regex import RegexEvaluator
 from guardana.core.rule import Rule
 from guardana.core.rule.yaml_rule import load_yaml_rules
+from guardana.rules.a2a import A2aAgentCardRule, A2aCallerIdentityRule, A2aTaskVisibilityRule
 from guardana.rules.agent.excessive_agency import ExcessiveAgencyRule
 from guardana.rules.agent.mcp_server_manifest import McpServerManifestRule
 from guardana.rules.mcp import (
@@ -19,14 +25,17 @@ from guardana.rules.mcp import (
     McpCacheScopeRule,
     McpDiscoveryTargetRule,
     McpIssuerIdentificationRule,
+    McpRegistryEntryRule,
     McpScopeBreadthRule,
     McpSessionBindingRule,
+    McpTaskIdentityRule,
     McpTokenAudienceRule,
     McpUnauthenticatedAccessRule,
 )
 from guardana.rules.output.secrets import OutputSecretsRule
 from guardana.rules.prompt.hidden_instructions import HiddenInstructionsRule
 from guardana.rules.prompt.mcp_tool_poisoning import McpToolPoisoningRule
+from guardana.rules.seeded import CrossTenantAnswerRule, PoisonedDocumentRule
 from guardana.rules.supply_chain.chat_template import ChatTemplateRule
 from guardana.rules.supply_chain.code_execution import CodeExecutionRule
 from guardana.rules.supply_chain.dependency_risk import DependencyRiskRule
@@ -100,6 +109,11 @@ def provide_rules() -> list[Rule]:
         McpDiscoveryTargetRule(),
         McpIssuerIdentificationRule(),
         McpCacheScopeRule(),
+        McpTaskIdentityRule(),
+        McpRegistryEntryRule(),
+        A2aAgentCardRule(),
+        A2aCallerIdentityRule(),
+        A2aTaskVisibilityRule(),
         CredentialPassthroughRule(),
         IdentityDisagreementRule(),
         SessionAsIdentityRule(),
@@ -109,6 +123,8 @@ def provide_rules() -> list[Rule]:
         SecretInToolArgumentRule(),
         CrossTenantRetrievalRule(),
         HandoffAuthorityExpansionRule(),
+        CrossTenantAnswerRule(),
+        PoisonedDocumentRule(),
         *_load_catalog_rules(),
     ]
 
@@ -116,17 +132,22 @@ def provide_rules() -> list[Rule]:
 def provide_evaluators() -> list[Evaluator]:
     """Return every built-in evaluator that can be constructed with no arguments.
 
-    `LlmJudgeEvaluator` and `GuardEvaluator` are excluded here because each needs
-    a model callable to ask. The CLI builds them from a `guardana.yaml`
-    `evaluators:` block (`guardana.cli._evaluators.wire_config_evaluators`) and
-    registers them at run time. Absent that config, a rule that asks for
-    `evaluator: llm_judge` resolves to nothing and is skipped visibly — never a
-    silent pass.
+    `LlmJudgeEvaluator`, `ReferenceJudgeEvaluator` and `GuardEvaluator` are
+    excluded here because each needs a model callable to ask. The CLI builds
+    the judge and the guard from a `guardana.yaml` `evaluators:` block
+    (`guardana.cli._evaluators.wire_config_evaluators`) and registers them at run
+    time. Absent that config, a rule that asks for `evaluator: llm_judge`
+    resolves to nothing and is skipped visibly — never a silent pass.
     """
     return [
         AmplificationEvaluator(),
+        AnsweredEvaluator(),
         CanaryEvaluator(),
+        ContainsEvaluator(),
+        ExactMatchEvaluator(),
+        JsonValidEvaluator(),
         KeywordEvaluator(),
         LengthEvaluator(),
+        RegexEvaluator(),
         ToolCallEvaluator(),
     ]

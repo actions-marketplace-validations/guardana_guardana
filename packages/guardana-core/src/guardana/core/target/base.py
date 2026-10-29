@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from enum import StrEnum
+from types import MappingProxyType
 from typing import TYPE_CHECKING, ClassVar, Self
 
 from guardana.core.budget import BudgetExhausted, Budgets
@@ -41,11 +42,15 @@ class Capability(StrEnum):
     CALL_TOOLS = "call_tools"
     LIST_TOOLS = "list_tools"
     INSPECT_AUTHORIZATION = "inspect_authorization"
+    INSPECT_A2A = "inspect_a2a"
+    """The target is an A2A agent whose card and task reads can be observed."""
+    REGISTRY_ENTRY = "registry_entry"
+    """The operator supplied the registry entry an MCP server is compared with."""
     # A trace answers each of these only if its producer recorded that dimension, so
     # they are one capability per dimension rather than one for "a trace is present".
     # A single `READ_TRACE` would let the approval rule run against a trace with no
     # approval records and accuse a system whose instrumentation is merely quieter
-    # than ours. See `docs/design/trace-domain-model.md`.
+    # than ours.
     READ_TRACE = "read_trace"
     READ_MESSAGES = "read_messages"
     READ_TOOL_CALLS = "read_tool_calls"
@@ -57,6 +62,47 @@ class Capability(StrEnum):
     READ_POLICY_DECISIONS = "read_policy_decisions"
     READ_APPROVALS = "read_approvals"
     READ_SIDE_EFFECTS = "read_side_effects"
+    SEEDED_DATA = "seeded_data"
+    """The target holds a fixtures file's seeded items and one endpoint per declared tenant."""
+
+
+class WireProtocol(StrEnum):
+    """The protocol a target speaks to its callers, and the one a rule's capabilities examine.
+
+    The MCP and A2A values equal the keys of `Target.protocols()`, so a negotiated
+    version and a spoken protocol are named alike.
+    """
+
+    CHAT = "chat"
+    MCP = "mcp"
+    A2A = "a2a"
+
+
+WIRE_PROTOCOL_OF: Mapping[Capability, WireProtocol] = MappingProxyType(
+    {
+        Capability.CHAT: WireProtocol.CHAT,
+        Capability.CALL_TOOLS: WireProtocol.CHAT,
+        Capability.PLANT_SYSTEM_PROMPT: WireProtocol.CHAT,
+        Capability.LIST_TOOLS: WireProtocol.MCP,
+        Capability.INSPECT_AUTHORIZATION: WireProtocol.MCP,
+        Capability.REGISTRY_ENTRY: WireProtocol.MCP,
+        Capability.INSPECT_A2A: WireProtocol.A2A,
+    }
+)
+"""The wire protocol each protocol-bound capability belongs to.
+
+A capability left out (file reads, trace dimensions, seeded data) names no protocol, so
+a rule requiring only those is never read as being about another protocol.
+"""
+
+
+def wire_protocols_of(capabilities: Collection[Capability]) -> frozenset[WireProtocol]:
+    """Return the wire protocols `capabilities` examine; empty when none names one."""
+    return frozenset(
+        WIRE_PROTOCOL_OF[capability]
+        for capability in capabilities
+        if capability in WIRE_PROTOCOL_OF
+    )
 
 
 class LocatorError(ValueError):
@@ -99,6 +145,17 @@ class Target(ABC):
     @abstractmethod
     def ref(self) -> str:
         """Stable identifier used in findings and reports."""
+
+    def speaks(self) -> frozenset[WireProtocol] | None:
+        """Return the wire protocols this target speaks, or None when it does not say.
+
+        What a target implements is its capabilities; what it is is its protocol. A target
+        that fronts MCP tools may implement only `chat` and `call_tools`, so the protocol
+        cannot be read from the capabilities. A rule examining only protocols this target
+        does not speak is skipped as not applicable; with None, a missing capability stays
+        a coverage gap.
+        """
+        return None
 
     def protocols(self) -> dict[str, str]:
         """Protocol versions this target actually negotiated, by protocol name.
@@ -148,3 +205,14 @@ class Target(ABC):
                 f"a budget was set, but {type(self).__name__} ({self.ref}) does not enforce "
                 f"budgets — remove the ceiling, or implement apply_budgets on the target"
             )
+
+
+def examined_by_rules_only(target: Target) -> bool:
+    """Whether a run examines `target` with its rules alone, in one pass.
+
+    A target no rule can chat with and none can plant a system prompt in has no canary
+    to plant, so there are no probe passes to split it into; `verify` and `plan` both
+    ask this. Either capability alone means a planting pass may be needed.
+    """
+    declared = target.capabilities()
+    return Capability.CHAT not in declared and Capability.PLANT_SYSTEM_PROMPT not in declared

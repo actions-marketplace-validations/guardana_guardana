@@ -47,6 +47,34 @@ def test_a_relative_contract_in_a_subdirectory_keeps_its_shape(tmp_path: Path) -
     assert Path(prof.contract_paths[0]) == contracts / "checkout.yaml"
 
 
+def test_a_relative_calibration_file_is_found_from_another_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = tmp_path / "config"
+    config.mkdir()
+    profile = config / "guardana.yaml"
+    profile.write_text("name: t\ncalibrations: ['cal.json']\n", encoding="utf-8")
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+
+    prof = load_profile(profile)
+
+    assert prof.calibration_paths == (str(config / "cal.json"),)
+
+
+def test_an_absolute_calibration_file_is_left_exactly_as_written(tmp_path: Path) -> None:
+    calibration = tmp_path / "shared" / "cal.json"
+    config = tmp_path / "config"
+    config.mkdir()
+    profile = config / "guardana.yaml"
+    profile.write_text(f"name: t\ncalibrations: ['{calibration}']\n", encoding="utf-8")
+
+    prof = load_profile(profile)
+
+    assert prof.calibration_paths == (str(calibration),)
+
+
 def test_an_absolute_contract_is_left_exactly_as_written(tmp_path: Path) -> None:
     contract = tmp_path / "somewhere" / "checkout.yaml"
     contract.parent.mkdir()

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from guardana.core.plugins import PluginTrust
 from guardana.core.redaction import EvidenceMode
 
 __all__ = [
@@ -31,6 +32,15 @@ class ConfigurationRef:
     retriever_digest: str | None = None
     dataset_digest: str | None = None
     adapter_digest: str | None = None
+    provider: str | None = None
+    """The provider wire the run spoke to its target; None when it reached none or did not say."""
+
+    plugins: PluginTrust | None = None
+    """Which installed distributions the run loaded entry points from.
+
+    None when the run did not discover its plugins or the document predates the record,
+    which is unknown, never "built-ins only".
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +67,7 @@ class ExecutionSettings:
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
     max_duration_seconds: float | None = None
+    max_requests_per_minute: int | None = None
     trials: int = 1
     """How many attempts at every case the operator asked for.
 

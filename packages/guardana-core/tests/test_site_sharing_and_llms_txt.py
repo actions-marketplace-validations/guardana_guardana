@@ -11,11 +11,14 @@ produces. `test_docs_consistency.py` runs the generator's own `--check`; this co
 the half that lives in HTML.
 """
 
+import json
 import re
 import struct
 from pathlib import Path
 
 import pytest
+from guardana.core import __version__
+from guardana.core.manifest.serialize import SCHEMA_URL
 
 _OG_IMAGE_WIDTH = 1200
 _OG_IMAGE_HEIGHT = 630
@@ -123,3 +126,52 @@ def test_nothing_the_site_publishes_is_excluded_from_the_deploy() -> None:
     assert {"llms.txt", "og.png"}.isdisjoint(ignored), (
         f"site/.assetsignore excludes something the page links to: {sorted(ignored)}"
     )
+
+
+def _served_file(path: str) -> Path:
+    """Map a URL path to the file behind it: itself, or the page the host serves without `.html`."""
+    site = _repo() / "site"
+    if not path or path.endswith("/"):
+        return site / f"{path}index.html"
+    return site / path if (site / path).is_file() else site / f"{path}.html"
+
+
+def test_every_guardana_dev_url_in_llms_txt_is_a_file_the_site_serves() -> None:
+    llms = (_repo() / "site" / "llms.txt").read_text(encoding="utf-8")
+    urls = re.findall(r"\((https://guardana\.dev/[^)]+)\)", llms)
+    missing = [url for url in urls if not _served_file(url.split("/", 3)[3]).is_file()]
+
+    assert urls, "llms.txt names no guardana.dev URL — its schema list is gone"
+    assert not missing, f"llms.txt points at files site/ does not serve: {missing}"
+
+
+def test_llms_txt_lists_the_schema_a_saved_run_is_written_to() -> None:
+    assert f"({SCHEMA_URL})" in (_repo() / "site" / "llms.txt").read_text(encoding="utf-8")
+
+
+def _structured_data() -> dict[str, dict[str, object]]:
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', _page(), re.DOTALL)
+    return {str(block.get("name", block["@type"])): block for block in map(json.loads, blocks)}
+
+
+def test_the_structured_data_states_the_version_that_ships() -> None:
+    assert _structured_data()["Guardana"]["softwareVersion"] == __version__
+
+
+def test_guardana_control_is_described_where_it_answers() -> None:
+    """Control's structured data points at its own site and names its latest release."""
+    control = _structured_data()["Guardana Control"]
+
+    assert control["url"] == "https://control.guardana.dev/"
+    assert control["codeRepository"] == "https://github.com/guardana/control"
+    assert re.fullmatch(r"\d+\.\d+\.\d+(?:-[a-z]+)?", str(control["softwareVersion"]))
+
+
+def test_the_landing_page_links_control_where_it_answers() -> None:
+    assert 'href="https://control.guardana.dev/"' in _page()
+    assert "website is coming soon" not in _page()
+
+
+def test_llms_txt_names_no_control_resource_that_does_not_answer() -> None:
+    """Control publishes no llms.txt yet; the related-project entry stays on its README."""
+    assert "control.guardana.dev" not in (_repo() / "site" / "llms.txt").read_text(encoding="utf-8")

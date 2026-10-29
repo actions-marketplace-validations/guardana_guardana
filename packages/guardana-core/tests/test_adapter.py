@@ -3,21 +3,21 @@ from collections.abc import Mapping
 
 import pytest
 from guardana.core.target import AdapterConfig, ChatMessage, EndpointError, HttpAdapterTransport
-from guardana.core.target.adapter import extract_path
+from guardana.core.target.adapter import FetchedReply, extract_path
 
 
-def _stub_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
-    return {}
+def _stub_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
+    return FetchedReply(200, b"{}")
 
 
 def test_transport_fills_prompt_and_extracts_wrapped_reply() -> None:
     captured: dict[str, object] = {}
 
-    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
         captured["url"] = url
         captured["data"] = data
         captured["headers"] = dict(headers)
-        return {"data": {"reply": "the model said hi"}}
+        return FetchedReply(200, b'{"data": {"reply": "the model said hi"}}')
 
     config = AdapterConfig(
         url="https://api.example.com/v1/wellness/chat",
@@ -31,7 +31,7 @@ def test_transport_fills_prompt_and_extracts_wrapped_reply() -> None:
     )
     assert reply == "the model said hi"
     assert b"hello there" in captured["data"]  # type: ignore[operator]
-    assert captured["headers"] == {"X-Api-Key": "secret123"}
+    assert captured["headers"] == {"X-Api-Key": "secret123", "Content-Type": "application/json"}
     assert captured["url"] == "https://api.example.com/v1/wellness/chat"
 
 
@@ -64,9 +64,9 @@ def test_extract_path_indexes_into_lists() -> None:
 def test_system_prompt_folded_into_prompt_when_no_slot() -> None:
     captured: dict[str, bytes] = {}
 
-    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
         captured["data"] = data
-        return {"reply": "ok"}
+        return FetchedReply(200, b'{"reply": "ok"}')
 
     config = AdapterConfig(url="https://x", body={"message": "{{prompt}}"}, response_path="reply")
     transport = HttpAdapterTransport(config, fetch=fake_fetch)
@@ -84,9 +84,9 @@ def test_multi_turn_conversation_is_folded_not_dropped() -> None:
     # F-G: a replay scenario's escalation must not collapse to the last turn.
     captured: dict[str, bytes] = {}
 
-    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
         captured["data"] = data
-        return {"reply": "ok"}
+        return FetchedReply(200, b'{"reply": "ok"}')
 
     config = AdapterConfig(url="https://x", body={"message": "{{prompt}}"}, response_path="reply")
     transport = HttpAdapterTransport(config, fetch=fake_fetch)
@@ -109,9 +109,9 @@ def test_multi_turn_conversation_is_folded_not_dropped() -> None:
 def test_messages_slot_receives_full_transcript() -> None:
     captured: dict[str, bytes] = {}
 
-    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
         captured["data"] = data
-        return {"reply": "ok"}
+        return FetchedReply(200, b'{"reply": "ok"}')
 
     config = AdapterConfig(
         url="https://x", body={"messages": "{{messages}}"}, response_path="reply"
@@ -145,9 +145,9 @@ def test_messages_only_body_is_accepted() -> None:
 def test_system_slot_used_when_present() -> None:
     captured: dict[str, bytes] = {}
 
-    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> object:
+    def fake_fetch(url: str, data: bytes, headers: Mapping[str, str]) -> FetchedReply:
         captured["data"] = data
-        return {"reply": "ok"}
+        return FetchedReply(200, b'{"reply": "ok"}')
 
     config = AdapterConfig(
         url="https://x",
@@ -162,3 +162,34 @@ def test_system_slot_used_when_present() -> None:
         None,
     )
     assert b"SYS" in captured["data"]
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        "apikey",
+        "x-apikey",
+        "X-ApiKey",
+        "api_key",
+        "X-API_KEY",
+        "access_token",
+        "Client_Secret",
+        "X-Api-Key",
+        "Authorization",
+    ],
+)
+def test_a_header_named_for_a_credential_is_withheld_however_it_is_spelled(header: str) -> None:
+    config = AdapterConfig(
+        url="https://x", body={"m": "{{prompt}}"}, response_path="r", headers={header: "k-1234"}
+    )
+
+    assert HttpAdapterTransport(config, fetch=_stub_fetch).sent_secrets() == ("k-1234",)
+
+
+@pytest.mark.parametrize("header", ["Content-Type", "Accept", "X-Request-Id"])
+def test_an_ordinary_header_is_not_withheld(header: str) -> None:
+    config = AdapterConfig(
+        url="https://x", body={"m": "{{prompt}}"}, response_path="r", headers={header: "text"}
+    )
+
+    assert HttpAdapterTransport(config, fetch=_stub_fetch).sent_secrets() == ()

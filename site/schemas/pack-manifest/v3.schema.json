@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/pack-manifest/v3.schema.json",
+  "title": "Guardana Pack Manifest v3",
+  "description": "guardana-pack.yaml: what an extension package provides and which contracts it was written against, shipped inside the package directory and checked by `guardana pack validate`. Version 3 adds `provides.renderers`, `provides.reporters` and `output_api`, which is required exactly when an output is provided; this build reads versions 1 and 2 too.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "extension_api",
+    "provides"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "name": {
+      "$ref": "#/$defs/text"
+    },
+    "description": {
+      "type": "string"
+    },
+    "extension_api": {
+      "$ref": "#/$defs/api_range",
+      "description": "The rule, evaluator and target contract versions the pack works with."
+    },
+    "output_api": {
+      "$ref": "#/$defs/api_range",
+      "description": "The renderer and reporter contract versions the pack's outputs work with."
+    },
+    "provides": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "rules": {
+          "$ref": "#/$defs/ids"
+        },
+        "evaluators": {
+          "$ref": "#/$defs/ids"
+        },
+        "targets": {
+          "$ref": "#/$defs/ids"
+        },
+        "taxonomies": {
+          "$ref": "#/$defs/ids",
+          "description": "Control catalogues the pack registers, by framework name."
+        },
+        "renderers": {
+          "$ref": "#/$defs/renderer_names",
+          "description": "Installed formats the pack provides, by entry-point name in guardana.renderers."
+        },
+        "reporters": {
+          "$ref": "#/$defs/reporter_names",
+          "description": "Installed reporters the pack provides, by entry-point name in guardana.reporters."
+        }
+      }
+    }
+  },
+  "if": {
+    "properties": {
+      "provides": {
+        "anyOf": [
+          {
+            "required": [
+              "renderers"
+            ],
+            "properties": {
+              "renderers": {
+                "minItems": 1
+              }
+            }
+          },
+          {
+            "required": [
+              "reporters"
+            ],
+            "properties": {
+              "reporters": {
+                "minItems": 1
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "output_api"
+    ]
+  },
+  "else": {
+    "not": {
+      "required": [
+        "output_api"
+      ]
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "api_range": {
+      "type": "string",
+      "pattern": "^>=\\s*\\d+\\s*,\\s*<\\s*\\d+$"
+    },
+    "ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "output_name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 40,
+      "not": {
+        "pattern": "^guardana"
+      }
+    },
+    "renderer_names": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/output_name"
+          }
+        ],
+        "not": {
+          "enum": [
+            "human",
+            "json",
+            "sarif",
+            "junit"
+          ]
+        }
+      }
+    },
+    "reporter_names": {
+      "type": "array",
+      "items": {
+        "allOf": [
+          {
+            "$ref": "#/$defs/output_name"
+          }
+        ],
+        "not": {
+          "enum": [
+            "server",
+            "http",
+            "https"
+          ]
+        }
+      }
+    }
+  }
+}

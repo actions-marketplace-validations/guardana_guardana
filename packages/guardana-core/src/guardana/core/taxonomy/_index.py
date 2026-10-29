@@ -50,7 +50,7 @@ class ReferenceIndex:
         self._by_local_id.setdefault(ref.id, []).append(ref)
 
     def forget(self, reference: str) -> None:
-        """Drop one reference again. For a test that registered a fake framework."""
+        """Drop one reference again, so a provider that failed part-way leaves none behind."""
         ref = self._by_reference.pop(reference, None)
         if ref is None:
             return

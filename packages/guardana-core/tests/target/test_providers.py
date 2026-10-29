@@ -35,7 +35,7 @@ def _patch(
             seen["body"] = json.loads(request.data)
         return _Canned(body)
 
-    monkeypatch.setattr("guardana.core.target.endpoint.urlopen", fake_urlopen)
+    monkeypatch.setattr("guardana.core.target.endpoint.open_unredirected", fake_urlopen)
 
 
 def test_ollama_posts_to_api_chat_and_parses_message_content(

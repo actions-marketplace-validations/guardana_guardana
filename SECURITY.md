@@ -21,9 +21,17 @@ Either way, include:
   (`guardana-core`, `guardana-rules`, `guardana-cli`, `guardana-report`,
   `guardana-server`).
 
-We aim to acknowledge reports promptly and to coordinate a disclosure
-timeline with the reporter once a fix is available. Please give us
-reasonable time to ship a fix before any public disclosure.
+We will send a first response to every vulnerability report within 14 days
+of receiving it. Once a fix is available, we will coordinate a disclosure
+timeline with the reporter. Please allow us reasonable time to ship a fix
+before public disclosure.
+
+The default disclosure window is 90 days: the advisory is published when the fix ships, and at the latest 90 days after the report, unless the reporter agrees otherwise.
+
+- An emailed report is moved into a draft GitHub advisory. The fix is prepared on the advisory's private fork; nothing about it appears in a public branch, issue or PR before the release.
+- The advisory is published once all five distributions are on PyPI. It lists the affected distributions, affected versions (`<= X.Y.Z`) and patched version.
+- A CVE is requested when the severity warrants one. The reporter is credited if they want to be.
+- `CHANGELOG.md` gets a `### Security` entry linking the advisory.
 
 ## Scope
 
@@ -34,79 +42,42 @@ report those to the package's own maintainers (see the trust model below).
 
 ## The plugin trust model
 
-Guardana's extensibility is entry-point based: **any installed package that
-registers under the `guardana.rules`, `guardana.evaluators`,
-`guardana.targets`, or `guardana.taxonomies` entry-point groups is discovered
-and its code is executed** when the registry runs `Registry.discover()` (used
-by `guardana scan`, `probe`, and `monitor` by default). This is intentional —
-it's what lets a company or contributor ship a private rule package that
-plugs in exactly like a built-in — but it means:
+Guardana supports plugins through entry points. An installed package can register under `guardana.rules`, `guardana.evaluators`, `guardana.targets` or `guardana.taxonomies`, and add an output under `guardana.renderers` or `guardana.reporters`. Once Guardana loads it, it works like a built-in and its code runs. This lets a company ship a private rule package. It also means:
 
-- **A third-party rule, evaluator, or target package runs arbitrary Python
-  in your process.** Installing an untrusted package and letting Guardana
-  discover it is equivalent to running that package's code directly. Treat
-  `pip install`/`uv add` of a Guardana plugin with the same scrutiny you'd
-  give any other dependency with import-time side effects.
-- Guardana's own built-in rules (`guardana-rules`) are reviewed as part of
-  this repository and held to the same code-quality and test bar as the
-  engine. A third-party plugin is not — it's outside this project's
-  supply chain the moment it's a separate package.
+- **A third-party rule, evaluator, target or output package runs arbitrary Python in your process once it is admitted.** Review `pip install`/`uv add` of a Guardana plugin as you would any dependency that can run code when imported.
+- Guardana's built-in rules (`guardana-rules`) are reviewed in this repository and meet the same code quality and test standards as the engine. A third-party plugin is a separate package outside this project's supply chain.
 
-### `--plugins`: the trust modes
+### Every command starts with built-in trust
 
-For untrusted or locked-down environments, choose how much installed code a
-run is willing to import:
+Every CLI command loads Guardana's own distributions (`guardana-core`, `guardana-rules`, `guardana-report`). It refuses other installed entry points before importing them unless you admit them. Guardana records each refusal as an error. While any installed pack is refused, every run whose gate fails on errors (the default) is `indeterminate`, whether or not it would have used the pack: `scan` and `probe` exit `2`, and `monitor` raises a gate-failed alert every cycle. The command prints the refused distributions and how to admit them on stderr. Admit the pack, or uninstall it. `guardana doctor` lists every third-party Guardana entry point, the module it would import, and whether the current trust setting would load it. It does this without importing the entry point.
+
+An installed format or reporter is different: no run imports it unless `--format` or `--reporter` names it, so an unselected one is never refused and never an error. When a command names a refused one, the command exits `3` before it sends anything ([installed outputs](docs/outputs.md)).
 
 ```bash
-guardana scan .                              # all: every installed entry point
-guardana scan . --plugins builtins           # only Guardana's own distributions
+guardana scan .                              # builtins: Guardana's own distributions only
 guardana scan . --plugins allowlist --allow-plugin acme-rules
+guardana scan . --plugins all                # every installed entry point
 guardana scan . --plugins disabled           # nothing; YAML rules still load from disk
 ```
 
-`Registry.discover()` runs in every mode, including `disabled` — there is no
-"empty registry" shortcut. What changes is whether a `PluginTrust` policy lets
-a given entry point load: a refused one is never imported, and its refusal is
-recorded in `registry.load_errors` rather than dropped. Combine any mode with
-YAML rule directories you've reviewed yourself if you need checks beyond the
-engine's core behavior: YAML rules are parsed data (via `yaml.safe_load`), not
-executed code, so they don't carry the same risk as a `guardana.rules`
-entry-point package.
+A profile sets trust for every command given that profile with `--profile` (`plugins: {mode: allowlist, allow: [acme-rules]}`, see [profiles](docs/profiles.md#plugin-trust-plugins)). A flag takes precedence over the profile. A pipeline that checks untrusted contributions should pass `--plugins builtins` as a flag. A `guardana.yaml` changed in the same pull request can widen a profile, but it cannot change that flag. `doctor` warns when a profile widens trust beyond the built-ins.
 
-A restricted run says what it declined, not just what it ran. `scan`,
-`probe`, `monitor`, `analyze-trace`, and `baseline create`/`update` fold
-`registry.load_errors` into the run's own `errors` channel, so a refused
-rule pack shows up in the report you already read and fails the gate by
-default (see "Plugin trust (0.7)" below). `plan scan`, `plan probe`,
-`rule test`, `rules`, `taxonomy`, `calibrate`, `target inspect`,
-`trace inspect`, `pack validate`, and `pack lock` produce no run report for a
-refusal to travel in, so each prints it directly on stderr — `warning: could
-not load rule — …`, with the evaluator, extension, and taxonomy-provider
-equivalents reading `could not load evaluator` / `could not load an
-extension` / `could not load a taxonomy provider`. Either way, restricting
-trust is something you can verify, not something you have to hope worked.
+Guardana decides trust by **distribution name**: the name pip installed and a lockfile pins. It does not use the entry-point name or module path. It compares names the way pip does (`Acme_Rules` is `acme-rules`). A third party can name an entry point `builtin` and a module `guardana_rules`; neither name means anyone checked it. Guardana treats an entry point with no recorded origin as third-party. Otherwise, an entry point could bypass the allowlist by omitting its origin.
 
-A restrictive mode does not only print, either. `rules` and `taxonomy
-<reference>` exit `2` (indeterminate) rather than `0` when a restrictive
-`--plugins` mode is what emptied the answer — an empty rule listing, or a
-reference no *loaded* catalogue defines, is not a clean result, and each
-says so before exiting rather than reading as "nothing installed" or "no
-such entry". `pack validate` and `pack lock` go further and refuse outright
-the moment plugin trust refused anything at all, because both check or pin
-this build's *own* registrations: a registry that dropped extensions cannot
-tell you a pack "does not register" something it was simply never allowed to
-load, and a lock built from it cannot call a refused rule "gone" without
-lying about why. Script against the exit code when you restrict trust in
-CI, not just the presence of a warning on stderr.
+Trust controls which **Guardana entry points** Guardana imports. It does not control a package's dependencies or `.pth` startup hooks; those run when Python starts, before Guardana makes a trust decision. An admitted pack runs with your privileges. A Python caller states trust the same way: `Registry.discover(trust)` and `Verifier(trust=...)` take a `PluginTrust` and have no default.
 
-`--no-plugins` remains as a deprecated alias for `--plugins disabled` on
-`scan` and `plan scan` only.
+`Registry.discover(trust)` runs in every mode, including `disabled`. There is no "empty registry" shortcut. Guardana never imports a refused entry point. It records the refusal in `registry.load_errors` and `registry.refused`. If you need checks beyond the engine's core behavior, you can combine any mode with YAML rule directories you have reviewed. YAML rules are parsed as data (via `yaml.safe_load`), not executed as code, so they do not carry the same risk as a `guardana.rules` entry-point package.
 
-Use `--plugins builtins` whenever you're running Guardana against a codebase
-or in a pipeline where you haven't audited every installed plugin package,
-e.g. shared CI runners, third-party contribution checks, or any environment
-where "whatever happens to be pip-installed" isn't a trust boundary you
-control: the reviewed built-in rules still run, nothing else is imported.
+A restricted run reports what it refused as well as what it ran. `scan`, `probe`, `monitor`, `analyze-trace`, and `baseline create`/`update` put `registry.load_errors` in the run's `errors` channel. A refused rule pack therefore appears in the run report and fails the gate by default. `plan scan`, `plan probe`, `rule test`, `rules`, `taxonomy`, `calibrate`, `target inspect`, `trace inspect`, `pack validate`, and `pack lock` have no run report for a refusal, so they print it on stderr. You can verify what a trust restriction refused.
+
+A restrictive mode affects exit codes too. `rules` and `taxonomy
+<reference>` exit `2` (indeterminate) rather than `0` when a restrictive `--plugins` mode leaves an empty rule list or a reference that no *loaded* catalogue defines. Neither is a clean result. `pack validate` and `pack lock` refuse before reading any manifest if plugin trust refused anything, an installed format or reporter included, or if two distributions install one output name. Reading a manifest imports its package, and both commands check or pin this build's *own* registrations. A registry that omitted extensions cannot determine that a pack "does not register" something it was not allowed to load. In CI, check the exit code when you restrict trust; do not rely only on a warning on stderr.
+
+`--no-plugins` remains as a deprecated alias for `--plugins disabled` on `scan` and `plan scan` only.
+
+### What trust and a lock do not do
+
+Trust is per distribution: admitting one for its output also admits every rule, evaluator and target it ships. Pack manifests and locks are not signed. A pack lock detects a changed rule declaration or version, but does not authenticate the publisher or pin the Python behind an evaluator, target or output. Code installed editable or from a direct URL can change under one version; only a recipe lock pins it by file digests. To pin installed code, use hash-checked installs (`pip --require-hashes`, `uv.lock`).
 
 ## Running the collector (`guardana-server`)
 
@@ -128,7 +99,10 @@ and signs in with a **read-scoped API key**, kept in an `HttpOnly`,
 `SameSite=Strict` cookie the page cannot read. `key revoke` ends the session.
 **The cookie authenticates reads and nothing else**: ingest accepts a bearer
 header only, so a page on another origin cannot make a signed-in browser submit
-findings — enforced in the guard rather than left to one browser flag.
+findings — enforced in the guard rather than left to one browser flag. The page
+is served with a Content-Security-Policy that runs only its own script and
+stylesheet, by hash, and it escapes every submitted value it renders
+([threat model](docs/threat-model.md), T7).
 
 Two limits bound what one caller can do: a request-body ceiling
 (`GUARDANA_MAX_BODY_BYTES`, 8 MiB, `413` over it) and a per-caller rate limit
@@ -148,7 +122,22 @@ CI runs the bandit rule set over our own source (`ruff`'s `S` family), audits
 our dependencies (`uv audit`), and runs `guardana scan packages` — Guardana
 against Guardana, which must stay at zero findings. The pre-commit gate refuses
 a commit that contains a private key (`detect-private-key`) before it ever
-leaves a contributor's machine.
+leaves a contributor's machine. `.github/workflows/fuzz.yml` runs the Atheris
+targets for `120` seconds each. `.github/workflows/scorecard.yml` publishes
+OpenSSF Scorecard results to the OpenSSF API and GitHub code scanning, and
+retains the SARIF workflow artifact for `30` days.
+
+## What one maintainer cannot guarantee
+
+One maintainer cannot provide independent review or release continuity.
+
+- The sole write collaborator is the sole `guardana` organization and `@guardana/maintainers` member, owning every path.
+- `main` requires pull requests, passing required checks on an up-to-date branch, resolved conversations and linear history; administrators follow these rules, and force pushes are refused. Required approving reviews: `0`.
+- The tag-pushing maintainer is the only `pypi` publish reviewer, holds the SSH tag-signing key and publishing approval, and approves every publish. Nobody else holds keys or can take over releases during unavailability.
+- DCO sign-off is optional and unenforced (`CONTRIBUTING.md` § Sign-off).
+- Scorecard's `Code-Review`, `Branch-Protection` and `Contributors` scores reflect these limits and are expected to remain below maximum with one maintainer.
+
+Required checks on every `main` change, signed and GitHub-verified release tags from `v1.0.0rc3` (`v1.0.0rc2`, earlier tags and the moving Action pin `vX.Y` remain unsigned), trusted publishing without a long-lived token, build provenance, SBOMs and reproducible builds anyone can re-run still hold.
 
 ## What a release publishes, and how to check it yourself
 
@@ -160,15 +149,35 @@ Every release publishes, alongside the five distributions:
   operator they had installed Typer;
 - **build provenance** for the distributions, signed keylessly through Sigstore,
   plus PyPI's own PEP 740 attestation from the trusted-publishing upload;
+- **build-provenance bundles**, attached to the GitHub Release as
+  `guardana-<version>.sigstore.json` for the five packages' wheels and sdists, and
+  `guardana-reference-pack-<pack version>.sigstore.json` for the reference pack's
+  wheel and sdist. The pack uses its own version, independent of the release tag.
+  The first release after `1.0.0rc5` carries these bundles; `1.0.0rc5` and earlier
+  have none;
 - **an SBOM and provenance attestation for each container image**, pushed into
-  the registry beside it.
+  the registry beside it, and from 0.33.0 a provenance statement per image digest
+  signed keylessly through Sigstore, which is what `gh attestation verify oci://…`
+  checks. Images before 0.33.0 carry the unsigned attestations only.
 
 Check them without trusting this document:
 
 ```bash
 gh attestation verify ./guardana_cli-<version>-py3-none-any.whl --repo guardana/guardana
-gh attestation verify oci://ghcr.io/guardana/guardana:0.27 --repo guardana/guardana
-docker buildx imagetools inspect ghcr.io/guardana/guardana:0.27 --format '{{ json .SBOM }}'
+gh attestation verify oci://ghcr.io/guardana/guardana:1.0 --repo guardana/guardana
+docker buildx imagetools inspect ghcr.io/guardana/guardana:1.0 --format '{{ json .SBOM }}'
+```
+
+For a downloaded file, use `--bundle` to check it against the build-provenance bundle attached to the GitHub Release:
+
+```bash
+gh attestation verify ./guardana_cli-<version>-py3-none-any.whl --bundle guardana-<version>.sigstore.json --repo guardana/guardana
+```
+
+Release tags from `v1.0.0rc3` are signed with an SSH key registered to the maintainer's GitHub account and reported verified by GitHub; tags `v1.0.0rc2` and earlier are not signed. The following command reads GitHub's verdict on a tag's signature and prints `true` for a verified signature.
+
+```bash
+gh api "repos/guardana/guardana/git/tags/$(gh api repos/guardana/guardana/git/ref/tags/v<version> --jq .object.sha)" --jq .verification.verified
 ```
 
 The SBOMs are generated by `uv export` from the same `uv.lock` the tests and the
@@ -177,37 +186,23 @@ what was built — and `scripts/generate_sbom.py` reads each file back and check
 against that package's own metadata before the release keeps it. CI generates and
 verifies them on every push, so a tag is never the first time they are produced.
 
+To check that PyPI's files match the release tag's build, rebuild them
+and compare byte for byte as described in [Reproducible builds](docs/reproducible-builds.md).
+The release controls are described in [the threat model](docs/threat-model.md#t10--a-compromised-guardana-release).
+
+## If a release is withdrawn
+
+- All five PyPI distributions are yanked, not deleted. An exact pin still installs the yanked release; a version range no longer picks it.
+- The ghcr image versions of both images are deleted, breaking digest pins to them. The moving `X.Y` image tag points back to the last good release.
+- The moving `vX.Y` Action tag moves back. `vX.Y.Z` never moves.
+- The GitHub Release is marked pre-release with the reason. A security advisory is published when the cause was a vulnerability or an artifact the project did not build.
+
 ## Supported versions
 
-Guardana is pre-1.0 (0.27.x). Security fixes land on the latest released
-version; there is no separate LTS branch yet.
-
-## Plugin trust (0.7)
-
-Installed plugins are code Guardana imports, and importing code is trusting it.
-Until 0.7 the only control was `--no-plugins`, which refused *everything* —
-Guardana's own rules included. A safe mode that costs all your coverage is one
-people switch off, and a control people switch off is not a control.
-
-```bash
-guardana scan .                              # all: every installed entry point
-guardana scan . --plugins builtins           # only Guardana's own distributions
-guardana scan . --plugins allowlist --allow-plugin acme-rules
-guardana scan . --plugins disabled           # nothing; YAML rules still load from disk
-```
-
-`builtins` is the setting most `--no-plugins` pipelines actually wanted: the
-reviewed rules run, nothing else is imported.
-
-Trust is decided by **distribution name** — what pip installed and what a lockfile
-pins — not by entry-point name or module path. A third party can name their entry
-point `builtin` and their module `guardana_rules`; neither is a claim anybody
-checked. An entry point that cannot name its origin is treated as third-party,
-because reading an unnamed origin as trusted would make the allowlist bypassable
-by anything that fails to record where it came from.
-
-A plugin that is refused is **recorded** in the run's `errors` channel, not
-silently dropped: a rule pack you installed and this run declined to load is
-coverage you think you have, and `errors` fails the gate by default.
-
-`--no-plugins` still works and still means "import nothing".
+Guardana supports major 1 (1.0.x). Security fixes land on the latest release;
+there is no LTS branch. Neither 0.41.x nor the 1.0.0 release candidates receive
+further releases. A plain install selects the latest stable release;
+`pip install --upgrade --pre` is needed only for a release candidate. Which
+versions stay compatible, how long a Python version is supported and how a name
+is deprecated before it is removed is stated in the
+[compatibility policy](docs/compatibility.md).

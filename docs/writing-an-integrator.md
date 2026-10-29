@@ -80,6 +80,12 @@ with open_trace(
     ...
 ```
 
+The versioned contract is the trace file format, schema 3
+([`schemas/trace-v3.schema.json`](../schemas/trace-v3.schema.json)). The Python writer in
+`guardana.core.trace` (`open_trace`, `resume_trace`, `TraceWriter` and the types beside them)
+is outside the [supported surface](compatibility.md#the-supported-surface). An integrator that
+imports it pins the exact `guardana-core` version it was tested with.
+
 `instrumented` is a **promise**, and it works in both directions.
 
 Leave a dimension out and its rules do not run — the safe direction, and how you start:
@@ -89,8 +95,7 @@ that supply them exist.
 Overstate it and you get a check that runs on nothing. This is not theoretical, and it
 is not symmetric between dimensions: declaring `approval` and never writing one makes
 the rules **decline**, while declaring `effects` and never writing one produces
-`✓ No findings.` and exit `0` over an execution that moved money. The measurement is in
-[`docs/design/trace-producer.md`](design/trace-producer.md). It is also why the writer
+`✓ No findings.` and exit `0` over an execution that moved money. It is also why the writer
 refuses to record a tool call the producer marked `mutates: true` without an effect
 beside it — the file that grades falsely clean is one you cannot write.
 
@@ -151,6 +156,20 @@ than as read-only.
 Write the span when the call **finishes**, not when it starts. A span records what
 happened; a span written at the start would record an intention, and an effect that
 never landed is not a consequence.
+
+## If your producer may record nothing
+
+`create_trace` takes the same keywords as `open_trace` for a producer that might never
+write a span, such as a test double that a run may not reach. It creates the file
+exclusively, refusing one that already exists, and holds the header back until the first
+span, writing the two in one write. The file is then either empty, which every reader
+refuses, or holds a span: never a header alone that declares dimensions over nothing.
+`finish()` before any span leaves it empty.
+
+A tool that reaches no sink at all goes in `SinkMap(..., read_only=frozenset({"lookup"}))`,
+and its calls record no effect. A read you did not name still falls through to `default`,
+because nobody saying is not the same as nothing happening; a call to a read-only tool that
+says it changed something is refused.
 
 ## If your agent's hooks are commands, not callbacks
 
@@ -241,12 +260,12 @@ first-class producer with no Python anywhere. If the writer's refusals are usefu
 you, take them; if you write your own emitter, take the four rules in
 [the format reference](usage-analyze-trace.md#the-native-format) instead.
 
-**Not somebody else's problem to keep working.** Two worked examples live in
-[`examples/`](../examples/), each pinned to the upstream version it was written against
-and each in one of the two shapes above:
-[`hermes_integrator/`](../examples/hermes_integrator/) is a plugin holding the file for
-a whole session, and [`shell_hook_integrator/`](../examples/shell_hook_integrator/) is a
-command the agent spawns per event. They are examples rather than integrations this
-project carries — a later release of that framework may break either — and neither
-imports the agent it integrates with, which is what lets their tests run in CI without a
-green build here depending on somebody else's release.
+**Not somebody else's problem to keep working.** Two worked examples are in
+[`examples/`](../examples/). Each is written against a named upstream version stated in its
+README, and each uses one of the two forms above.
+[`hermes_integrator/`](../examples/hermes_integrator/) is a plugin that holds the file for a
+whole session. [`shell_hook_integrator/`](../examples/shell_hook_integrator/) is a command the
+agent spawns per event. They are examples rather than integrations maintained by this
+project; neither is guaranteed to work with later releases of its framework. Neither imports
+the agent it integrates with, so their tests run in CI without a passing build here depending
+on somebody else's release.

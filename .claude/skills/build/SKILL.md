@@ -1,11 +1,11 @@
 ---
 name: build
-description: Execute the lanes of a work file in docs/work/ — yourself or through parallel coder subagents — keeping the suite green lane by lane and the Handoff section current. Use after /plan for M and L tasks, or to resume a half-built work file.
+description: Execute the lanes of a work file in .work/ — yourself or through parallel coder subagents — keeping the suite green lane by lane and the Handoff section current. Use after /plan for M and L tasks, or to resume a half-built work file.
 argument-hint: "[path to work file]"
 ---
 # Build — run the lanes
 
-Work file: $ARGUMENTS (default: the only file in `docs/work/`, else ask which).
+Work file: $ARGUMENTS (default: the only file in `.work/`, else ask which).
 
 1. **Read the work file once.** It is the brief; do not restate it to yourself. Tick lanes in the
    file as they land — the file is the ledger, there is no second one.
@@ -27,7 +27,7 @@ Work file: $ARGUMENTS (default: the only file in `docs/work/`, else ask which).
 5. **Integrate.** After the last lane: regenerate what a rule or evaluator change moved
    (`uv run python scripts/generate_docs.py`), then the full gate (`/gate`). Red for a reason that
    is not yours: say so in the work file and in the commit message — never push past it silently.
-6. **Wording lanes** go to `text-broker`; its output enters a page or a rule only through the
+6. **Wording lanes** are reviewed as text; their output enters a page or a rule only through the
    normal gates (the docs tests, `build_site.py --check`, the rule's fixtures).
 7. **Stop conditions.** A lane that fails twice for the same reason is a design problem: go back
    to the work file, change the plan, note why. Do not let a subagent widen its lane to make a

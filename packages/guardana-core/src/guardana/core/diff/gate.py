@@ -9,7 +9,9 @@ quietly switch them off.
 from guardana.core.diff.model import ChangeKind, RunDiff
 from guardana.core.profile.model import Policy
 
-_NO_EVIDENCE_TO_WEIGH = frozenset({ChangeKind.BLINDED, ChangeKind.COVERAGE_LOST})
+_NO_EVIDENCE_TO_WEIGH = frozenset(
+    {ChangeKind.BLINDED, ChangeKind.COVERAGE_LOST, ChangeKind.LEFT_SCAN}
+)
 """Regressions that report an absence of knowledge rather than a graded verdict.
 
 An unverified result carries confidence 0.0 by definition — that is what

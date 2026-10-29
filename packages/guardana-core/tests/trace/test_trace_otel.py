@@ -149,6 +149,35 @@ def test_a_span_with_no_id_is_reported_unreadable_rather_than_dropped(tmp_path: 
     assert "span id" in read.unreadable[0].reason
 
 
+def test_a_native_shaped_record_in_an_otel_file_is_unreadable_not_emptied(
+    tmp_path: Path,
+) -> None:
+    """Its `messages` are content the OTel reader cannot place, so dropping them hides a turn."""
+    first = {
+        "spanId": "s1",
+        "attributes": {"gen_ai.input.messages": [{"role": "user", "parts": ["safe"]}]},
+    }
+    native = {"span_id": "s2", "messages": [{"role": "user", "parts": ["attack"]}]}
+    read = read_trace(_write(tmp_path, first, native))
+    assert read.trace.provenance.dialect == str(Dialect.OTEL)
+    assert [s.span_id for s in read.trace.spans] == ["s1"]
+    assert read.trace.unreadable == 1
+    assert [u.line for u in read.unreadable] == [2]
+    assert "messages" in read.unreadable[0].reason
+
+
+def test_an_otel_span_with_only_otel_fields_reads_with_nothing_unreadable(tmp_path: Path) -> None:
+    record = {
+        "spanId": "s1",
+        "name": "chat",
+        "kind": "SPAN_KIND_CLIENT",
+        "attributes": {"gen_ai.input.messages": [{"role": "user", "parts": ["safe"]}]},
+    }
+    read = read_trace(_write(tmp_path, record))
+    assert read.trace.unreadable == 0
+    assert len(read.trace.spans[0].messages) == 1
+
+
 def test_tool_definitions_become_offers_and_memory_operations_become_memory(
     tmp_path: Path,
 ) -> None:

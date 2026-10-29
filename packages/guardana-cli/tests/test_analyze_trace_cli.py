@@ -13,9 +13,12 @@ clean, which is what a mistyped path in a pipeline looks like — and that is th
 shape of false green this project has.
 """
 
+import errno
+import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from guardana.cli.exit_codes import ExitCode
 from guardana.cli.main import app
 from guardana.core.manifest import SourceKind
@@ -191,6 +194,71 @@ def test_write_trace_converts_an_export_into_the_dialect_that_can_declare_dimens
     assert "does not record" in _run(str(destination)).output
 
 
+@pytest.mark.parametrize("unwritable", ["read-only directory", "directory", "read-only file"])
+def test_write_trace_that_cannot_be_written_is_a_usage_error_that_changes_nothing(
+    tmp_path: Path, unwritable: str
+) -> None:
+    source = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+    locked = tmp_path / "locked"
+    locked.mkdir()
+    destination = locked if unwritable == "directory" else locked / "native.jsonl"
+    if unwritable == "read-only file":
+        destination.write_text("an earlier trace\n", encoding="utf-8")
+        destination.chmod(0o444)
+    else:
+        locked.chmod(0o500)
+    before = {path.name: path.read_bytes() for path in locked.iterdir()}
+    try:
+        result = _run(str(source), "--write-trace", str(destination))
+    finally:
+        locked.chmod(0o700)
+        if destination.is_file():
+            destination.chmod(0o644)
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert f"error: could not write the native trace to {destination}: " in " ".join(
+        result.output.split()
+    )
+    assert not isinstance(result.exception, OSError)
+    assert {path.name: path.read_bytes() for path in locked.iterdir()} == before
+
+
+def test_write_trace_that_fails_part_way_keeps_the_earlier_trace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+    folder = tmp_path / "out"
+    folder.mkdir()
+    destination = folder / "native.jsonl"
+    destination.write_text("an earlier trace\n", encoding="utf-8")
+
+    def no_space(_fd: int) -> None:
+        raise OSError(errno.ENOSPC, "No space left on device")
+
+    monkeypatch.setattr("guardana.cli._atomic.os.fsync", no_space)
+    result = _run(str(source), "--write-trace", str(destination))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert destination.read_text(encoding="utf-8") == "an earlier trace\n"
+    assert list(folder.iterdir()) == [destination]
+
+
+def test_write_trace_replaces_an_earlier_trace_whole_and_keeps_its_mode(tmp_path: Path) -> None:
+    source = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+    folder = tmp_path / "out"
+    folder.mkdir()
+    destination = folder / "native.jsonl"
+    destination.write_text("an earlier trace\n" * 200, encoding="utf-8")
+    destination.chmod(0o640)
+
+    result = _run(str(source), "--write-trace", str(destination))
+
+    assert result.exit_code == ExitCode.OK, result.output
+    assert json.loads(destination.read_text(encoding="utf-8").splitlines()[0])["trace_id"] == "t-1"
+    assert destination.stat().st_mode & 0o777 == 0o640
+    assert list(folder.iterdir()) == [destination]
+
+
 def test_the_models_a_trace_actually_called_are_reported_as_observations(tmp_path: Path) -> None:
     record = {
         "name": "chat",
@@ -234,3 +302,54 @@ def test_a_truncated_trace_says_a_quiet_rule_is_not_a_passing_one(tmp_path: Path
     result = _run(str(_write(tmp_path, header, _CLEAN_SPAN)))
     assert "incomplete" in result.output
     assert "inconclusive rather than a pass" in result.output
+
+
+def _saved_document(tmp_path: Path, trace: Path) -> dict[str, object]:
+    output = tmp_path / "run.json"
+    result = _run(str(trace), "--format", "json", "--output", str(output))
+    assert result.exit_code == ExitCode.OK, result.output
+    document: dict[str, object] = json.loads(output.read_text(encoding="utf-8"))["run"]["target"][
+        "document"
+    ]
+    return document
+
+
+def test_a_saved_trace_run_records_the_digest_of_every_byte_it_read(tmp_path: Path) -> None:
+    trace = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+
+    document = _saved_document(tmp_path, trace)
+
+    assert document == {
+        "digest": f"sha256:{hashlib.sha256(trace.read_bytes()).hexdigest()}",
+        "kind": "content",
+        "bytes": trace.stat().st_size,
+    }
+
+
+def test_a_same_size_edit_to_the_trace_changes_the_saved_digest(tmp_path: Path) -> None:
+    trace = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+    before = _saved_document(tmp_path, trace)
+    original = trace.read_bytes()
+    trace.write_bytes(original.replace(b'"http"', b'"htpt"', 1))
+    assert trace.stat().st_size == len(original)
+
+    after = _saved_document(tmp_path, trace)
+
+    assert after["digest"] != before["digest"]
+    assert after["digest"] == f"sha256:{hashlib.sha256(trace.read_bytes()).hexdigest()}"
+
+
+def test_an_output_that_is_a_contract_inside_a_contract_directory_is_refused(
+    tmp_path: Path,
+) -> None:
+    source = _write(tmp_path, _HEADER, _CLEAN_SPAN)
+    contracts = tmp_path / "contracts"
+    contracts.mkdir()
+    contract = contracts / "checkout.yaml"
+    contract.write_text("the team's contract\n", encoding="utf-8")
+
+    result = _run(str(source), "--contract", str(contracts), "--output", str(contract))
+
+    assert result.exit_code == ExitCode.INVALID_USAGE, result.output
+    assert "--contract" in " ".join(result.output.split())
+    assert contract.read_text(encoding="utf-8") == "the team's contract\n"

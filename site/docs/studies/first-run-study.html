@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>First-run study — Guardana documentation</title>
+<meta name="description" content="How the maintainer records five consented first-run sessions and generates the adoption measure, separate from stable 1.0 release criteria">
+<link rel="canonical" href="https://guardana.dev/docs/studies/first-run-study">
+<link rel="icon" href="../../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="../docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="../index.html">Documentation</a>
+<a href="../rules/index.html">Rules</a>
+<a href="../../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html" aria-current="page">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>First-run study</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="../index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="../usage-init.html">guardana init</a></li>
+<li><a href="../recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="../recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="../recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="../adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="../how-it-works.html">How Guardana works</a></li>
+<li><a href="../install.html">Installing</a></li>
+<li><a href="../usage-testing.html">In your test suite</a></li>
+<li><a href="../python-api.html">Python API</a></li>
+<li><a href="../usage-scan.html">guardana scan</a></li>
+<li><a href="../usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="../safe-testing.html">Safe active testing</a></li>
+<li><a href="../usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="../usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="../usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="../usage-doctor.html">guardana doctor</a></li>
+<li><a href="../usage-target.html">guardana target inspect</a></li>
+<li><a href="../providers.html">Providers</a></li>
+<li><a href="../usage-plan.html">guardana plan</a></li>
+<li><a href="../exit-codes.html">Exit codes</a></li>
+<li><a href="../profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="../reading-results.html">Read results from your own tool</a></li>
+<li><a href="../usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="../usage-baseline.html">guardana baseline</a></li>
+<li><a href="../usage-diff.html">guardana diff</a></li>
+<li><a href="../usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="../usage-run.html">guardana run</a></li>
+<li><a href="../usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="../usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="../privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="../usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="../usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="../usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="../usage-contracts.html">Security contracts</a></li>
+<li><a href="../usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="../writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="../compatibility.html">Compatibility</a></li>
+<li><a href="../conformance-kit.html">Conformance kit</a></li>
+<li><a href="../usage-rules.html">guardana rules</a></li>
+<li><a href="../usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="../writing-rules.html">Writing rules</a></li>
+<li><a href="../usage-rule-test.html">guardana rule test</a></li>
+<li><a href="../usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="../usage-pack.html">guardana pack</a></li>
+<li><a href="../outputs.html">Installed outputs</a></li>
+<li><a href="../extending.html">Extending Guardana</a></li>
+<li><a href="../model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="../integrations.html">CI and pre-commit</a></li>
+<li><a href="../deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="../usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="../product-status.html">Product status</a></li>
+<li><a href="../threat-model.html">Threat model</a></li>
+<li><a href="../reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="../architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="../rules/index.html">Rule explorer</a></li>
+<li><a href="../generated/rule-summary.html">Rule summary</a></li>
+<li><a href="../generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="../generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="../generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="../generated/detection-limits.html">Detection limits</a></li>
+<li><a href="../generated/first-run.html">First-run measure</a></li>
+<li><a href="../generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="../generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="../community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="../studies/first-run-study.html" aria-current="page">First-run study</a></li>
+<li><a href="../studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>First-run study</h1><p class="lede">How the maintainer records five consented first-run sessions and generates the adoption measure, separate from stable 1.0 release criteria</p><p>The <a href="../product-status.html#adoption-measures">first-run study</a> covers five consented sessions with people new to Guardana, with a target of at least four of five completing a failure, a fix and one custom check in ten minutes without help. It is not a stable 1.0 release criterion. This page explains how the maintainer runs those sessions and records consent. The published measure is <a href="../generated/first-run.html">generated from the sheet</a> and reads &quot;not measured&quot;: 0 of 5 sessions are recorded. Invitations remain open.</p>
+<h2 id="one-session">One session</h2>
+<ul>
+<li>Use one participant who has not used Guardana. They work on their own machine, in a clean virtual environment, using the published release and the README only.</li>
+<li>The maintainer watches and does not help. Record a hint or taking over as such.</li>
+<li>Start the clock at the first command. Stop it when <code>rule test</code> passes on the edited check, or at 30 minutes. A participant finished within ten minutes when that happened within 600 seconds; <code>finished_in_10_min</code> must agree with <code>edited_check_seconds</code>, and the sheet is refused when it does not.</li>
+<li>Record the seconds from the start when each step was reached: install, first failure, fix, saved run, edited check. Leave a step empty if it was not reached.</li>
+</ul>
+<h2 id="consent">Consent</h2>
+<p>Ask for consent before the session, in the participant's language. The text must say what is recorded (the timings, whether they finished, where they got stuck), what is not (no screen recording unless they ask for one, no files from their machine, no telemetry; the starter runs offline, while probes and configured integrations make network requests), where the notes are kept and for how long, that only counts and times are published and never names, and that they can withdraw before publication. Fill in the storage place and the retention period before using it.</p>
+<h3 id="english">English</h3>
+<p>We record when each step was reached, whether you finished, and where you got stuck. We record your own words only if you agree separately.</p>
+<p>There is no screen recording unless you ask for one. We record no files from your machine. Your starter session runs offline and has no telemetry; probes and configured integrations make network requests.</p>
+<p>Notes are kept in [STORAGE] for [RETENTION]. Only counts and times are published, under an identifier such as P1, never your name. You can withdraw at any time before publication; your row will then be deleted.</p>
+<p>Do you agree to take part? Yes/No. Do you agree to publication of your anonymised row? Yes/No.</p>
+<h3 id="polski">Polski</h3>
+<p>Zapisujemy czas dotarcia do każdego kroku, informację o tym, czy udało Ci się ukończyć zadanie, oraz miejsce, w którym pojawiła się trudność. Twoje własne słowa zapiszemy tylko za osobną zgodą.</p>
+<p>Nie nagrywamy ekranu, chyba że o to poprosisz. Nie zapisujemy plików z Twojego komputera. Twoja sesja ze starterem działa offline i nie wysyła telemetrii; <code>guardana probe</code> i skonfigurowane integracje wysyłają żądania sieciowe.</p>
+<p>Notatki przechowujemy w [STORAGE] przez [RETENTION]. Publikujemy tylko liczby i czasy pod identyfikatorem takim jak P1, nigdy Twoje imię ani nazwisko. Możesz wycofać się w dowolnym momencie przed publikacją; Twój wiersz zostanie wtedy usunięty.</p>
+<p>Czy zgadzasz się na udział? Tak/Nie. Czy zgadzasz się na opublikowanie Twojego zanonimizowanego wiersza? Tak/Nie.</p>
+<h2 id="the-sheet">The sheet</h2>
+<p>Keep notes outside the repository until consent is confirmed. Then add one row per participant to <a href="https://github.com/guardana/guardana/blob/main/docs/studies/first-run-study.csv"><code>first-run-study.csv</code></a>, using these columns and nothing else:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>column</th>
+<th>values</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>participant</code></td>
+<td><code>P1</code>, <code>P2</code>, … — never a name</td>
+</tr>
+<tr>
+<td><code>date</code></td>
+<td><code>YYYY-MM-DD</code></td>
+</tr>
+<tr>
+<td><code>os</code>, <code>python</code></td>
+<td>as the participant reports them</td>
+</tr>
+<tr>
+<td><code>install_seconds</code>, <code>first_failure_seconds</code>, <code>fixed_seconds</code>, <code>saved_run_seconds</code>, <code>edited_check_seconds</code></td>
+<td>seconds from the start, empty when not reached</td>
+</tr>
+<tr>
+<td><code>finished_in_10_min</code></td>
+<td><code>yes</code> or <code>no</code></td>
+</tr>
+<tr>
+<td><code>maintainer_help</code></td>
+<td><code>none</code>, <code>hint</code> or <code>took over</code></td>
+</tr>
+<tr>
+<td><code>stuck_at</code></td>
+<td>the step, or empty</td>
+</tr>
+<tr>
+<td><code>consent_to_publish</code></td>
+<td><code>yes</code> — a row without it is never committed</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>uv run python scripts/first_run_measure.py</code> validates the sheet and prints the measure. <code>uv run python scripts/generate_docs.py</code> writes it to the generated page. Neither accepts a row without consent, a participant written as a name, or a finish the timings contradict.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/studies/first-run-study.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

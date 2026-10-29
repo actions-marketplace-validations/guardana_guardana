@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
+from guardana.core.fingerprint import DocumentDigest
 from guardana.core.trace.span import Span, SpanKind
 
 TRACE_SCHEMA_VERSION = 3
@@ -36,7 +37,7 @@ class Dimension(StrEnum):
     passes on the one that really skipped it.
 
     So a dimension the producer never emits is stated, and the rules that need it do
-    not run. See `docs/design/trace-domain-model.md`.
+    not run.
     """
 
     MESSAGES = "messages"
@@ -75,10 +76,11 @@ class TraceTruncation(StrEnum):
 class Provenance:
     """Where a trace or an observation came from, kept whole because Guardana did not make it.
 
-    The digest covers the bytes as read, so a claim can be traced back to the file
-    that carried it. A record nobody can trace back has no weight in an audit, which
-    is the whole reason an imported observation is worth importing rather than
-    retyping.
+    `document` digests the bytes as read and says whether they were the whole file,
+    so a claim can be traced back to the file that carried it. A record nobody can
+    trace back has no weight in an audit, which is the whole reason an imported
+    observation is worth importing rather than retyping. It is `None` when no file
+    was read.
     """
 
     producer: str
@@ -86,7 +88,12 @@ class Provenance:
     dialect: str
     producer_version: str | None = None
     recorded_at: datetime | None = None
-    document_digest: str | None = None
+    document: DocumentDigest | None = None
+
+    @property
+    def document_digest(self) -> str | None:
+        """The digest of the bytes read, without what it covers; `None` when nothing was read."""
+        return self.document.digest if self.document is not None else None
 
     def describe(self) -> str:
         """Render the provenance as one readable line for a finding's evidence."""

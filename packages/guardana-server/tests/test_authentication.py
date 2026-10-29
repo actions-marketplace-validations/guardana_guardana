@@ -10,13 +10,14 @@ system that reads "no credentials configured" as "no credentials required" is th
 shape of every default-admin incident there has ever been.
 """
 
+import hmac
 from datetime import UTC, datetime, timedelta
 
 import psycopg
 import pytest
 from conftest import DbConnection
 from fastapi.testclient import TestClient
-from guardana.server import create_app
+from guardana.server import auth, create_app
 from guardana.server.auth import (
     AuthError,
     Scope,
@@ -39,6 +40,7 @@ from test_migrations import _apply_through
 
 _UNAUTHORIZED = 401
 _FORBIDDEN = 403
+_METHOD_NOT_ALLOWED = 405
 _OK = 200
 _UNAVAILABLE = 503
 _SUBMISSION = {"source": "ci", "schema_version": 5, "findings": []}
@@ -119,9 +121,6 @@ _UNGUARDED_BY_DESIGN = frozenset(
         "/",  # the dashboard shell: static HTML, no findings
         "/catalog",  # this build's own rule documentation, about nobody's deployment
         "/openapi.json",
-        "/docs",
-        "/redoc",
-        "/docs/oauth2-redirect",
     }
 )
 
@@ -142,6 +141,19 @@ def test_every_data_route_refuses_an_anonymous_caller(
 
     for path in _guarded_get_routes(client):
         assert client.get(path).status_code == _UNAUTHORIZED, f"{path} answered without a key"
+
+
+def test_head_on_a_data_route_never_answers_an_anonymous_caller(
+    database_url: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
+    monkeypatch.setenv("GUARDANA_MIGRATE_ON_START", "1")
+    client = TestClient(create_app(dashboard=True))
+    guarded = _guarded_get_routes(client)
+
+    assert "/stats" in guarded
+    for path in guarded:
+        assert client.head(path).status_code in {_UNAUTHORIZED, _METHOD_NOT_ALLOWED}, path
 
 
 def test_ingest_refuses_an_anonymous_caller(
@@ -494,7 +506,36 @@ def test_a_well_formed_key_this_collector_never_issued_is_refused(
     _tenanted(connection)
 
     with pytest.raises(AuthError, match="unknown API key"):
-        authenticate(connection, "gdn_deadbeefcafe_not-a-key-this-collector-issued")
+        authenticate(connection, "gdn" + "_deadbeefcafe_not-a-key-this-collector-issued")
+
+
+def test_an_unknown_prefix_costs_the_digest_and_comparison_a_known_one_does(
+    connection: DbConnection, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Refusing before the digest would let response time say whether a prefix exists."""
+    _tenanted(connection)
+    hashed: list[str] = []
+    compared: list[tuple[str, str]] = []
+    real_hash, real_compare = auth.hash_secret, hmac.compare_digest
+
+    def spy_hash(secret: str) -> str:
+        hashed.append(secret)
+        return real_hash(secret)
+
+    def spy_compare(left: str, right: str) -> bool:
+        compared.append((left, right))
+        return real_compare(left, right)
+
+    monkeypatch.setattr(auth, "hash_secret", spy_hash)
+    monkeypatch.setattr(hmac, "compare_digest", spy_compare)
+
+    with pytest.raises(AuthError) as refused:
+        authenticate(connection, "gdn" + "_deadbeefcafe_not-a-key-this-collector-issued")
+
+    assert str(refused.value) == "unknown API key"
+    assert hashed == ["not-a-key-this-collector-issued"]
+    assert len(compared) == 1
+    assert real_hash("not-a-key-this-collector-issued") in compared[0]
 
 
 def test_a_key_whose_scopes_cannot_be_read_is_refused(connection: DbConnection) -> None:

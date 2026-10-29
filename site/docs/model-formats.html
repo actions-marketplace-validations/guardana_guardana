@@ -4,60 +4,80 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reading model formats — Guardana documentation</title>
-<meta name="description" content="the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract">
+<meta name="description" content="the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract">
 <link rel="canonical" href="https://guardana.dev/docs/model-formats">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html" aria-current="page">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,68 +98,121 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1>Reading model formats — <code>guardana.core.formats</code></h1><p class="lede">the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract</p><p>A rule that inspects a model file needs to read a binary format before it can
+<details class="mnav">
+<summary>Menu · <b>Reading model formats</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html" aria-current="page">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1>Reading model formats — <code>guardana.core.formats</code></h1><p class="lede">the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract</p><p>A rule that inspects a model file needs to read a binary format before it can
 say anything about it. Doing that by hand is where scanners get quietly wrong:
 a byte-window scan around a keyword both misses payloads that sit further away
 and invents findings from unrelated neighbouring bytes. Guardana ships the
 parsing so your rule can ship the judgement.</p>
-<p>These readers are <strong>public API</strong>. They are what a third-party rule pack is meant
-to build on.</p>
+<p>These readers can be imported but are <strong>outside the supported surface</strong> described
+in <a href="compatibility.html"><code>compatibility.md</code></a>. They may change in any release. A
+third-party rule pack that imports them pins the exact <code>guardana-core</code> version it
+was tested with.</p>
 <pre><code class="language-python">from guardana.core.formats import FormatError, read_gguf_metadata
 
 try:
@@ -163,7 +237,7 @@ template = metadata.text(&quot;tokenizer.chat_template&quot;)
 </tr>
 <tr>
 <td><strong>Bounded</strong></td>
-<td>Sizes claimed <em>inside</em> a file are checked against <code>Limits</code> before anything is allocated. A header claiming 2⁶⁴ entries costs a <code>FormatError</code>, not the scan.</td>
+<td>Every reader enforces the <code>Limits</code> you pass. <a href="#limits">The table under Limits</a> lists what each bound covers in each reader. Sizes claimed <em>inside</em> a file are checked before anything is allocated. A header claiming 2⁶⁴ entries raises <code>FormatError</code> instead of exhausting the scan.</td>
 </tr>
 <tr>
 <td><strong>Deterministic</strong></td>
@@ -171,7 +245,7 @@ template = metadata.text(&quot;tokenizer.chat_template&quot;)
 </tr>
 <tr>
 <td><strong>Fail-closed</strong></td>
-<td>Anything it cannot parse raises <code>FormatError</code>. A reader never returns &quot;empty&quot; to mean &quot;clean&quot;.</td>
+<td>Anything it cannot parse raises <code>FormatError</code>. The ONNX reader can also return a partial summary with <code>truncated</code> set at its budget or nesting-depth limit (see the ONNX section below). Treat that as incomplete coverage. A reader never returns &quot;empty&quot; to mean &quot;clean&quot;.</td>
 </tr>
 </tbody>
 </table></div>
@@ -195,6 +269,9 @@ class GgufMetadata:
 </code></pre>
 <p><code>text()</code> is the safe accessor: it returns <code>None</code> when the key is absent <em>or</em> is
 not a string, so a rule never has to type-check an entry itself.</p>
+<p>Versions 2 and 3 are supported; any other version raises <code>FormatError</code>. Version 1
+uses a different layout, and later versions may too. The version 3 layout would
+misread every offset after the header in either case.</p>
 <h3 id="safetensors--read_safetensors_headerpath--limitsdefault_limits---safetensorsheader">safetensors — <code>read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -&gt; SafetensorsHeader</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class SafetensorsHeader:
@@ -206,6 +283,12 @@ class SafetensorsHeader:
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.</p>
+<p>The header must describe the payload exactly. Every tensor entry must specify a
+format-defined <code>dtype</code>, a <code>shape</code> list of non-negative integers, and <code>data_offsets</code>
+inside the payload. The product of its <code>shape</code> dimensions times the dtype's width
+must equal its <code>data_offsets</code> range length. The ranges must cover every payload byte
+exactly once, with no overlaps, gaps or undeclared trailing bytes. A violation raises
+<code>FormatError(&quot;malformed safetensors header: ...&quot;)</code>, naming the tensor when there is one.</p>
 <h3 id="onnx--read_onnx_summarypath--limitsdefault_limits---onnxsummary">ONNX — <code>read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -&gt; OnnxSummary</code></h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class OnnxSummary:
@@ -218,17 +301,35 @@ class OnnxSummary:
 </code></pre>
 <p>The graph is walked straight off disk by a dependency-free streaming protobuf
 reader that seeks past tensor payloads, so summarising a multi-gigabyte model
-reads kilobytes. <code>STANDARD_ONNX_DOMAINS</code> is exported alongside it: anything else
-in <code>node_domains</code> means the runtime must register a native operator library
-before the model will run.</p>
-<p><code>truncated</code> is the honest half of the bound — it says the field budget ran out
-before the walk finished. <strong>A partial walk that found nothing has not cleared
-the model</strong>, and a rule must say so:</p>
-<pre><code class="language-python">findings = list(self._graded(path, summary))
-yield from findings
-if summary.truncated and not findings:
-    yield self._unscanned(path, &quot;the graph was too large to walk within the budget&quot;)
+reads kilobytes. The walk covers every graph the model carries: the main graph
+and its sparse initializers, tensors and subgraphs held in node attributes
+(Constant values, If/Loop/Scan bodies), model-local functions and training
+graphs. <code>node_domains</code> and <code>external_data_paths</code> collect from all of them.
+A file whose complete top-level message holds no graph raises
+<code>FormatError(&quot;ONNX model without a graph&quot;)</code>. An empty file parses as an empty
+protobuf message, which is not a model.
+<code>STANDARD_ONNX_DOMAINS</code> is exported alongside it: anything else in
+<code>node_domains</code> means the runtime must register a native operator library before
+the model will run.</p>
+<p><code>truncated</code> is the honest half of the bound — it says the walk did not finish:
+the field budget ran out, subgraphs were nested deeper than 32 levels, or the
+strings kept in the summary exceeded <code>Limits.max_header_bytes</code>. Metadata entries
+have one allowance of that size. The producer, domains and external-data paths
+share a separate allowance of the same size. This keeps a flood of metadata from
+excluding a graph's domains from the summary.
+The
+<code>guardana.supply_chain.onnx_graph</code> rule gives a file one field per two bytes of
+its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
+below the cap is walked in full. <strong>A partial walk has not cleared the model,
+whatever it found</strong>: a lead in the fields it reached says nothing about a worse
+one past the budget. A rule reports the findings it has and says the walk was
+partial:</p>
+<pre><code class="language-python">yield from self._graded(path, summary)
+if summary.truncated:
+    yield self._unscanned(path, &quot;the model was too large or nested too deeply to walk in full&quot;, ctx)
 </code></pre>
+<p><code>_unscanned</code> there yields the inconclusive finding and reports the file as an
+unexamined component; see <a href="#writing-a-rule-on-top">writing a rule on top</a>.</p>
 <h3 id="limits">Limits</h3>
 <pre><code class="language-python">@dataclass(frozen=True)
 class Limits:
@@ -240,36 +341,94 @@ class Limits:
 <p>Defaults are sized off real models — a 20k-tensor safetensors index is ~1.5 MiB
 of JSON, a 256k-token GGUF vocabulary a few MiB — so honest files stay far
 inside them. Pass your own <code>Limits</code> to tighten them for a constrained runner.</p>
+<p>The table lists what each bound covers in each reader. Exceeding a bound raises
+<code>FormatError</code>, except where the table says the ONNX summary is <code>truncated</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Limit</th>
+<th>GGUF</th>
+<th>safetensors</th>
+<th>ONNX</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>max_header_bytes</code></td>
+<td>bytes from the start of the file to the end of the metadata block</td>
+<td>declared header length, checked before reading the header</td>
+<td>separate allowances for metadata entries and other strings kept; exceeding either makes the summary <code>truncated</code></td>
+</tr>
+<tr>
+<td><code>max_entries</code></td>
+<td>metadata entries</td>
+<td>keys in each JSON object in the header, including the tensor index and <code>__metadata__</code></td>
+<td>protobuf fields walked; exceeding the bound makes the summary <code>truncated</code></td>
+</tr>
+<tr>
+<td><code>max_string_bytes</code></td>
+<td>each key and string value</td>
+<td>each string in the header and each non-string <code>__metadata__</code> value after serialisation</td>
+<td>each string read</td>
+</tr>
+<tr>
+<td><code>max_array_items</code></td>
+<td>each array</td>
+<td>each array in the header, including <code>shape</code> and <code>data_offsets</code></td>
+<td>not used: the summary keeps no arrays</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="writing-a-rule-on-top">Writing a rule on top</h2>
-<p>Two rules, one shape. Read the file, turn <code>FormatError</code> into a visible finding,
-grade what you got.</p>
-<pre><code class="language-python">from guardana.core.formats import FormatError, read_onnx_summary, STANDARD_ONNX_DOMAINS
-
-class UnapprovedOperatorRule(Rule):
-    meta = RuleMeta(
-        id=&quot;acme.supply_chain.unapproved_operator&quot;,
-        title=&quot;ONNX model uses an operator domain we have not vetted&quot;,
-        severity=Severity.MEDIUM,
-        target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03_2025,),
-        required_capabilities=frozenset({Capability.READ_FILES}),
-    )
-
-    def run(self, target: Target, ctx: RuleContext) -&gt; Iterable[Finding]:
-        if not isinstance(target, ArtifactTarget):
-            return
-        for path in target.iter_files((&quot;.onnx&quot;,)):
+<p>Every rule on a model format has one shape. Read the file, turn <code>FormatError</code>
+into a visible finding, grade what you got.</p>
+<p>A file the rule could not read, or read only in part, gets two reports. The finding
+carries an <code>inconclusive</code> verdict, so it lands on the unverified channel. The
+<code>unexamined_component</code> shortfall names the file, so the run is <code>indeterminate</code> under
+every policy rather than only under <code>fail_on_inconclusive</code>. The built-in model rules
+do both, and a rule that reads the format calls <code>ctx.examined(path)</code> either way, so
+the format-level pass does not name the file again
+(<a href="usage-scan.html#model-files-no-rule-reads"><code>guardana scan</code></a>).</p>
+<p>Here is that shape in <code>ApprovedModelRule</code>, from
+<code>examples/custom_rule/src/acme_rules/approved_model.py</code> — a complete third-party
+rule, tested, whose entire body is policy:</p>
+<pre><code class="language-python">    def run(self, target: Target, ctx: RuleContext) -&gt; Iterable[Finding]:
+        &quot;&quot;&quot;Check the provenance metadata of every GGUF model under the target.&quot;&quot;&quot;
+        if not isinstance(target, FileReader):
+            raise RuleError(f&quot;{self.meta.id} needs a file target, got {type(target).__name__}&quot;)
+        for path in target.iter_files((&quot;.gguf&quot;,)):
+            ctx.examined(path)
             try:
-                summary = read_onnx_summary(path)
+                metadata = read_gguf_metadata(path)
             except FormatError as exc:
-                yield unscanned(path, str(exc))     # never silence
+                yield self._unscanned(path, f&quot;provenance unreadable: {exc}&quot;, ctx)
                 continue
-            unknown = set(summary.node_domains) - STANDARD_ONNX_DOMAINS - APPROVED
-            if unknown:
-                yield Finding(...)
+            organization = metadata.text(_ORGANIZATION_KEY)
+            if organization is None or organization.lower() not in _APPROVED_ORGANIZATIONS:
+                name = metadata.text(_NAME_KEY) or path.name
+                yield self._finding(path, f&quot;'{name}' declares organization {organization!r}&quot;)
+
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -&gt; Finding:
+        # Unreadable provenance is a decline, not an accusation: reporting the model
+        # as unapproved would invent evidence. The shortfall keeps the run from
+        # passing under every policy, not only under `fail_on_inconclusive`.
+        ctx.shortfall(
+            CoverageShortfall(
+                ShortfallKind.UNEXAMINED_COMPONENT,
+                name=str(path),
+                detail=f&quot;{self.meta.id} could not read it: {reason}&quot;,
+            )
+        )
+        return Finding(
+            rule_id=self.meta.id,
+            severity=self.meta.severity,
+            title=self.meta.title,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(summary=reason, detail=f&quot;file={path.name}&quot;),
+            verdict=Verdict(&quot;inconclusive&quot;, 0.0, reason, self.meta.id),
+        )
 </code></pre>
-<p><code>examples/custom_rule/src/acme_rules/approved_model.py</code> is the runnable version
-of this — a complete third-party rule, tested, whose entire body is policy.</p>
 <h2 id="testing-your-rule">Testing your rule</h2>
 <p><code>guardana.core.testing</code> builds crafted artifacts so a malicious fixture is a
 dict literal in a test rather than a binary in your repository.</p>
@@ -305,8 +464,10 @@ welcome. See <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTIN
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/model-formats.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

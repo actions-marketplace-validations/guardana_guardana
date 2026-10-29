@@ -4,11 +4,14 @@
 from acme_rules.refusal_classifier import StrictRefusalClassifier
 from guardana.core.evaluator import Expectation
 from guardana.core.exchange import Exchange
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import default_profile
 from guardana.core.registry import Registry
 from guardana.core.runner import Runner
 from guardana.core.target import EndpointTarget
 from guardana.core.testing import ScriptedTransport
+
+_ACME = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"acme-guardana-rules"}))
 
 
 def test_clean_refusal_passes() -> None:
@@ -28,11 +31,11 @@ def test_a_hedged_reply_is_not_a_clean_refusal() -> None:
 
 
 def test_custom_evaluator_is_discovered_via_the_entry_point() -> None:
-    assert "acme.strict_refusal" in Registry.discover().evaluators()
+    assert "acme.strict_refusal" in Registry.discover(_ACME).evaluators()
 
 
 def test_a_yaml_rule_grades_with_the_custom_classifier_end_to_end() -> None:
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     complied = EndpointTarget("http://x", "m", transport=ScriptedTransport("Sure, here it is: ..."))
 
     result = Runner(registry=registry, profile=default_profile()).run(complied)
@@ -44,7 +47,7 @@ def test_a_yaml_rule_grades_with_the_custom_classifier_end_to_end() -> None:
 
 
 def test_the_custom_rule_stays_silent_on_a_clean_refusal() -> None:
-    registry = Registry.discover()
+    registry = Registry.discover(_ACME)
     refused = EndpointTarget(
         "http://x", "m", transport=ScriptedTransport("I cannot help with that.")
     )

@@ -1,5 +1,7 @@
 """Eight rules, one purchase — the reason the observation lives on the target."""
 
+import pytest
+from _offline import refuse_name_lookups
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.target import McpServerTarget
 from guardana.rules.mcp import (
@@ -13,6 +15,8 @@ from guardana.rules.mcp import (
     McpUnauthenticatedAccessRule,
 )
 from mcp_fixtures import CREDENTIAL, ROUTABLE, guarded
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 EVERY_MCP_RULE: list[Rule] = [
     McpUnauthenticatedAccessRule(),
@@ -28,7 +32,9 @@ EVERY_MCP_RULE: list[Rule] = [
 
 def test_running_every_rule_costs_no_more_than_running_them_one_at_a_time() -> None:
     server = guarded()
-    target = McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=server)
+    target = McpServerTarget(
+        ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+    )
 
     for rule in EVERY_MCP_RULE:
         list(rule.run(target, RuleContext()))
@@ -37,7 +43,12 @@ def test_running_every_rule_costs_no_more_than_running_them_one_at_a_time() -> N
     apart = 0
     for rule in EVERY_MCP_RULE:
         one = guarded()
-        list(rule.run(McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=one), RuleContext()))
+        list(
+            rule.run(
+                McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=one, discovery_sender=one),
+                RuleContext(),
+            )
+        )
         apart += len(one.requests)
 
     assert together < apart, "each rule bought its own observation"
@@ -48,7 +59,9 @@ def test_no_rule_spends_more_than_it_declared() -> None:
     # under-states what a rule sends makes `guardana plan` a ceiling over nothing.
     for rule in EVERY_MCP_RULE:
         server = guarded()
-        target = McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=server)
+        target = McpServerTarget(
+            ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+        )
 
         list(rule.run(target, RuleContext()))
 

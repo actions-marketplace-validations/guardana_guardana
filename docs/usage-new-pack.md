@@ -7,11 +7,7 @@ status: stable
 
 # `guardana new-pack` — start from something that already passes
 
-Guardana has had an extension contract since 0.18 and target locators since 0.24,
-and every declarative rule shape can carry its own samples since 0.25. What it did
-not have was a way to start: `guardana init` writes a policy file, `guardana
-new-rule` writes one rule, and everything else had to be copied out of this
-repository's example.
+`guardana new-pack` creates an extension pack when you need a starting point for rules. `guardana init` writes a policy file or, with `--starter`, a first-run project; `guardana new-rule` writes a rule.
 
 ```bash
 guardana new-pack acme-rules
@@ -21,10 +17,13 @@ guardana new-pack acme-rules
 Wrote 13 files to acme-rules/
 Install and verify it:
   pip install -e acme-rules
-  guardana pack validate acme-rules/src/acme_rules/guardana-pack.yaml
-  guardana rule test 'acme.*'
+  guardana pack validate acme-rules/src/acme_rules/guardana-pack.yaml --plugins allowlist --allow-plugin acme-rules
+  guardana rule test 'acme.*' --plugins allowlist --allow-plugin acme-rules
   pytest acme-rules/tests
 ```
+
+Every command starts with Guardana's own distributions only, so the two `guardana`
+lines admit the new pack by its distribution name.
 
 Those four lines are the point. Run them on the generated pack, before changing a
 character:
@@ -37,7 +36,7 @@ extension APIs implemented by this build: 1, 2 (newest 2)
 
 3 rule(s); 9 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 
-11 passed
+12 passed
 ```
 
 A scaffold whose first verification is red teaches you to distrust the tool at the
@@ -48,12 +47,12 @@ you ever see is about your own change.
 
 | path | what it is |
 |---|---|
-| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency |
+| `pyproject.toml` | the four entry-point groups Guardana discovers, and `guardana-core` as the only dependency, pinned from the version that wrote the pack up to, but excluding, the next minor because the generated target uses `read_source` outside the supported surface |
 | `src/acme_rules/guardana-pack.yaml` | the manifest: what the pack promises, checked against what it registers |
 | `src/acme_rules/catalog/` | one YAML file per rule, each with its finding, clean and inconclusive samples |
 | `src/acme_rules/target.py` | a target, reachable as `--target acme-rules://some/directory` |
-| `src/acme_rules/__init__.py` | `provide_rules`, `provide_evaluators`, `provide_targets`, `provide_taxonomies` |
-| `tests/` | the manifest is true, every rule proves all three outcomes, the target conforms |
+| `src/acme_rules/__init__.py` | `provide_rules`, `provide_evaluators`, `provide_targets`, `provide_taxonomies`; package code imports only supported names |
+| `tests/` | the manifest is true, every rule proves all three outcomes, the target conforms; the pack's own taxonomies are registered before loading its rules, as discovery does |
 
 No licence file is written. Picking one for you is not this command's decision —
 add a `LICENSE` and set `license` in `pyproject.toml`.
@@ -103,7 +102,9 @@ files is refused rather than written over; there is no `--force`. `.git`,
 - **Rules.** Change the prompts and the samples together, and keep the marker
   shape: it is what makes a positive sample evidence rather than an opinion.
 - **The manifest.** Add every new id to `provides`. `guardana pack validate` fails
-  when the manifest and the registrations disagree, in either direction — see
+  when the manifest declares an id nothing registers, or a rule another installed
+  distribution registers; an id registered and not declared is not an error, and
+  `pack lock` lists it as unlocked — see
   [`guardana pack`](usage-pack.md).
 - **The API range.** `extension_api` pins the extension API, not Guardana's release
   number. Widen it after reading what changed, never before.

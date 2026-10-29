@@ -6,58 +6,78 @@
 <title>guardana analyze-trace — Guardana documentation</title>
 <meta name="description" content="guardana analyze-trace: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana&#x27;s native dialect">
 <link rel="canonical" href="https://guardana.dev/docs/usage-analyze-trace">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html" aria-current="page">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html" aria-current="page">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,68 +98,116 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana analyze-trace</code> — grade an execution that already happened</h1><p class="lede"><code>guardana analyze-trace</code>: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect</p><p><code>scan</code> reads files. <code>probe</code> talks to a live model. <code>analyze-trace</code> reads a <strong>trace</strong>:
-a recording of what your agent actually did, exported by whatever instrumentation you
-already run.</p>
+<details class="mnav">
+<summary>Menu · <b>guardana analyze-trace</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html" aria-current="page">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana analyze-trace</code> — grade an execution that already happened<span class="status beta">beta</span></h1><p class="lede"><code>guardana analyze-trace</code>: grade an execution your agent already performed, from OpenTelemetry GenAI spans or Guardana's native dialect</p><p><code>analyze-trace</code> reads a recorded agent execution when you need to check what happened offline. <code>scan</code> reads files; <code>probe</code> talks to a live model.</p>
 <pre><code class="language-bash">guardana analyze-trace trace.jsonl
 </code></pre>
-<p>It opens one file and no socket. Nothing is sent anywhere, no model is called, and no
-tool is invoked.</p>
+<p>It opens one file and calls no model and no tool; it sends nothing over the network unless you pass <code>--reporter</code>.</p>
 <h2 id="what-it-is-for">What it is for</h2>
 <p>Some failures cannot be reproduced from outside. The documents your retriever returned
 were whatever the index held at 09:41. The memory already contained a note from Tuesday.
@@ -157,7 +226,13 @@ wrong at all;</li>
 <p>A tool that reads that absence as world 1 fires on every well-governed system. One that
 reads it as world 2 passes on the one system that really skipped it. So Guardana reads it
 as neither: <strong>a dimension your producer does not record makes the rules that need it not
-run</strong>, and the command says which ones and why.</p>
+run</strong>, and the command says which ones and why. A grant or consent recorded in the action's
+own span or an earlier-written span counts unless its own time (<code>decided_at</code>, else
+<code>requested_at</code>; a consent's <code>recorded_at</code>) is after the action span's <code>ended_at</code>. One recorded
+in a later span counts when that time is not after the action span's <code>started_at</code>, gives a
+finding when it is after <code>ended_at</code>, and is inconclusive when it falls inside the span's
+window or no time orders them. An attempted consequential effect with no approval shown
+to precede it is inconclusive.</p>
 <pre><code>$ guardana analyze-trace otel-export.jsonl
 read 2 span(s) from otel-export.jsonl as otel (producer: opentelemetry)
 note: this producer does not record identity, delegation, consent, policy, approval,
@@ -222,14 +297,38 @@ one.</p>
 {&quot;span_id&quot;: &quot;s2&quot;, &quot;kind&quot;: &quot;tool_execution&quot;, &quot;name&quot;: &quot;refund&quot;, &quot;tool&quot;: {&quot;name&quot;: &quot;refund&quot;, &quot;arguments&quot;: &quot;{\&quot;order\&quot;: 12}&quot;, &quot;mutates&quot;: true}, &quot;identity&quot;: {&quot;actor&quot;: &quot;support-agent&quot;, &quot;session&quot;: {&quot;id&quot;: &quot;sess-1&quot;, &quot;protocol&quot;: &quot;mcp&quot;}}, &quot;delegations&quot;: [{&quot;actor&quot;: &quot;support-agent&quot;, &quot;boundary&quot;: &quot;agent-&gt;billing-mcp&quot;, &quot;credential&quot;: {&quot;kind&quot;: &quot;bearer&quot;, &quot;digest&quot;: &quot;sha256:…&quot;, &quot;audience&quot;: [&quot;https://billing.internal/&quot;]}, &quot;scopes&quot;: [&quot;orders:read&quot;, &quot;orders:refund&quot;]}], &quot;effects&quot;: [{&quot;sink&quot;: &quot;payment&quot;, &quot;action&quot;: &quot;refund&quot;, &quot;target&quot;: &quot;order/12&quot;, &quot;status&quot;: &quot;executed&quot;, &quot;reversible&quot;: false}], &quot;approvals&quot;: [{&quot;action&quot;: &quot;refund&quot;, &quot;outcome&quot;: &quot;not_requested&quot;}]}
 {&quot;guardana_trace_end&quot;: 3, &quot;spans&quot;: 2}
 </code></pre>
-<p>Six rules of the format, each with a reason:</p>
+<p>Seven rules of the format, each with a reason:</p>
 <p><strong><code>instrumented</code> is what licenses a finding.</strong> List the dimensions your producer really
 records. Leave one out and its rules do not run — which is the safe direction. If you
 omit the field entirely, Guardana derives it from what is present, and derivation can only
 ever <em>reduce</em> what runs.</p>
-<p><strong>Unknown keys are refused.</strong> A misspelled <code>aprovals:</code> would leave the approval dimension
-declared and empty, the rule would run, and it would report a system that approved
-everything properly. A load error is better than a false accusation.</p>
+<p><strong>Unknown keys are refused, at every level.</strong> The header, its <code>producer</code>, each span and
+every object inside a span — message, part, tool, retrieval, credential, approval, effect
+and the rest — accept only the keys <code>schemas/trace-v3.schema.json</code> defines. Anything else
+stops the read with exit <code>3</code>. A misspelled <code>aprovals:</code> would leave the approval dimension
+declared and empty; a misspelled <code>aprover</code> or a part written <code>{&quot;type&quot;: &quot;text&quot;, &quot;text&quot;: …}</code>
+would read as a missing value. Either way a rule grades nothing, or accuses a system that
+did nothing wrong. The shapes are held the same way: a value where the schema has an object,
+a list or a list of strings must be one, every item of <code>messages</code>, <code>approvals</code>, <code>effects</code>
+and the other lists must be an object, and every part names its <code>type</code>. <code>&quot;approvals&quot;: {…}</code> or a bare-string part stops the read naming the span, rather than reading as no
+approvals or as text nobody typed. The <code>otel</code> dialect stays tolerant, because an
+OpenTelemetry span carries attributes from other domains.</p>
+<p><strong>Values are refused unless they have the schema's type and, for a list of choices, are
+one of them.</strong> Every field typed in <code>schemas/trace-v3.schema.json</code> must hold that type:
+<code>&quot;reversible&quot;: &quot;false&quot;</code>, <code>&quot;terminated&quot;: &quot;true&quot;</code>, <code>&quot;input_tokens&quot;: &quot;12&quot;</code> or a <code>null</code> stop the
+read with exit <code>3</code>, naming the span and the field. A field with a fixed list of values —
+a span's <code>kind</code>, a tool's <code>status</code>, a memory <code>action</code>, a credential's <code>kind</code>, an effect's
+<code>sink</code> and <code>status</code>, a policy or approval <code>outcome</code>, <code>approver_kind</code>, the header's
+<code>truncated</code> — accepts exactly the values the schema lists, in lower case: <code>&quot;Shell&quot;</code> and
+<code>&quot;bash&quot;</code> are refused, never read as <code>other</code>. Missing <code>delegations[].actor</code>,
+<code>delegations[].boundary</code>, <code>consents[].client</code>, <code>policy_decisions[].action</code>,
+<code>approvals[].action</code> or <code>effects[].action</code> stops the read with exit <code>3</code>, as does a
+native trace with no spans that is not cut short. The <code>tenant_boundary</code> contract with
+<code>sources:</code> is inconclusive for a retrieval that records no source. An effect's <code>sink</code> and a policy decision's or
+an approval's <code>outcome</code> are required. Write <code>other</code> or <code>unknown</code> when that is what you
+mean. Read leniently, <code>&quot;sink&quot;: &quot;Shell&quot;</code> would reach no contract forbidding a shell, and
+<code>&quot;terminated&quot;: &quot;true&quot;</code> would withdraw the promise that makes a missing footer
+<code>unterminated</code>.</p>
 <p><strong>Credentials are named, never carried.</strong> Write a <code>digest</code> if you have one. If you write a
 <code>value</code>, Guardana hashes it on read and keeps only the hash — the model has no field to
 put a token in. Nothing here reaches a report at any privacy level.</p>
@@ -319,17 +418,17 @@ half.</p>
 <tr>
 <td><code>guardana.trace.session_as_identity</code></td>
 <td>a step that changed something identified itself with a session and nothing else</td>
-<td>identity</td>
+<td>identity, and tools or effects</td>
 </tr>
 <tr>
 <td><code>guardana.trace.consent_scope_exceeded</code></td>
 <td>a hop exercised a scope no consent granted</td>
-<td>consent</td>
+<td>consent + delegation</td>
 </tr>
 <tr>
 <td><code>guardana.trace.policy_decision_ignored</code></td>
 <td>a policy said no — or could not say — and the action happened anyway</td>
-<td>policy</td>
+<td>policy, and tools or effects</td>
 </tr>
 <tr>
 <td><code>guardana.trace.unapproved_side_effect</code></td>
@@ -351,6 +450,9 @@ half.</p>
 <p>Full mapping to OWASP and MITRE ATLAS:
 <a href="generated/rule-catalog.html">the generated catalog</a>.</p>
 <h2 id="a-truncated-trace-is-not-a-shorter-one">A truncated trace is not a shorter one</h2>
+<p>The read ceilings count the bytes in the file: 64 MiB in all, blank lines and line endings
+included, and 1 MiB for one record, in UTF-8. A path that is not a regular file, such as a FIFO,
+is refused with exit <code>3</code> without waiting for anything to be written to it.</p>
 <p>If the header says <code>truncated</code>, or the file exceeds a read ceiling, then a rule that
 <strong>found</strong> something still reports it — the evidence is real — and a rule that found
 nothing reports <code>inconclusive</code>, because the step it needed may be in the part that is
@@ -388,7 +490,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--write-trace PATH</code></td>
-<td>Also write the trace in the native dialect</td>
+<td>Also write the trace in the native dialect, whole: a failed write leaves an earlier file as it was and exits <code>3</code>. A <code>PATH</code> that is <code>--output</code>, its <code>&lt;stem&gt;.exchanges.jsonl</code>, or a file the command reads — the trace, <code>--profile</code>, a <code>--rules</code> or <code>--contract</code> file or one read from such a directory, or a file the profile names under <code>rules.paths</code>, <code>contracts:</code>, <code>calibrations:</code> or a judge's <code>adapter</code> — exits <code>3</code> before any rule is loaded or run</td>
 </tr>
 <tr>
 <td><code>--profile</code>, <code>--preset</code></td>
@@ -396,7 +498,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--format human|json|sarif|junit</code></td>
-<td><code>json</code> is what <a href="usage-diff.html"><code>guardana diff</code></a> reads</td>
+<td><code>json</code> is what <a href="usage-diff.html"><code>guardana diff</code></a> reads; an <a href="outputs.html">installed format</a> is named the same way</td>
 </tr>
 <tr>
 <td><code>--output PATH</code></td>
@@ -404,7 +506,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--reporter server://URL</code></td>
-<td>Forward findings to a collector</td>
+<td>Forward findings to a collector, or to an <a href="outputs.html">installed reporter</a> as <code>&lt;name&gt;://&lt;locator&gt;</code></td>
 </tr>
 <tr>
 <td><code>--ai-system</code>, <code>--environment</code>, <code>--deployment-id</code></td>
@@ -412,7 +514,7 @@ session that ends when the process does is <code>unterminated</code> by construc
 </tr>
 <tr>
 <td><code>--rules</code>, <code>--plugins</code>, <code>--allow-plugin</code></td>
-<td>Rule loading, as for <code>scan</code></td>
+<td>Rule loading and plugin trust, as for <code>scan</code>: <code>builtins</code> unless the flag or the profile's <code>plugins:</code> says otherwise</td>
 </tr>
 <tr>
 <td><code>--contract PATH</code></td>
@@ -437,6 +539,13 @@ can tell a recording from a live check. It compares with <code>guardana diff</co
 run, and the coverage fingerprint records which dimensions were available — so a diff
 against a richer trace says the <em>reach</em> changed instead of reading the missing findings as
 an improvement.</p>
+<p>The run also records which bytes it read, under <code>run.target.document</code>. <code>digest</code> is SHA-256
+over the first <code>bytes</code> bytes of the trace file, and <code>kind</code> is <code>content</code> when that is the
+whole file or <code>content_prefix</code> when a read ceiling stopped the reader first. Check it with
+<code>head -c &lt;bytes&gt; trace.jsonl | sha256sum</code>. An edit changes the digest even when the file
+keeps its size. The digest sits beside the target fingerprint, not inside it, so a trace
+re-recorded at the same path is still the same target for <code>diff</code>. A run saved before
+schema 11 carries <code>document: null</code>: the digest was not recorded.</p>
 <h2 id="related">Related</h2>
 <ul>
 <li><a href="usage-trace-inspect.html"><code>usage-trace-inspect.md</code></a> — what this file can answer at
@@ -445,8 +554,6 @@ all, before anything grades it</li>
 file this command checks</li>
 <li><a href="usage-import-observations.html"><code>usage-import-observations.md</code></a> — carrying another
 tool's results in as unverified claims</li>
-<li><a href="design/trace-domain-model.html"><code>design/trace-domain-model.md</code></a> — why the model is
-shaped this way, and what was rejected</li>
 <li><a href="usage-probe.html"><code>usage-probe.md</code></a> — verifying a live endpoint or MCP server instead</li>
 <li><a href="privacy.html"><code>privacy.md</code></a> — what evidence keeps, and what the redactor removes</li>
 </ul>
@@ -454,8 +561,10 @@ shaped this way, and what was rejected</li>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-analyze-trace.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

@@ -40,6 +40,9 @@ class _Server:
             ]
         }
 
+    def notify(self, method: str) -> None:
+        pass
+
     def close(self) -> None:
         return None
 

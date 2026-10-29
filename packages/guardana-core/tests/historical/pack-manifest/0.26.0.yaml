@@ -1,0 +1,19 @@
+# What this pack promises. `guardana pack validate` compares it against what the
+# entry points actually register, in both directions: a pack claiming a check it
+# does not register leaves a team believing something runs that does not.
+schema_version: 2
+name: histpack-rules
+
+# The extension API, versioned separately from Guardana's own release number.
+extension_api: ">=2,<3"
+
+description: >
+  Rules and a target for histpack-rules, scaffolded by `guardana new-pack`.
+
+provides:
+  rules:
+    - histpack.agent.tool_exfiltration
+    - histpack.prompt.secret_disclosure
+    - histpack.scenario.retrieved_document
+  targets:
+    - HistpackRulesTarget

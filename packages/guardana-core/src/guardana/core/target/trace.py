@@ -60,8 +60,8 @@ class TraceTarget(Target):
     of rules.
 
     Capabilities come from what the producer records, not from what the type can hold.
-    That is what stops the most dangerous inference a trace invites; see
-    `docs/design/trace-domain-model.md`.
+    That is what stops the most dangerous inference a trace invites:
+    reading a dimension the producer never records as evidence that nothing happened.
     """
 
     kind = TargetKind.TRACE
@@ -138,10 +138,10 @@ class TraceTarget(Target):
         return tuple(seen.values())
 
     def apply_budgets(self, budgets: Budgets) -> None:
-        """Accept request and token ceilings, which reading a file cannot exceed; refuse a clock.
+        """Accept the ceilings reading a file cannot exceed; refuse a clock.
 
         The same split as a file scan, for the same reason. Analysing a trace sends
-        nothing, so a request or token ceiling is satisfied by construction and
+        nothing, so a request, token or rate ceiling is satisfied by construction and
         accepting it is honest — while a duration ceiling would promise an
         interruption this target does not perform.
 

@@ -5,8 +5,7 @@ an export and wrong for a producer: a live agent cannot buffer a session that ru
 hours, and the file has to be worth reading if the process dies halfway through.
 
 Every refusal here is a measured false green rather than a matter of taste. Grading four
-hand-built traces against the released engine (written up in
-`docs/design/trace-producer.md`) put the leak in one place: a producer that declares
+hand-built traces against the released engine put the leak in one place: a producer that declares
 `effects` and never writes one gets `✓ No findings.` and exit `0` over an execution that
 refunded money. The declared dimensions that *drive* a rule's loop are the dangerous
 ones, and the writer is where they stop being a promise.

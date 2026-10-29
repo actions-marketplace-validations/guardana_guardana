@@ -1,27 +1,39 @@
+import re
 import threading
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 
 from guardana.core.budget import Budgets
+from guardana.core.fingerprint import digest_of
 from guardana.core.target._mcp_authorization import McpAuthorizationView
 from guardana.core.target._mcp_authorization import observe as observe_authorization
 from guardana.core.target._mcp_client import (
+    MAX_LISTING_PAGES,
     CacheHints,
+    ConversationRefused,
     HttpMcpTransport,
+    IncompleteListing,
     McpConversation,
     McpTool,
     McpTransport,
     MeteredTransport,
     Negotiation,
+    Opening,
     StdioMcpTransport,
+    announce_opening,
+    list_manifest,
+    modern,
     negotiate,
-    read_manifest,
+    open_era,
 )
-from guardana.core.target._mcp_http import McpError, Sender, send
+from guardana.core.target._mcp_http import DiscoverySender, HttpSender, McpError, RawReply, Sender
+from guardana.core.target._mcp_registry import RegistryEntry, ReportedServer
 from guardana.core.target._mcp_wire import Era
-from guardana.core.target.base import Capability, Target, TargetKind
+from guardana.core.target._url import display_url
+from guardana.core.target.base import Capability, Target, TargetKind, WireProtocol
 from guardana.core.usage import TargetUsage, UsageMeter
 
 __all__ = [
+    "MAX_LISTING_PAGES",
     "CacheHints",
     "Era",
     "McpAuthorizationView",
@@ -29,6 +41,7 @@ __all__ = [
     "McpError",
     "McpServerTarget",
     "McpTool",
+    "Opening",
 ]
 
 _EXEC_REFUSED = (
@@ -36,6 +49,122 @@ _EXEC_REFUSED = (
     "you are asking it to examine. Pass allow_exec=True (CLI: --allow-exec) if that "
     "is what you intend; a streamable-HTTP server needs no such permission."
 )
+_LONE_SENDER = (
+    "a supplied sender needs a discovery_sender too: pass the same scripted server, or "
+    "guardana.core.target.send for the built-in pinned client"
+)
+
+
+_SECRET_WORDS = frozenset(
+    {
+        "apikey",
+        "apikeys",
+        "auth",
+        "authorization",
+        "bearer",
+        "cookie",
+        "credential",
+        "credentials",
+        "jwt",
+        "key",
+        "pass",
+        "passphrase",
+        "passwd",
+        "password",
+        "passwords",
+        "pat",
+        "privatekey",
+        "pwd",
+        "secret",
+        "secrets",
+        "session",
+        "token",
+        "tokens",
+    }
+)
+_SECRET_SUFFIXES = (
+    "accesskey",
+    "apikey",
+    "credential",
+    "passphrase",
+    "passwd",
+    "password",
+    "privatekey",
+    "secret",
+    "token",
+)
+"""Endings that name a secret inside one word, as `accesstoken` or `clientsecret` do."""
+_NAME_WORDS = re.compile(r"[A-Z]?[a-z0-9]+|[A-Z]+(?![a-z])")
+_ASSIGNMENT = re.compile(r"([A-Za-z_][A-Za-z0-9_.-]*)=")
+_HEADER = re.compile(r"[ \t]*([A-Za-z][A-Za-z0-9-]*)[ \t]*:[ \t]*\S")
+_USERINFO = re.compile(r"://[^/?#]*@")
+_WITHHELD = "[withheld]"
+_ARGV_DIGEST_CHARS = 16
+
+
+def _stdio_ref(command: Sequence[str]) -> str:
+    """Name an stdio server by its whole command line, never by its executable alone.
+
+    Two servers started by one interpreter differ only in their arguments, so a ref
+    that dropped them let one server's pin approve another. A command with arguments
+    is named `mcp+stdio://<executable>#argv-<digest>`; the digest covers every argument
+    with each value that looks like a credential withheld, so the ref neither carries
+    a secret nor changes when one is rotated. A bare executable keeps its plain name.
+    """
+    if len(command) == 1:
+        return f"mcp+stdio://{command[0]}"
+    digest = digest_of(*_shown_argv(command)).split(":", 1)[1][:_ARGV_DIGEST_CHARS]
+    return f"mcp+stdio://{command[0]}#argv-{digest}"
+
+
+def _shown_argv(command: Sequence[str]) -> Iterator[str]:
+    """Yield the command line with every value that looks like a credential withheld.
+
+    A value is withheld after a flag whose name says it is a secret (`--token X`,
+    `--api-key=X`), in an assignment or a header whose name does (`API_KEY=X`,
+    `Authorization: Bearer X`), alone or as a flag's value, and wherever a URL carries
+    userinfo.
+    """
+    withhold_next = False
+    for argument in command:
+        if withhold_next:
+            withhold_next = False
+            yield _WITHHELD
+            continue
+        if argument.startswith("-"):
+            name, equals, value = argument.partition("=")
+            secret = _names_a_secret(name)
+            if equals:
+                yield f"{name}={_WITHHELD if secret else _shown_value(value)}"
+                continue
+            withhold_next = secret
+            yield argument
+            continue
+        yield _shown_value(argument)
+
+
+def _shown_value(value: str) -> str:
+    """Return `value`, or its form with the secret it carries withheld."""
+    assignment = _ASSIGNMENT.match(value)
+    if assignment is not None and _names_a_secret(assignment.group(1)):
+        return f"{assignment.group(1)}={_WITHHELD}"
+    header = _HEADER.match(value)
+    if header is not None and _names_a_secret(header.group(1)):
+        return f"{header.group(1)}: {_WITHHELD}"
+    if _USERINFO.search(value):
+        return _WITHHELD
+    return value
+
+
+def _names_a_secret(name: str) -> bool:
+    """Tell whether a flag or variable name says its value is a secret.
+
+    Read word by word, so `--api-key`, `--authToken` and `API_KEY` name one while
+    `--keys-dir` and `--author` do not: withholding those would let two servers that
+    differ only there share one ref.
+    """
+    words = [word.lower() for word in _NAME_WORDS.findall(name)]
+    return any(word in _SECRET_WORDS or word.endswith(_SECRET_SUFFIXES) for word in words)
 
 
 class McpServerTarget(Target):
@@ -56,12 +185,21 @@ class McpServerTarget(Target):
     The protocol underneath it has two eras, and this target speaks both: which one
     a given server is in gets settled once, before any question is asked, and is
     recorded in the run manifest so a later comparison can say the two runs graded
-    different revisions rather than that the system changed. See
-    `docs/design/mcp-protocol-eras.md`.
+    different revisions rather than that the system changed. The negotiation is one
+    live record the authorization view reads too, so a server that drops the agreed
+    revision part-way stops the run instead of being graded in two revisions.
 
-    Kind is `endpoint` — this is a live service, not files. It advertises
-    `LIST_TOOLS` always, so every chat rule is skipped against it by capability
-    rather than by a type check that could quietly return nothing, and
+    `sender` carries the server's own requests and `discovery_sender` the discovery
+    documents at addresses the server named. With neither, both are the built-in
+    pinned client; a `sender` without a `discovery_sender` is refused, so a supplied
+    transport can neither skip the pin nor send a test suite's discovery to the network.
+
+    `registry_entry` is the operator's copy of the server's registry `server.json`;
+    `REGISTRY_ENTRY` is declared only when one was given, over HTTP or stdio.
+
+    Kind is `endpoint` — this is a live service, not files. It speaks MCP, so every
+    chat or A2A rule is skipped against it as not applicable rather than by a type
+    check that could quietly return nothing. It advertises `LIST_TOOLS` always, and
     `INSPECT_AUTHORIZATION` **only over HTTP**: the specification says an stdio
     server should take its credentials from the environment instead of following
     the authorization spec, so grading one against OAuth requirements would be
@@ -79,17 +217,33 @@ class McpServerTarget(Target):
         credential: str | None = None,
         transport: McpTransport | None = None,
         sender: Sender | None = None,
+        discovery_sender: DiscoverySender | None = None,
+        registry_entry: RegistryEntry | None = None,
     ) -> None:
+        if sender is not None and discovery_sender is None:
+            raise ValueError(_LONE_SENDER)
+        built_in = HttpSender()
         self._url: str | None = None
         self._credential = credential
         self._meter = UsageMeter()
-        self._sender: Sender = sender if sender is not None else send
-        raw = self._connect(url, command, allow_exec, transport)
-        self._transport: McpTransport = MeteredTransport(raw, self._meter)
+        self._sender: Sender = sender if sender is not None else built_in
+        self._discovery_sender: DiscoverySender = (
+            discovery_sender if discovery_sender is not None else built_in
+        )
+        self._sender_supplied = sender is not None
+        self._registry_entry = registry_entry
+        self._lock = threading.RLock()
+        self._learned: list[str] = []
+        self._raw = self._connect(url, command, allow_exec, transport)
+        self._transport: McpTransport = MeteredTransport(self._raw, self._meter)
         self._negotiation: Negotiation | None = None
+        self._opening: Opening | None = None
+        self._opened = False
+        self._announce = False
+        self._refused: RawReply | None = None
+        self._incomplete: str | None = None
         self._conversation: McpConversation | None = None
         self._authorization: McpAuthorizationView | None = None
-        self._lock = threading.Lock()
 
     def _connect(
         self,
@@ -99,12 +253,12 @@ class McpServerTarget(Target):
         transport: McpTransport | None,
     ) -> McpTransport:
         if transport is not None:
-            self._ref = url or "mcp://injected"
+            self._ref = display_url(url) if url else "mcp://injected"
             # Only when a sender was supplied too. A caller that injects a transport
             # has replaced the JSON-RPC half and not the HTTP half, and claiming
             # INSPECT_AUTHORIZATION anyway sent the authorization probe to the real
             # network from tests that thought they had no network at all.
-            self._url = url if self._sender is not send else None
+            self._url = url if self._sender_supplied else None
             return transport
         if command is not None:
             if not allow_exec:
@@ -114,20 +268,56 @@ class McpServerTarget(Target):
                 # raised `IndexError`, which no caller catches — so a target that
                 # should refuse with a sentence crashed with a traceback instead.
                 raise McpError("an stdio MCP server needs a command to run")
-            self._ref = f"mcp+stdio://{command[0]}"
-            return StdioMcpTransport(command)
+            self._ref = _stdio_ref(command)
+            return StdioMcpTransport(command, ref=self._ref)
         if url is not None:
-            self._ref = url
+            self._ref = display_url(url)
             self._url = url
-            return HttpMcpTransport(url, credential=self._credential, send=self._sender)
+            return HttpMcpTransport(
+                url, credential=self._credential, send=self._sender, on_session=self._learn
+            )
         raise McpError("an MCP target needs a URL or a command")
 
     def capabilities(self) -> set[Capability]:
-        """Declare tool listing always, and authorization inspection only over real HTTP."""
+        """Declare tool listing always, authorization inspection only over real HTTP.
+
+        `REGISTRY_ENTRY` only when the operator supplied an entry to compare with.
+        """
         declared = {Capability.LIST_TOOLS}
         if self._url is not None:
             declared.add(Capability.INSPECT_AUTHORIZATION)
+        if self._registry_entry is not None:
+            declared.add(Capability.REGISTRY_ENTRY)
         return declared
+
+    def speaks(self) -> frozenset[WireProtocol]:
+        """Speak MCP, over HTTP or stdio."""
+        return frozenset({WireProtocol.MCP})
+
+    def registry_entry(self) -> RegistryEntry:
+        """Return the registry entry the operator supplied; raise when there is none."""
+        if self._registry_entry is None:
+            raise McpError(
+                "no registry entry was supplied; this target does not declare "
+                "REGISTRY_ENTRY, so a rule needing it is skipped"
+            )
+        return self._registry_entry
+
+    def reported_server(self) -> ReportedServer | None:
+        """Return what the server reported about itself, from discovery or the opening.
+
+        None when it reported no version. Read from what the run already asked; over the
+        handshake era that is the conversation's opening.
+        """
+        info = self.negotiation().server_info
+        if info is None:
+            opening = self.opening()
+            info = opening.server_info if opening is not None else None
+        return ReportedServer.from_info(info)
+
+    def server_url(self) -> str | None:
+        """Return the URL the server is reached at, or None when it was started over stdio."""
+        return self._url
 
     @property
     def ref(self) -> str:
@@ -138,6 +328,18 @@ class McpServerTarget(Target):
     def credential_supplied(self) -> bool:
         """Whether the operator gave a credential for this server."""
         return self._credential is not None
+
+    def sent_secrets(self) -> tuple[str, ...]:
+        """Return the bearer token and every session and task id this run learned.
+
+        All are withheld from records. They are learned during the run, so the run asks
+        again after it ends, before it writes anything: an id a server echoed into an
+        error stays out.
+        """
+        with self._lock:
+            learned = tuple(self._learned)
+        own = () if self._credential is None else (self._credential,)
+        return (*own, *learned)
 
     def usage(self) -> TargetUsage:
         """Return what this server has been asked for. Tokens never apply: there is no model.
@@ -172,25 +374,53 @@ class McpServerTarget(Target):
         agreed = negotiation.agreed if negotiation is not None else None
         return {"mcp": agreed} if agreed else {}
 
+    def negotiation(self) -> Negotiation:
+        """Return the one negotiation this run holds with the server, settled on first read."""
+        with self._lock:
+            return self._settle()
+
+    def opening(self) -> Opening | None:
+        """Return the server's answer to the conversation's `initialize`, opened on first read.
+
+        None for a modern conversation, which has no handshake, and when there is no
+        revision in common. Opened with the operator's credential when one is configured.
+        """
+        with self._lock:
+            self._open()
+            return self._opening
+
     def conversation(self) -> McpConversation:
         """Everything one exchange with this server established: revision, tools, cache claims.
 
         Bought once per run and cached under a lock, because several rules read the
         same manifest and `probe` may run them at once: a scan's cost must grow with
         the target rather than with how many rules look at it, and an unlocked check
-        would buy the same negotiation once per concurrent reader.
+        would buy the same negotiation once per concurrent reader. A status the
+        server gave the one request it was sent is remembered and handed to every
+        later reader without sending it again, and so is a listing that could not be
+        read to its end, which every page bought again would not change.
         """
         with self._lock:
+            if self._incomplete is not None:
+                raise IncompleteListing(self._incomplete)
             if self._conversation is None:
-                self._conversation = read_manifest(self._transport, self._settle())
-                # The handshake era only confirms its revision when a conversation
-                # is opened, so what `protocols()` reports comes from here rather
-                # than from the negotiation that preceded it.
-                self._negotiation = self._conversation.negotiation
+                negotiation = self._open()
+                try:
+                    self._conversation = list_manifest(
+                        self._transport, negotiation, self._ref, announce=self._announce
+                    )
+                except ConversationRefused as refused:
+                    self._refused = refused.reply
+                    raise
+                except IncompleteListing as incomplete:
+                    self._incomplete = str(incomplete)
+                    raise
+                finally:
+                    self._announce = False
             return self._conversation
 
     def list_tools(self) -> tuple[McpTool, ...]:
-        """Every tool the server advertises, fetched once per run and cached."""
+        """Every tool the server advertises, on every page, fetched once per run and cached."""
         return self.conversation().tools
 
     def _settle(self) -> Negotiation:
@@ -198,6 +428,57 @@ class McpServerTarget(Target):
         if self._negotiation is None:
             self._negotiation = negotiate(self._transport)
         return self._negotiation
+
+    def _open(self) -> Negotiation:
+        """Settle, and open the conversation's handshake once. The caller holds the lock."""
+        if self._refused is not None:
+            raise ConversationRefused(self._refused, self._ref)
+        negotiation = self._settle()
+        if self._opened:
+            return negotiation
+        self._transport.speak(negotiation.wire)
+        try:
+            settled, opening = open_era(self._transport, negotiation)
+        except ConversationRefused as refused:
+            self._refused = refused.reply
+            raise
+        self._negotiation = settled
+        self._opening = opening
+        self._announce = opening is not None and settled.unsupported is None
+        self._opened = True
+        return settled
+
+    def _conversation_session(self) -> str | None:
+        """Open the conversation, announce its accepted handshake, and return its session id.
+
+        None when the conversation has no session: a modern one, or a transport that
+        keeps none. The announcement is sent once, here or before the manifest; a session
+        it finds expired is opened once more, as a request's would be.
+        """
+        with self._lock:
+            negotiation = self._open()
+            if self._announce:
+                try:
+                    announce_opening(self._transport, negotiation, self._ref)
+                finally:
+                    self._announce = False
+            raw = self._raw
+            return raw.session_id if isinstance(raw, HttpMcpTransport) else None
+
+    def _resettle(self, offered: tuple[str, ...]) -> Negotiation:
+        """Settle again on what a modern server named, unless the era is already settled."""
+        with self._lock:
+            current = self._settle()
+            if current.settled_version is not None or self._opened:
+                return current
+            self._negotiation = modern(self._transport, offered, None)
+            return self._negotiation
+
+    def _learn(self, secret: str) -> None:
+        """Remember a value the server handed out that later requests may carry."""
+        with self._lock:
+            if secret not in self._learned:
+                self._learned.append(secret)
 
     def authorization(self) -> McpAuthorizationView:
         """Observe how the server authorizes a caller, as far as a client can tell.
@@ -215,12 +496,18 @@ class McpServerTarget(Target):
                         "authorization cannot be observed over stdio; this target does not "
                         "declare INSPECT_AUTHORIZATION, so a rule needing it is skipped"
                     )
+                self._settle()
                 self._authorization = observe_authorization(
                     self._url,
                     credential=self._credential,
                     meter=self._meter,
                     send=self._sender,
-                    negotiation=self._settle(),
+                    discovery_send=self._discovery_sender,
+                    negotiation=self.negotiation,
+                    resettle=self._resettle,
+                    opening=self.opening,
+                    conversation_session=self._conversation_session,
+                    learn=self._learn,
                 )
             return self._authorization
 

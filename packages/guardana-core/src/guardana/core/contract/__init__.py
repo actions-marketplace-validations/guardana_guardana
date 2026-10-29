@@ -6,8 +6,7 @@ application is allowed to do*. No public framework knows that, which is why it i
 authored by the team that owns the application and lives in their repository.
 
 The engine here owns the schema, its version and its refusals. The checking lives
-in `guardana.rules.contract`, where every other check does. See
-`docs/design/security-contracts.md`.
+in `guardana.rules.contract`, where every other check does.
 """
 
 from guardana.core.contract.assertion import (

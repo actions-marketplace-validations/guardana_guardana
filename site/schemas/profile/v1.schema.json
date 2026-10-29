@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/profile/v1.schema.json",
+  "title": "Guardana Profile v1",
+  "description": "guardana.yaml: which rules a run uses, what fails it, what it may spend and keep, and whether its deliveries must be acknowledged. Hand-written; Guardana never rewrites it. Every key is optional, a block left empty reads as its defaults, and relative paths are read beside the profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1,
+      "description": "Absent means 1. A version above the one this build reads is refused, naming the upgrade."
+    },
+    "name": {
+      "type": "string",
+      "description": "A label; not part of the profile digest. Defaults to `custom`."
+    },
+    "rules": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "description": "Rule id globs to run; omitted, every rule. An empty list matches no rule and is refused."
+        },
+        "exclude": {
+          "$ref": "#/$defs/globs",
+          "description": "Rule id globs to leave out; exclude wins over include."
+        },
+        "paths": {
+          "$ref": "#/$defs/globs",
+          "description": "Directories or files of custom YAML rules."
+        },
+        "paths_exclude": {
+          "$ref": "#/$defs/globs",
+          "description": "Path globs a scan does not read."
+        }
+      }
+    },
+    "fail_on": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "severity": {
+          "type": "string",
+          "pattern": "^([Ii][Nn][Ff][Oo]|[Ll][Oo][Ww]|[Mm][Ee][Dd][Ii][Uu][Mm]|[Hh][Ii][Gg][Hh]|[Cc][Rr][Ii][Tt][Ii][Cc][Aa][Ll])$",
+          "description": "The least severity that fails the run, in any case. Defaults to high."
+        },
+        "min_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "fail_on_inconclusive": {
+          "type": "boolean"
+        },
+        "fail_on_error": {
+          "type": "boolean",
+          "description": "Defaults to true."
+        },
+        "fail_on_skipped": {
+          "type": "boolean"
+        },
+        "min_graded_share": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "description": "The least share of a rule's attempted cases it must grade."
+        }
+      }
+    },
+    "rule_config": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "object"
+      },
+      "description": "Per-rule settings, keyed by rule id; each rule reads its own."
+    },
+    "evaluators": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "llm_judge": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "api_key_env": {
+              "type": "string",
+              "description": "The name of the variable that holds the key, never the key."
+            },
+            "provider": {
+              "type": "string"
+            },
+            "adapter": {
+              "type": "string",
+              "description": "An adapter file, read beside the profile."
+            },
+            "prompt_version": {
+              "type": "string"
+            },
+            "min_agreement": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "calibration": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "accuracy",
+                "samples",
+                "evaluator_id"
+              ],
+              "properties": {
+                "accuracy": {
+                  "type": "number"
+                },
+                "samples": {
+                  "type": "integer"
+                },
+                "evaluator_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "guard": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "endpoint": {
+              "type": "string"
+            },
+            "model": {
+              "type": "string"
+            },
+            "api_key_env": {
+              "type": "string",
+              "description": "The name of the variable that holds the key, never the key."
+            },
+            "provider": {
+              "type": "string"
+            },
+            "adapter": {
+              "type": "string",
+              "description": "An adapter file, read beside the profile."
+            }
+          }
+        }
+      }
+    },
+    "budgets": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_requests": {
+          "$ref": "#/$defs/ceiling"
+        },
+        "max_input_tokens": {
+          "$ref": "#/$defs/ceiling"
+        },
+        "max_output_tokens": {
+          "$ref": "#/$defs/ceiling"
+        },
+        "max_duration": {
+          "type": [
+            "string",
+            "number"
+          ],
+          "description": "A duration such as 90s, 15m or 2h."
+        },
+        "max_requests_per_minute": {
+          "$ref": "#/$defs/ceiling"
+        }
+      }
+    },
+    "privacy": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "evidence_mode": {
+          "enum": [
+            "metadata_only",
+            "redacted",
+            "full"
+          ],
+          "description": "Defaults to redacted."
+        },
+        "redact_secrets": {
+          "const": true,
+          "description": "A secret is removed at every evidence mode; false is refused."
+        },
+        "redact_emails": {
+          "type": "boolean"
+        },
+        "redact_ip_addresses": {
+          "type": "boolean"
+        },
+        "hash_identifiers": {
+          "type": "boolean"
+        },
+        "custom_patterns": {
+          "$ref": "#/$defs/globs",
+          "description": "Regular expressions whose matches are redacted."
+        },
+        "max_evidence_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "keep_exchanges": {
+          "type": "boolean",
+          "description": "Refused beside evidence_mode metadata_only."
+        }
+      }
+    },
+    "trace": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "require": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "enum": [
+              "messages",
+              "tools",
+              "retrieval",
+              "memory",
+              "identity",
+              "delegation",
+              "consent",
+              "policy",
+              "approval",
+              "effects",
+              "handoff"
+            ]
+          },
+          "description": "Dimensions a trace must record, or the run is indeterminate."
+        }
+      }
+    },
+    "contracts": {
+      "$ref": "#/$defs/globs",
+      "description": "Security contract files to load."
+    },
+    "calibrations": {
+      "$ref": "#/$defs/globs",
+      "description": "Recorded evaluator calibration files."
+    },
+    "trials": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Attempts per case for rules that grade a sampled reply. Defaults to 1."
+    },
+    "plugins": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "all",
+            "builtins",
+            "allowlist",
+            "disabled"
+          ]
+        },
+        "allow": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Distributions to admit; only with mode allowlist, which needs at least one."
+        }
+      }
+    },
+    "delivery": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "When true, a delivery to the collector or an installed reporter that was not acknowledged ends the command with exit 8. Defaults to false. Not part of the profile digest."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "globs": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
+    "ceiling": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}

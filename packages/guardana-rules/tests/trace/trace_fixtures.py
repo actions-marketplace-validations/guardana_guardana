@@ -8,6 +8,7 @@ never recorded, which must produce no finding at all.
 
 from collections.abc import Iterable
 
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.report import Finding
 from guardana.core.rule import Rule, RuleContext
 from guardana.core.runner import Runner
@@ -76,4 +77,7 @@ def built_in_runner() -> Runner:
     from guardana.core.profile import Policy, Profile  # noqa: PLC0415
     from guardana.core.registry import Registry  # noqa: PLC0415
 
-    return Runner(registry=Registry.discover(), profile=Profile(name="t", policy=Policy()))
+    return Runner(
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="t", policy=Policy()),
+    )

@@ -30,6 +30,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from guardana.core.trace._native import _SPAN_KEYS
 from guardana.core.trace._parse import (
     json_value,
     message_from,
@@ -42,7 +43,6 @@ from guardana.core.trace.agent import AgentRef
 from guardana.core.trace.identity import Identity, SessionRef
 from guardana.core.trace.memory import MemoryAction, MemoryOperation
 from guardana.core.trace.message import Message, Role
-from guardana.core.trace.retrieval import Retrieval
 from guardana.core.trace.span import ModelCall, Span, SpanKind
 from guardana.core.trace.tool import ToolDeclaration, ToolExecution, ToolStatus
 
@@ -74,6 +74,14 @@ _EVENT_ROLES = {
     "gen_ai.choice": Role.ASSISTANT,
 }
 _MCP_TOOL_METHODS = frozenset({"tools/call"})
+_NATIVE_CONTENT_KEYS = tuple(
+    sorted(_SPAN_KEYS - {"span_id", "parent_span_id", "kind", "name", "started_at", "ended_at"})
+)
+"""Native span fields that no OpenTelemetry encoding carries at the top level of a span.
+
+Derived from the native reader's own keys, so a field the native dialect gains is
+refused here too; the ones left out name a span in both dialects.
+"""
 _NANOS_PER_SECOND = 1_000_000_000
 
 
@@ -82,14 +90,28 @@ def read_span(raw: Mapping[str, Any]) -> tuple[Span, int]:
 
     The second value is not decoration. A span carrying GenAI message *events* whose
     content this reader could not extract would otherwise arrive with no messages,
-    and a rule reading its content would report clean over a turn that was there.
+    and a rule reading its content would report clean over a turn that was there. An
+    exporter that says it dropped attributes or events counts the same way.
+
+    A record carrying native span fields is refused with `ValueError`: this reader
+    would keep its id and drop the content those fields hold.
     """
+    native = [key for key in _NATIVE_CONTENT_KEYS if key in raw]
+    if native:
+        raise ValueError(
+            f"span carries native-dialect field(s) {', '.join(native)}, which an "
+            f"OpenTelemetry span does not have and this reader would drop"
+        )
     attributes = _attributes(raw)
     span_id = _identifier(raw, "spanId", "span_id") or ""
     if not span_id:
         raise ValueError("span has no span id in any encoding this reader knows")
     events, unread = _event_messages(raw)
-    messages = _messages(attributes) or events
+    # Both encodings may be present, each holding turns the other lacks; a turn
+    # carried by both is the same record and is kept once.
+    carried = _messages(attributes)
+    messages = carried + tuple(message for message in events if message not in carried)
+    unread += _dropped(raw)
     return (
         Span(
             span_id=span_id,
@@ -109,7 +131,6 @@ def read_span(raw: Mapping[str, Any]) -> tuple[Span, int]:
             ),
             tool_offers=_offers(attributes),
             tool=_tool(attributes),
-            retrieval=_retrieval(attributes),
             memory=_memory(attributes),
             conversation_id=_string(attributes.get("gen_ai.conversation.id")),
             identity=_identity(attributes),
@@ -283,6 +304,23 @@ def _messages(attributes: Mapping[str, Any]) -> tuple[Message, ...]:
     return tuple(messages)
 
 
+def _dropped(raw: Mapping[str, Any]) -> int:
+    """Count the attribute and event losses an exporter declared on this span, as one each."""
+    keys = (
+        ("droppedAttributesCount", "dropped_attributes_count"),
+        ("droppedEventsCount", "dropped_events_count"),
+    )
+    return sum(1 for camel, snake in keys if _declares_loss(raw, camel, snake))
+
+
+def _declares_loss(raw: Mapping[str, Any], camel: str, snake: str) -> bool:
+    """Whether a span or event carries a positive drop counter under either spelling."""
+    value = raw.get(camel, raw.get(snake))
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+
 def _event_messages(raw: Mapping[str, Any]) -> tuple[tuple[Message, ...], int]:
     """Read the event-based revision of the conventions, counting what stayed unread.
 
@@ -290,7 +328,9 @@ def _event_messages(raw: Mapping[str, Any]) -> tuple[tuple[Message, ...], int]:
     `gen_ai.input.messages`, the conventions carried message content in span events.
     An exporter may put the content in the event's attributes or in a `body`, and an
     event whose content is in neither place this reader knows is **counted** — a span
-    that plainly had a turn in it must not arrive looking like a span with none.
+    that plainly had a turn in it must not arrive looking like a span with none. So is a
+    message event whose exporter declares it dropped attributes, once, with whatever it
+    still carries kept: the dropped attribute may be the one holding the content.
     """
     messages: list[Message] = []
     unread = 0
@@ -301,10 +341,12 @@ def _event_messages(raw: Mapping[str, Any]) -> tuple[tuple[Message, ...], int]:
         if not isinstance(name, str) or name not in _EVENT_ROLES:
             continue
         payload = _event_payload(event)
-        if payload is None:
+        if payload is None or _declares_loss(
+            event, "droppedAttributesCount", "dropped_attributes_count"
+        ):
             unread += 1
-            continue
-        messages.append(_event_message(name, payload))
+        if payload is not None:
+            messages.append(_event_message(name, payload))
     return tuple(messages), unread
 
 
@@ -398,11 +440,6 @@ def _arguments(attributes: Mapping[str, Any]) -> str | None:
     return json.dumps(value, sort_keys=True) if value is not None else None
 
 
-def _retrieval(attributes: Mapping[str, Any]) -> Retrieval | None:
-    source = _string(attributes.get("gen_ai.data_source.id"))
-    return Retrieval(source=source) if source is not None else None
-
-
 def _memory(attributes: Mapping[str, Any]) -> MemoryOperation | None:
     operation = _string(attributes.get("gen_ai.operation.name"))
     action = _MEMORY_OPERATIONS.get(operation or "")
@@ -416,8 +453,8 @@ def _identity(attributes: Mapping[str, Any]) -> Identity | None:
     instrumented" from a session id would let the rule that fires on
     *session-as-authentication* run against a trace that never recorded a credential
     — accusing a properly authenticated deployment because its instrumentation is
-    quieter than ours. This is the same distinction as
-    `docs/design/mcp-authorization-depth.md`, arriving a second time.
+    quieter than ours. This is the same distinction `Identity` draws between a
+    credential and a session.
     """
     session = _string(attributes.get("mcp.session.id"))
     if session is None:

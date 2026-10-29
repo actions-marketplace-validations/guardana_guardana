@@ -118,7 +118,7 @@ def test_a_plan_does_not_price_a_rule_the_safety_ceiling_would_refuse() -> None:
     from guardana.core.target import EndpointTarget  # noqa: PLC0415
     from guardana.core.testing import RefusingTransport  # noqa: PLC0415
 
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     target = EndpointTarget("http://x", "m", transport=RefusingTransport())
     active = build_plan(registry, default_profile(), target)
 
@@ -126,7 +126,7 @@ def test_a_plan_does_not_price_a_rule_the_safety_ceiling_would_refuse() -> None:
 
     assert active.rules, "the fixture selected no rules at all"
     assert not passive.rules, "a passive run would refuse these, so a plan must not price them"
-    assert set(active.rules) <= set(passive.skipped)
+    assert set(active.rules) <= set(passive.skipped_rule_ids)
 
 
 @pytest.mark.parametrize("impact", list(Impact))
@@ -137,7 +137,7 @@ def test_a_plan_and_a_run_agree_about_every_impact_level(impact: Impact) -> None
     from guardana.core.target import EndpointTarget  # noqa: PLC0415
     from guardana.core.testing import RefusingTransport  # noqa: PLC0415
 
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     profile = replace(default_profile(), max_impact=impact)
     target = EndpointTarget("http://x", "m", transport=RefusingTransport())
 

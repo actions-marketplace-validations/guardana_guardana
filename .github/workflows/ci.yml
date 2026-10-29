@@ -6,19 +6,16 @@ on:
   pull_request:
     branches: ["**"]
 
-# Least privilege for the whole file, then per job where more is genuinely needed
-# (none is, here — CI reads the repository and reports). Without this block the
-# workflow inherits whatever the repository default is, which on an older repo is
-# read-write: a compromised action anywhere in this file would then hold a token
-# that can push to `main` of a security product. `release.yml` already declares
-# its own; this one did not, and nothing noticed because a too-wide token never
-# fails a build.
+# Least privilege: without this block the workflow inherits the repository default,
+# which can be read-write, and a compromised action would hold a token that can push.
 permissions:
   contents: read
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04's archive carries no postgresql-client-16, and pg_dump has to match
+    # the postgres:16 service below; moving this job means moving both together.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -31,7 +28,9 @@ jobs:
     # fail-open this project refuses everywhere else.
     services:
       postgres:
-        image: postgres:16-alpine
+        # Google's mirror of Docker Hub's official images: a shared runner address
+        # often exhausts Docker Hub's anonymous pull limit, which failed every job here.
+        image: mirror.gcr.io/library/postgres:16-alpine
         env:
           POSTGRES_USER: guardana
           POSTGRES_PASSWORD: guardana
@@ -63,7 +62,7 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y postgresql-client-16
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
@@ -84,6 +83,9 @@ jobs:
       - name: Architecture (the engine must never depend on the collector)
         run: uv run lint-imports
 
+      - name: Agent setup is consistent
+        run: uv run python scripts/check_claude_setup.py
+
       - name: Tests + coverage gate
         run: uv run pytest --cov --cov-report=term-missing --cov-report=json:.coverage.json
 
@@ -100,22 +102,39 @@ jobs:
       # `scan .` would fail by design: examples/vulnerable-model is deliberately
       # malicious. Guardana scans its own source instead, and must stay clean.
       - name: Dogfood (Guardana scans its own source)
-        run: uv run guardana scan packages
+        run: uv run guardana scan packages --profile scripts/dogfood.yaml
 
   images:
     # The images are built on every push, not first at the tag. An entrypoint, a
     # missing extra or a non-root user that cannot read the mounted volume are
     # failure modes no Python test can see, and finding them while cutting a
     # release is finding them at the worst possible moment.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.13"
+          cache-suffix: images
+
+      # The images install the requirement files exported from uv.lock; a lock change
+      # without a re-export would ship versions the test job never ran. The check reads
+      # them with `packaging`, so it runs in the locked development environment.
+      - name: Image requirements match uv.lock
+        run: uv run --locked python scripts/export_image_requirements.py --check
+
+      # The base images are pinned by digest, so the mirror serves the same bytes or
+      # the build fails; Docker Hub stays the fallback when the mirror has no copy.
+      - name: Pull Docker Hub images through Google's mirror
+        run: |
+          { sudo cat /etc/docker/daemon.json 2>/dev/null || echo '{}'; } \
+            | jq '. + {"registry-mirrors": ["https://mirror.gcr.io"]}' > "$RUNNER_TEMP/daemon.json"
+          sudo mv "$RUNNER_TEMP/daemon.json" /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker info --format '{{json .RegistryConfig.Mirrors}}'
 
       - name: Build both images and run them
         run: uv run --no-project python scripts/image_smoke.py
@@ -127,15 +146,16 @@ jobs:
     # type. It is the only job that could have caught the defect that made 0.9.0
     # unshippable (`ModuleNotFoundError: click` on every command), and the
     # release workflow runs the same script before it publishes anything.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.13"
+          cache-suffix: clean-install
 
       # --no-project on purpose: this must not depend on the development
       # environment resolving, because a user's install does not.
@@ -153,25 +173,15 @@ jobs:
     # workspace registers rules through the `guardana.rules` entry point and is
     # discovered. Isolated on purpose — installing it into the main test env
     # would put `acme.*` rules into every discovery and skew the dogfood scan.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      # `enable-cache: false`, stated rather than left to the default. Every step
-      # below runs `--no-cache` — that is the job's whole point, because uv
-      # otherwise serves a previously built wheel for an example and the metadata
-      # inside it is exactly what these tests check. So nothing ever writes to
-      # `UV_CACHE_DIR`, and setup-uv's post step fails the job trying to save a
-      # directory that was never created.
-      #
-      # Dropping `enable-cache: true` was not enough: the default is `auto`, which
-      # still enables it. The job passed anyway for four releases because another
-      # job's cache happened to match the key and *restoring* it created the
-      # directory — so the first commit to change `uv.lock` turned a green job red
-      # for a reason unrelated to anything it tests.
+      # Every step below runs `--no-cache`, so `UV_CACHE_DIR` is never created and
+      # setup-uv's post step would fail saving it; the default `auto` still enables the cache.
       - name: Install uv
-        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
         with:
           python-version: "3.13"
           enable-cache: false
@@ -217,7 +227,50 @@ jobs:
           --with pytest
           pytest examples/shell_hook_integrator/tests -q
 
-      # The three steps above prove a hand-written pack still works. This one proves
+      # A reference application served on a local port: the probe drives the installed CLI
+      # against it as a team would in CI, so the two checks over seeded data, their
+      # controls and the doubles' trace are proven against a real HTTP endpoint.
+      - name: Run the reference retrieval application's tests against an installed Guardana
+        run: >
+          uv run --isolated --no-cache
+          --with ./packages/guardana-core
+          --with ./packages/guardana-rules
+          --with ./packages/guardana-cli
+          --with ./packages/guardana-report
+          --with ./examples/retrieval_pilot
+          --with pytest
+          pytest examples/retrieval_pilot/tests
+
+      # An installed format and an installed reporter from a package Guardana does not
+      # ship, selected through the CLI. The webhook receiver checks every delivery with
+      # `standardwebhooks`, the specification's reference verifier, installed for the
+      # tests only: nothing in the package imports it.
+      - name: Run the output package's own tests against an installed Guardana
+        run: >
+          uv run --isolated --no-cache
+          --with ./packages/guardana-core
+          --with ./packages/guardana-rules
+          --with ./packages/guardana-cli
+          --with ./packages/guardana-report
+          --with ./examples/output_pack
+          --with standardwebhooks==1.1.0
+          --with pytest
+          pytest examples/output_pack/tests
+
+      # Every extension point in one pack, imported only through the supported surface
+      # and checked only by the commands and the conformance kit Guardana ships.
+      - name: Run the reference pack's own tests against an installed Guardana
+        run: >
+          uv run --isolated --no-cache
+          --with ./packages/guardana-core
+          --with ./packages/guardana-rules
+          --with ./packages/guardana-cli
+          --with ./packages/guardana-report
+          --with ./examples/reference_pack
+          --with pytest
+          pytest examples/reference_pack/tests
+
+      # The example steps above prove a hand-written package still works. This one proves
       # the command that writes a pack from nothing does — installed, validated and
       # graded, with its own detector checked against a manifest that lies.
       - name: Scaffold a pack and prove it installs, validates and grades

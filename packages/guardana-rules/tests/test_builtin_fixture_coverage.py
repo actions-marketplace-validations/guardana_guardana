@@ -1,37 +1,22 @@
-"""How many built-in rules carry their own samples, pinned so the number can only rise.
+"""Every built-in rule proves it can find, stay silent and decline, on samples of its own.
 
-Every declarative built-in that can honestly declare all three outcomes does. The
-remainder are Python plugins still to be sampled, plus one declarative rule whose
-honest clean sample is a finding today. Writing the rest in one sitting would mean
-writing fixtures to make a counter move, and a fixture written for that reason is a
-test that cannot fail — which this repository treats as worse than no test at all.
-
-So the migration is ratcheted instead of declared finished. This test states the real
-number, fails when it drops, and tells whoever raised it to raise the number here in
-the same change. `guardana rule test 'guardana.*'` reports the remainder as
-`indeterminate`, truthfully.
-
-**The bar is ours before it is anyone else's.** `rule test` asks a third party to
-sample every rule they ship, and a project that exempted itself would be asking them
-to clear a bar it had not.
+`guardana rule test` asks a third party to sample every rule they ship, and a project that
+exempted itself would be asking them to clear a bar it had not. A rule that can never decline
+honestly is listed in `_EXEMPT` with the reason, and nowhere else.
 """
 
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext
 from guardana.core.rule.verify import verify_rule
 from guardana.rules import provide_rules
 
-_FULLY_SAMPLED = 11
-"""Built-in rules declaring a finding, a clean *and* an inconclusive fixture.
-
-Raise this when you sample another rule. Never lower it: a rule whose samples were
-deleted is a rule that stopped being checked, and the point of a ratchet is that it
-does not turn both ways.
-"""
+_EXEMPT: dict[str, str] = {}
+"""Built-in rules that can never be prevented from establishing their claim, each with why."""
 
 
 def _sampled() -> tuple[list[str], list[str]]:
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     ctx = RuleContext(evaluators=registry.evaluators())
     proven: list[str] = []
     unsampled: list[str] = []
@@ -40,30 +25,22 @@ def _sampled() -> tuple[list[str], list[str]]:
     return proven, unsampled
 
 
-def test_the_number_of_fully_sampled_built_in_rules_never_drops() -> None:
-    proven, _unsampled = _sampled()
+def test_every_built_in_rule_not_exempt_carries_all_three_samples() -> None:
+    proven, unsampled = _sampled()
 
-    assert len(proven) >= _FULLY_SAMPLED, (
-        f"{_FULLY_SAMPLED} built-in rule(s) used to carry a finding, a clean and an "
-        f"inconclusive fixture; {len(proven)} do now. A rule that stopped being "
-        f"sampled stopped being checked: {sorted(proven)}"
+    missing = sorted(set(unsampled) - set(_EXEMPT))
+    assert not missing, (
+        f"built-in rules without a finding, a clean and an inconclusive sample: {missing}"
     )
+    assert len(proven) == len(provide_rules()) - len(_EXEMPT)
 
 
-def test_the_pinned_number_is_the_real_one() -> None:
-    """A ratchet nobody raises is a ratchet that stops meaning anything.
+def test_every_exemption_names_a_shipped_unsampled_rule_and_a_reason() -> None:
+    _proven, unsampled = _sampled()
 
-    The lower bound above would still pass if every rule in the catalogue gained
-    fixtures and nobody updated it, and the count `docs/usage-rule-test.md` quotes
-    would quietly become wrong. This is what makes raising the number part of the
-    change that earns it.
-    """
-    proven, _unsampled = _sampled()
-
-    assert len(proven) == _FULLY_SAMPLED, (
-        f"{len(proven)} built-in rule(s) are now fully sampled and this file still "
-        f"says {_FULLY_SAMPLED} — raise it, and the count in docs/usage-rule-test.md"
-    )
+    stale = sorted(rule_id for rule_id in _EXEMPT if rule_id not in unsampled)
+    assert not stale, f"exempt rules that ship all three samples or no longer exist: {stale}"
+    assert all(reason.strip() for reason in _EXEMPT.values())
 
 
 def test_every_fully_sampled_rule_actually_classifies_its_own_samples() -> None:
@@ -72,7 +49,7 @@ def test_every_fully_sampled_rule_actually_classifies_its_own_samples() -> None:
     Separate on purpose: a rule could declare all three fixtures and get them wrong,
     and a coverage count that rose on a broken rule would be measuring paperwork.
     """
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     ctx = RuleContext(evaluators=registry.evaluators())
 
     wrong = [

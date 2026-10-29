@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from sitegen import explorer, layout, nav, render, theme
+from sitegen.diagram import DiagramError
 from sitegen.errors import SiteBuildError
 from sitegen.links import LinkResolver
+from sitegen.notes import read_notes
 from sitegen.page import Page, read_pages
 
 _RULES_ENTRY = nav.NavEntry("Rule explorer", "rules/index.html", "stable")
@@ -31,7 +33,9 @@ def build(repo: Path, version: str) -> dict[str, str]:
     pages = read_pages(docs)
     rules = explorer.load_rules(docs / "generated" / "rules.json")
     chrome = layout.Chrome(
-        tuple(nav.build(docs / "index.md", pages, {_RULES_SECTION: (_RULES_ENTRY,)})), version
+        tuple(nav.build(docs / "index.md", pages, {_RULES_SECTION: (_RULES_ENTRY,)})),
+        version,
+        notes=bool(read_notes(repo / "notes")),
     )
     files = {"docs.css": theme.CSS}
     files.update(_prose(repo, docs, pages, chrome))
@@ -45,6 +49,10 @@ def _prose(repo: Path, docs: Path, pages: list[Page], chrome: layout.Chrome) -> 
     rendered = {}
     for page in pages:
         title_html, body = render.split_heading(page.body)
+        try:
+            html = render.render(body, resolver.for_page(page)).html
+        except DiagramError as exc:
+            raise SiteBuildError(f"docs/{page.relative.as_posix()}: diagram: {exc}") from None
         rendered[page.output.as_posix()] = layout.page(
             chrome=chrome,
             href=page.output.as_posix(),
@@ -55,7 +63,7 @@ def _prose(repo: Path, docs: Path, pages: list[Page], chrome: layout.Chrome) -> 
                 render.inline(page.summary),
                 page.status,
             )
-            + _tables(render.render(body, resolver.for_page(page)).html),
+            + render.wrap_tables(html),
             edit_path=f"docs/{page.relative.as_posix()}",
         )
     if resolver.problems:
@@ -63,13 +71,6 @@ def _prose(repo: Path, docs: Path, pages: list[Page], chrome: layout.Chrome) -> 
             "links that do not survive rendering:\n  " + "\n  ".join(sorted(resolver.problems))
         )
     return rendered
-
-
-def _tables(html: str) -> str:
-    """Wrap every table so a wide one scrolls inside itself instead of the page."""
-    return html.replace("<table>", '<div class="table-wrap"><table>').replace(
-        "</table>", "</table></div>"
-    )
 
 
 def _explorer(rules: list[dict[str, Any]], chrome: layout.Chrome) -> dict[str, str]:

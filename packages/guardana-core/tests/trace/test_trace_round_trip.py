@@ -62,7 +62,7 @@ _THE_READING_NOT_THE_TRACE = frozenset(
     {
         "trace.provenance.source",
         "trace.provenance.dialect",
-        "trace.provenance.document_digest",
+        "trace.provenance.document",
         "trace.unreadable",
     }
 )

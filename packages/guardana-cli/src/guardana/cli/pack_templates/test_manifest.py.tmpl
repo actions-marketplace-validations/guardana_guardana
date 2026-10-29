@@ -10,11 +10,16 @@ import __MODULE__
 from guardana.core.pack import (
     EXTENSION_API_VERSION,
     PackManifest,
+    Registered,
     check_pack,
     installed_manifests,
     load_manifest,
 )
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
+from guardana.core.taxonomy import register_all
+
+_THIS_PACK = PluginTrust(mode=PluginMode.ALLOWLIST, allowed=frozenset({"__DIST__"}))
 
 
 def _manifest() -> PackManifest:
@@ -23,13 +28,20 @@ def _manifest() -> PackManifest:
         return load_manifest(manifest)
 
 
-def _registered() -> set[str]:
-    """Every id the entry points register, in the vocabulary the manifest uses."""
-    return (
-        {rule.meta.id for rule in __MODULE__.provide_rules()}
-        | {evaluator.id for evaluator in __MODULE__.provide_evaluators()}
-        | {target.__name__ for target in __MODULE__.provide_targets()}
-        | {ref.framework for ref in __MODULE__.provide_taxonomies()}
+def _registered(*, without: str | None = None) -> Registered:
+    """Every id the entry points register, each under its own kind, as the manifest declares it."""
+
+    def kept(ids: list[str]) -> dict[str, str | None]:
+        return {i: None for i in ids if i != without}
+
+    # Discovery registers the pack's taxonomies before its rules; called directly, so is this.
+    register_all(__MODULE__.provide_taxonomies())
+
+    return Registered(
+        rules=kept([rule.meta.id for rule in __MODULE__.provide_rules()]),
+        evaluators=kept([evaluator.id for evaluator in __MODULE__.provide_evaluators()]),
+        targets=kept([target.__name__ for target in __MODULE__.provide_targets()]),
+        taxonomies=kept([ref.framework for ref in __MODULE__.provide_taxonomies()]),
     )
 
 
@@ -47,13 +59,27 @@ def test_this_build_can_load_this_pack() -> None:
 
 
 def test_the_manifest_lists_exactly_what_the_entry_points_register() -> None:
-    assert set(_manifest().provides) == _registered()
+    registered = _registered()
+    every_id = {
+        *registered.rules,
+        *registered.evaluators,
+        *registered.targets,
+        *registered.taxonomies,
+    }
+    assert set(_manifest().provides) == every_id
 
 
 def test_discovery_finds_this_pack() -> None:
-    found = [m for m in installed_manifests() if m.name == "__DIST__"]
+    found = [m for m in installed_manifests(_THIS_PACK) if m.name == "__DIST__"]
 
     assert found, "the pack ships a manifest and registers entry points, so it must be found"
+
+
+def test_the_manifest_passes_the_check_pack_validate_runs() -> None:
+    """Every declared id is registered under its own kind, as `guardana pack validate` asks."""
+    check = check_pack(_manifest(), _registered())
+
+    assert check.ok, check.problems
 
 
 def test_a_promise_the_package_does_not_keep_is_reported() -> None:
@@ -64,14 +90,14 @@ def test_a_promise_the_package_does_not_keep_is_reported() -> None:
     ids = sorted(rule.meta.id for rule in __MODULE__.provide_rules())
     assert ids, "the package registers no rules, so there is no promise to break"
 
-    check = check_pack(_manifest(), _registered() - {ids[0]})
+    check = check_pack(_manifest(), _registered(without=ids[0]))
 
     assert not check.ok
     assert ids[0] in check.problems[0]
 
 
 def test_the_target_is_registered_and_declared() -> None:
-    registered = {target.__name__ for target in Registry.discover().targets()}
+    registered = {target.__name__ for target in Registry.discover(_THIS_PACK).targets()}
 
     assert "__CLASS__Target" in registered
     assert "__CLASS__Target" in _manifest().provides

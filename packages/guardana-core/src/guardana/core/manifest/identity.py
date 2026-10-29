@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from guardana.core.fingerprint import DocumentDigest
 from guardana.core.target import TargetKind
 
 
@@ -56,6 +57,9 @@ class TargetIdentity:
     a URL and a model name identifies a *declared* target; it says nothing about
     the weights behind it. Without this field the document would be silent on the
     difference, and silence is how a reader invents the stronger reading.
+
+    `document` is the digest of the document the run read and what it covers, or
+    `None` when the run read no document or did not record one — never a match.
     """
 
     kind: TargetKind
@@ -63,6 +67,7 @@ class TargetIdentity:
     fingerprint: str | None = None
     fingerprint_inputs: tuple[str, ...] = ()
     capabilities: tuple[str, ...] = ()
+    document: DocumentDigest | None = None
 
 
 @dataclass(frozen=True, slots=True)

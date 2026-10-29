@@ -1,12 +1,13 @@
-"""Render `docs/**.md` and the rule registry into the static site at `site/docs/`.
+"""Render `docs/**.md`, the rule registry and `notes/*.md` into the static site under `site/`.
 
 Split across small modules for the reason the engine is: one concept per file, so
 a change to how links are rewritten does not sit in the same file as the palette.
 
-`build.py` is the only entry point anybody outside this package needs.
+`build` and `build_notes` are the only entry points anybody outside this package needs.
 """
 
 from sitegen.build import build
 from sitegen.errors import SiteBuildError
+from sitegen.notes import build_notes
 
-__all__ = ["SiteBuildError", "build"]
+__all__ = ["SiteBuildError", "build", "build_notes"]

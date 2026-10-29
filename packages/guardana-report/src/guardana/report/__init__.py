@@ -1,5 +1,6 @@
 from collections.abc import Callable
 
+from guardana.core.gate import GateOutcome
 from guardana.core.manifest import RunManifest
 from guardana.core.redaction import EvidenceRedactor
 from guardana.core.report import ScanResult
@@ -11,11 +12,11 @@ from guardana.report.json_report import JsonRenderer
 from guardana.report.junit import JUnitRenderer
 from guardana.report.sarif import SarifRenderer
 
-_RENDERERS: dict[str, Callable[[RunManifest | None], Renderer]] = {
+_RENDERERS: dict[str, Callable[[RunManifest | None, GateOutcome | None], Renderer]] = {
     JsonRenderer.name: JsonRenderer,
     HumanRenderer.name: HumanRenderer,
     SarifRenderer.name: SarifRenderer,
-    JUnitRenderer.name: lambda _run: JUnitRenderer(),
+    JUnitRenderer.name: JUnitRenderer,
 }
 
 
@@ -60,18 +61,23 @@ class _Redacting:
 
 
 def get_renderer(
-    name: str, *, run: RunManifest | None = None, redactor: EvidenceRedactor | None = None
+    name: str,
+    *,
+    run: RunManifest | None = None,
+    redactor: EvidenceRedactor | None = None,
+    gate: GateOutcome | None = None,
 ) -> Renderer:
     """Look up a renderer by the name the CLI's `--format` takes.
 
-    Renderers are built per call rather than shared, because two of them take the
-    run manifest: JSON writes it whole (that document is read back by `guardana
-    diff`), and SARIF folds the parts its `invocation` object has a place for.
-    The rest accept the argument and ignore it, which is a contract being
-    honoured rather than a smell.
+    Renderers are built per call rather than shared, because each takes the run
+    manifest: JSON writes it whole (that document is read back by `guardana diff`),
+    SARIF folds the parts its `invocation` object has a place for, and every other
+    format reads the recorded gate so it cannot render clean a run the gate refused.
+    `gate` stands in for that recorded gate when no manifest was written, as for a
+    `monitor` cycle; a manifest's own gate wins.
     """
     try:
-        inner = _RENDERERS[name](run)
+        inner = _RENDERERS[name](run, gate)
     except KeyError as exc:
         raise ValueError(f"unknown renderer: {name!r}") from exc
     return _Redacting(inner, redactor if redactor is not None else EvidenceRedactor())

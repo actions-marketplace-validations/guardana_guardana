@@ -7,28 +7,24 @@ status: stable
 
 # `guardana rules` — what is discovered, before anything runs
 
-List all discovered rules, grouped by the layer they secure — build-time
-(static, artifact — dev machine, CI, training server) versus runtime (dynamic,
-endpoint — live probe and monitor).
+`guardana rules` lists discovered build-time and runtime rules when you need to check what is available.
 
 ```bash
 guardana rules
 ```
 
-Pass `--rules <dir>` to include your own YAML rules in the listing — the same
-flag `scan`/`probe` take — so you can confirm a rule pack parses and is picked
-up without launching a full probe. A file that fails to load is warned about,
-never silently dropped.
+Pass `--rules <dir>` to include YAML rules, as with `scan` and `probe`. Files that fail to load produce a warning.
 
 ## Flags
 
-`rules` discovers plugins the same way `scan`/`probe` do, so it takes the same
-plugin-trust flags:
+`rules` takes a layer filter and the same plugin-trust flags `scan`/`probe` do:
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--surface [all\|build\|runtime]` | `all` | Filter by security layer: list every rule, or only build-time or runtime ones |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
+| `--profile PATH` | none | A `guardana.yaml` whose `plugins:` decides which installed plugins load — see [`profiles.md`](profiles.md#plugin-trust-plugins) |
 
 ## See also
 

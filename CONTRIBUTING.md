@@ -24,19 +24,9 @@ uv run pre-commit install --install-hooks --hook-type commit-msg --hook-type pre
 
 ## Your first contribution
 
-The fastest way in is a **new declarative rule**, and it needs no engine
-knowledge. A YAML rule is "send these prompts, grade with this evaluator" —
-`uv run guardana new-rule yourname.prompt.my_check` scaffolds a valid skeleton,
-and the whole thing (rule + its required positive and negative test fixtures) is
-typically a ~30-minute PR. See [`docs/writing-rules.md`](docs/writing-rules.md)
-and the worked example in [`examples/custom_rule/`](examples/custom_rule/).
+Documentation fixes, tests for existing behaviour, examples, and maintainer scripts are open now. Browse issues labelled [`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22) for a concrete task.
 
-Looking for something concrete? Browse issues labelled
-[`good first issue`](https://github.com/guardana/guardana/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
-Every rule maps to a standard (OWASP LLM / MITRE ATLAS / NIST) and ships with a
-positive **and** a negative fixture — that fixture pair is non-negotiable,
-because it is what keeps the project honest about the false-positive /
-false-negative failure mode dynamic checks are prone to.
+New declarative rules are welcome. A built-in rule needs a public framework mapping in edition form and positive and negative fixtures. `uv run guardana new-rule yourname.prompt.my_check` scaffolds a skeleton. See [`docs/writing-rules.md`](docs/writing-rules.md) and [`examples/custom_rule/`](examples/custom_rule/).
 
 ## Tooling gates
 
@@ -49,7 +39,7 @@ uv run ruff format --check .   # formatting
 uv run mypy --strict .         # types — the whole repo, tests included
 uv run lint-imports            # architecture: the engine must not import the collector
 uv run pytest --cov            # tests + the 90% branch-coverage gate
-uv run guardana scan packages  # dogfood: Guardana scans its own source
+uv run guardana scan packages --profile scripts/dogfood.yaml  # dogfood: Guardana scans its own source
 ```
 
 One more runs in CI on every push, and you want it locally whenever you touch a
@@ -58,6 +48,11 @@ dependency, an import or an entry point:
 ```bash
 uv run python scripts/clean_install_check.py   # ~40s: five packages, empty venv
 ```
+
+After `uv lock` or `uv add`, and on a Dependabot `uv` pull request, run
+`uv run python scripts/export_image_requirements.py` and commit the three
+`deploy/docker/*-requirements.txt` files it rewrites. Container images install
+from these files. CI rejects an export that does not match `uv.lock`.
 
 And one more, whenever you touch anything a third-party pack depends on — the
 `Rule`/`Evaluator`/`Target` contracts, the entry-point groups, the pack manifest:
@@ -153,27 +148,28 @@ If a rule fires on code you believe is right, argue it in the PR with a
 `# noqa: RULE — reason` and the reason must be about *this* code, not about
 disliking the rule.
 
-## Product principles
+## Principles
 
-Before the code standards, the seven rules that decide whether a change belongs
-in the engine *at all*. A PR that breaks one gets sent back however good the code
-is — these are what [`ROADMAP.md`](ROADMAP.md) is planned against. The full
-wording and the incidents behind each live in
-[`docs/maintainers/lessons.md`](docs/maintainers/lessons.md); in short:
+Before the code standards, the rules that decide whether a change belongs in the
+engine *at all*. A PR that breaks one gets sent back however good the code is —
+these govern [public issues](https://github.com/guardana/guardana/issues), and they outrank
+convenience, in every 0.x:
 
-1. **No regulation or vendor name is logic in `guardana-core`** — it is data in a
-   rule, a taxonomy entry, or a separate extension package.
-2. **Cost grows with the target, not the rule count** — no new tree walk,
-   re-read, or re-parse per rule. Performance is a security property: a scan
-   nobody waits for gets excluded from CI, which is a fail-open one level up.
-3. **Offline, no account, no phone-home.** The only traffic is to the target.
-4. **The engine and every built-in rule stay open source, permanently.** Only
-   hosting and curated content may ever be paid.
-5. **Every rule maps to a public framework** (OWASP LLM / OWASP ASI / MITRE
-   ATLAS / NIST). No mapping, no merge.
-6. **Adding a dependency needs a justification in the PR** — a security scanner
-   with a sprawling dependency tree is its own supply-chain risk.
-7. **No fixture carries real data, secrets, or production prompts.**
+1. The engine knows no regulation and no vendor: a law, a vendor, a format is data, never logic in core.
+2. Cost grows with the target, not the rule count; performance is a security property, pinned by operation-count gates.
+3. Offline, no account, always: traffic goes only to destinations the run names — the target under test, a judge or guard the profile configures, the authorization metadata the target itself advertises, and a collector or reporter `--reporter` names; the collector is optional in every direction.
+4. The commercial boundary is fixed: engine and built-in rules stay open source; only hosting and curated content may be paid.
+5. Every built-in security rule maps to a public framework, in edition form; no mapping, no merge. A team's own quality criteria (suites, local checks) need no public mapping.
+6. The dependency surface is part of the posture: a new dependency needs a written justification.
+7. Tests are never a leak: no real data, secrets or production prompts; fixtures are built in code.
+8. Company usability before coverage volume.
+9. No public claim without generated or cited evidence.
+10. No false green from any direction: unsupported capability, exhausted budget, redaction failure, missing coverage, incomparable diff — each its own outcome.
+11. Every persisted schema is versioned and migratable.
+12. Every collector change considers tenancy and authorization.
+13. Every active rule declares its impact and expected cost.
+14. No API freeze before the domain model is complete.
+15. Documentation is part of the acceptance criteria.
 
 ## Code standards
 
@@ -227,6 +223,39 @@ short:
 Namespace anything you don't intend to upstream as `yourcompany.*` rather than
 `guardana.*`, so profiles can include/exclude cleanly.
 
+## Planning work in public
+
+[Issues](https://github.com/guardana/guardana/issues) are the work queue, and
+[milestones](https://github.com/guardana/guardana/milestones) group work committed
+to a release. Bring an idea without a reproducible problem or an acceptance
+criterion to [Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas)
+first. Before starting an issue, check for a duplicate and confirm that its
+description still matches the code. A ready issue states the user problem, the
+evidence, what would count as done, and any security, compatibility or
+execution-cost impact. A milestone is a release scope, not a promised date.
+
+Maintainers assign work to themselves. Contributors without repository write
+access can ask to take an issue in a comment; a maintainer will coordinate the
+assignment. Keep one logical change in a pull request. Link it with Closes #N
+only when it meets that issue's acceptance criteria; otherwise use a plain
+reference and leave the issue open. A release issue carries the public
+checklist, and its milestone closes after the promised artifacts are verified.
+
+A merged pull request runs CI but does not publish a package. The maintainer
+chooses a release from the completed work using
+[the versioning policy](docs/compatibility.md#versioning), then uses the
+tag-gated release process.
+
+### Release cadence
+
+Fixes and improvements merge to `main` whenever ready, any day of the week. `main` never freezes.
+
+Every Monday, the maintainer reviews changes merged since the last release. If any affect a published package, a release ships that day from `main` as it stands. Pull requests merged during preparation enter the next release. Weeks with only documentation, tests or maintainer tooling produce no package release; the site updates on every merge.
+
+Versions follow [the versioning policy](docs/compatibility.md#versioning): corrections receive a patch release; compatible opt-in features, improvements or deprecations receive a minor release. Contract breaks require a major release, a deprecation in an earlier minor release and a separate release candidate. Major releases never ship in the weekly release. Security fixes and urgent defects ship outside Monday's schedule through the same gates: the full local gate, green CI on the exact release commit, a signed tag approved by the maintainer, and published artifact verification.
+
+Plans live in GitHub Issues. Coming work uses the `next` milestone. On release, that milestone takes the version's name and closes; a new `next` opens. New issues are triaged weekly. `ROADMAP.md` remains the entry point.
+
 ## Commits and pull requests
 
 - Commits are made **manually, after a milestone** — not continuously, not as a
@@ -235,22 +264,11 @@ Namespace anything you don't intend to upstream as `yourcompany.*` rather than
   `docs: …`, `refactor: …`, `test: …`, `chore: …`. The `commit-msg` hook
   enforces the format; a message like `wip` or `fixes` is rejected before it
   reaches review.
-- **PRs must be a single commit.** This repository does not accept multi-commit
-  PRs — squash your branch before opening or updating a PR.
-
-To squash before pushing:
-
-```bash
-# from your feature branch, with N commits since it diverged from main
-git rebase -i main   # mark all but the first commit as "squash" or "fixup"
-# or, simpler if you don't need to keep intermediate messages:
-git reset --soft $(git merge-base HEAD main)
-git commit -m "feat: your single, specific commit message"
-git push --force-with-lease
-```
-
-If you already opened a multi-commit PR, squash and force-push to the same
-branch — don't open a second PR.
+- Keep each PR to one logical change. Contributor branches may contain multiple
+  commits; there is no need to squash or force-push before review.
+- Give the PR a specific conventional-commit title. After all CI checks pass
+  and review is complete, a maintainer squash-merges the PR and confirms the
+  squash commit title. Merging a PR does not release a package.
 
 ### Sign-off (optional)
 
@@ -265,6 +283,14 @@ option) needs documentation alongside the code that introduces it, not as a
 follow-up. Contributor-facing docs live near the code they describe; end-user
 docs live under `docs/`.
 
+Document new options, parameters, Python keywords and payload fields using the
+[availability convention](docs/compatibility.md#feature-and-field-availability).
+Record the first published Guardana package version, using `Unreleased` during
+development and resolving it during release preparation. Include the applicable
+document type and schema version, or `extension_api` / `output_api` version, and
+explain migration and unavailable evidence for older input. JSON Schema field
+descriptions carry this guidance without adding runtime keys.
+
 A user-visible change carries its documentation in the **same PR**, and there are
 five places to consider, each answered with an edit or an explicit "not
 applicable":
@@ -275,7 +301,7 @@ applicable":
 | [`FEATURES.md`](FEATURES.md) | a new capability, or one whose shape changed (a registry test fails if a built-in rule or evaluator ships without appearing there) |
 | [`docs/`](docs/) | a new command gets its own `usage-*.md`; a changed one gets its page reconciled, plus `docs/index.md` |
 | `site/index.html` | a headline claim moved: a rule count, a run mode, what the terminal demo prints |
-| [`ROADMAP.md`](ROADMAP.md) | the direction moved — delete what shipped, add what was deliberately deferred and why |
+| [Issues and milestones](https://github.com/guardana/guardana/issues) | the direction moved — update the affected issue and release scope; keep durable product limits in `docs/product-status.md` |
 
 This is a rule because it is a mistake the project has actually made: the landing
 page advertised "25 rules" across three releases that took the real number to 32,
@@ -283,11 +309,10 @@ while the release tooling dutifully rewrote the version number one element above
 it. Where you can, pin a claim with a test instead of a promise — `test_features_doc.py`
 and `test_landing_page.py` are the pattern.
 
-A larger change gets a design document first, under
-[`docs/design/`](docs/design/) — named for its topic, never for its date, with a
-status line at the top. [`docs/design/README.md`](docs/design/README.md) is the
-convention, and a test fails on any local link that points at a file which does
-not exist, so moving a document is never quietly half-done.
+A larger change starts with an
+[issue or a discussion](https://github.com/guardana/guardana/discussions), before
+the code. A test fails on any local link that points at a file which does not
+exist, so moving a document is never quietly half-done.
 
 ## Contribution lanes
 
@@ -320,10 +345,3 @@ Answer each with a sentence or an explicit "not applicable":
 - [ ] Documentation, per the five places above
 - [ ] `CHANGELOG.md` entry saying *why*
 - [ ] Generated docs refreshed (`uv run python scripts/generate_docs.py`)
-
-## For maintainers
-
-- Cutting a release (version bump, changelog, tag, PyPI publish):
-  [`RELEASING.md`](RELEASING.md).
-- One-time GitHub repo configuration (branch protection, labels, security,
-  the `pypi` environment): [`docs/maintainers/github-setup.md`](docs/maintainers/github-setup.md).

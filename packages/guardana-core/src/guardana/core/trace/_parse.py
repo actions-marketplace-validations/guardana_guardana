@@ -146,12 +146,13 @@ def reject_unknown_keys(raw: Mapping[str, Any], allowed: Iterable[str], what: st
     unknown key is ordinary: the conventions expect every span to carry attributes
     from other domains.
     """
-    unknown = sorted(set(raw) - set(allowed))
+    known = set(allowed)
+    unknown = sorted(set(raw) - known)
     if unknown:
         raise TraceLoadError(
-            f"{what} has unknown key(s) {', '.join(unknown)} — a misspelled field would "
-            f"leave a dimension declared and empty, which is how a rule accuses a system "
-            f"that did nothing wrong"
+            f"{what} has unknown key(s) {', '.join(unknown)}; known keys are "
+            f"{', '.join(sorted(known))} — a misspelled field would read as absent, which is "
+            f"how a rule grades nothing or accuses a system that did nothing wrong"
         )
 
 

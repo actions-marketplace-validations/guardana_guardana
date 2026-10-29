@@ -85,14 +85,26 @@ def test_one_credential_used_twice_within_one_boundary_is_ordinary() -> None:
     assert graded(CredentialPassthroughRule(), trace) == ()
 
 
-def test_two_hops_nobody_digested_are_not_evidence_of_reuse() -> None:
-    """The fail-closed direction: the alternative turns every two-hop trace into a finding."""
+def test_two_hops_nobody_digested_are_declined_never_reported_as_reuse() -> None:
+    """Undigested credentials are no evidence of reuse, and no evidence of its absence."""
     bare = CredentialRef(kind=CredentialKind.BEARER)
     trace = trace_of(
         span("s1", delegations=(Delegation(actor="a", boundary="a->b", credential=bare),)),
         span("s2", delegations=(Delegation(actor="b", boundary="b->c", credential=bare),)),
     )
-    assert graded(CredentialPassthroughRule(), trace) == ()
+
+    results = graded(CredentialPassthroughRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "carry no digest" in inconclusive(results)[0].evidence.summary
+
+
+def test_an_undigested_hop_with_no_other_boundary_is_not_a_question() -> None:
+    bare = CredentialRef(kind=CredentialKind.BEARER)
+    hop = (Delegation(actor="a", boundary="a->b", credential=bare),)
+
+    assert graded(CredentialPassthroughRule(), trace_of(span("s1", delegations=hop))) == ()
 
 
 def test_the_same_passthrough_is_reported_once_not_once_per_pair() -> None:
@@ -134,15 +146,41 @@ def test_a_prefix_is_not_a_match_because_a_lookalike_host_is_the_attack() -> Non
 
 
 @pytest.mark.parametrize(
-    "identity",
+    ("identity", "declined"),
     [
-        Identity(credential=CredentialRef(audience=()), claimed_resource="https://b/"),
-        Identity(credential=CredentialRef(audience=("https://a/",)), claimed_resource=None),
-        Identity(claimed_resource="https://b/"),
+        (
+            Identity(
+                credential=CredentialRef(kind=CredentialKind.BEARER, audience=()),
+                claimed_resource="https://b/",
+            ),
+            1,
+        ),
+        (Identity(credential=CredentialRef(audience=("https://a/",)), claimed_resource=None), 1),
+        (
+            Identity(
+                credential=CredentialRef(kind=CredentialKind.API_KEY, audience=()),
+                claimed_resource="https://b/",
+            ),
+            0,
+        ),
+        (Identity(credential=CredentialRef(audience=()), claimed_resource="https://b/"), 1),
+        (Identity(claimed_resource="https://b/"), 0),
+    ],
+    ids=[
+        "bearer-without-audience",
+        "no-callee",
+        "not-audience-bound",
+        "kind-not-stated",
+        "no-credential",
     ],
 )
-def test_two_thirds_of_a_disagreement_is_not_a_disagreement(identity: Identity) -> None:
-    assert graded(IdentityDisagreementRule(), trace_of(span("s1", identity=identity))) == ()
+def test_two_thirds_of_a_disagreement_is_declined_never_reported(
+    identity: Identity, declined: int
+) -> None:
+    results = graded(IdentityDisagreementRule(), trace_of(span("s1", identity=identity)))
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == declined
 
 
 # ── session_as_identity ─────────────────────────────────────────────────────────
@@ -165,7 +203,9 @@ def test_a_read_only_step_identified_by_a_session_is_a_different_question() -> N
     """Firing on every recorded read would bury the case where an unidentified caller wrote."""
     trace = trace_of(
         span(
-            "s1", identity=Identity(session=SessionRef(id="sess-1")), tool=ToolExecution(name="get")
+            "s1",
+            identity=Identity(session=SessionRef(id="sess-1")),
+            tool=ToolExecution(name="get", mutates=False),
         )
     )
     assert graded(SessionAsIdentityRule(), trace) == ()
@@ -191,7 +231,9 @@ def test_a_tool_whose_mutation_is_unknown_does_not_count_as_changing_something()
             tool=ToolExecution(name="delete_everything", mutates=None),
         )
     )
-    assert graded(SessionAsIdentityRule(), trace) == ()
+    results = graded(SessionAsIdentityRule(), trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
 
 
 # ── consent_scope_exceeded ──────────────────────────────────────────────────────
@@ -239,18 +281,42 @@ def test_a_consent_that_never_recorded_its_scopes_makes_the_rule_decline_by_name
     assert "agent" in inconclusive(results)[0].evidence.summary
 
 
-def test_a_hop_that_never_recorded_its_scopes_is_not_compared() -> None:
+def test_a_hop_that_never_recorded_its_scopes_makes_the_rule_decline_by_name() -> None:
+    """The hop may have used any scope, so "nothing ungranted was used" is unprovable."""
     trace = trace_of(
         span("s1", consents=(Consent(client="agent", granted=True, scopes=("read",)),)),
         span("s2", delegations=(Delegation(actor="agent", boundary="a->b", scopes=None),)),
     )
-    assert graded(ConsentScopeExceededRule(), trace) == ()
+    results = graded(ConsentScopeExceededRule(), trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "'a->b'" in inconclusive(results)[0].evidence.summary
 
 
-def test_a_hop_by_a_client_with_no_consent_record_at_all_is_not_compared() -> None:
+def test_a_scope_used_by_a_client_with_no_consent_record_at_all_is_a_finding() -> None:
+    """Consent is recorded in this trace, and none of it is for this client: nothing granted."""
     trace = trace_of(
         span("s1", consents=(Consent(client="other", granted=True, scopes=("read",)),)),
         span("s2", delegations=(Delegation(actor="agent", boundary="a->b", scopes=("write",)),)),
+    )
+    found = findings(graded(ConsentScopeExceededRule(), trace))
+    assert len(found) == 1
+    assert "no consent" in found[0].evidence.summary
+    assert "write" in found[0].evidence.summary
+
+
+def test_a_scope_used_where_the_trace_records_consent_and_holds_none_is_a_finding() -> None:
+    """A declared dimension is believed: a consent-recording producer that saw none saw none."""
+    trace = trace_of(
+        span("s2", delegations=(Delegation(actor="agent", boundary="a->b", scopes=("write",)),)),
+    )
+    assert len(findings(graded(ConsentScopeExceededRule(), trace))) == 1
+
+
+def test_a_hop_using_no_scope_needs_no_consent_record() -> None:
+    trace = trace_of(
+        span("s1", consents=(Consent(client="other", granted=True, scopes=("read",)),)),
+        span("s2", delegations=(Delegation(actor="agent", boundary="a->b", scopes=()),)),
     )
     assert graded(ConsentScopeExceededRule(), trace) == ()
 
@@ -305,13 +371,15 @@ def test_a_refusal_of_something_that_then_did_not_happen_is_the_system_working()
     assert graded(PolicyDecisionIgnoredRule(), trace) == ()
 
 
-def test_an_action_recorded_before_the_decision_was_not_permitted_by_it() -> None:
-    """A decision is about what follows it. Looking backwards would invent a bypass."""
+def test_an_action_written_before_the_decision_is_no_bypass_but_unordered_is_declined() -> None:
+    """Looking backwards would invent a bypass; write order alone does not say it came first."""
     trace = trace_of(
         span("s1", tool=ToolExecution(name="pay")),
         span("s2", policy_decisions=(PolicyDecision(outcome=PolicyOutcome.DENY, action="pay"),)),
     )
-    assert graded(PolicyDecisionIgnoredRule(), trace) == ()
+    results = graded(PolicyDecisionIgnoredRule(), trace)
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
 
 
 def test_a_similar_tool_name_is_not_the_refused_action() -> None:
@@ -691,6 +759,24 @@ def test_a_handoff_that_did_not_record_its_scopes_declines_by_name() -> None:
 
     assert findings(results) == ()
     assert len(inconclusive(results)) == 1
+
+
+def test_a_receiver_delegation_that_did_not_record_its_scopes_declines_by_name() -> None:
+    """The receiver may have used anything on that hop, so staying inside is unprovable."""
+    trace = trace_of(
+        _handoff_span(("docs:read",)),
+        span(
+            "s2",
+            agent=AgentRef(name="writer"),
+            delegations=(Delegation(actor="writer", boundary="writer->db", scopes=None),),
+        ),
+    )
+
+    results = graded(HandoffAuthorityExpansionRule(), trace)
+
+    assert findings(results) == ()
+    assert len(inconclusive(results)) == 1
+    assert "'writer->db'" in inconclusive(results)[0].evidence.summary
 
 
 def test_a_handoff_carrying_no_scopes_at_all_still_bounds_the_receiver() -> None:

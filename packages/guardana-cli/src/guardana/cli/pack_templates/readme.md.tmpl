@@ -10,10 +10,15 @@ commands that judge a pack:
 
 ```bash
 pip install -e .
-guardana pack validate src/__MODULE__/guardana-pack.yaml
-guardana rule test '__PREFIX__.*'
+guardana pack validate src/__MODULE__/guardana-pack.yaml --plugins allowlist --allow-plugin __DIST__
+guardana rule test '__PREFIX__.*' --plugins allowlist --allow-plugin __DIST__
 pytest tests
 ```
+
+Guardana loads only its own built-ins unless you say otherwise, so every command
+that should see this pack names it with `--allow-plugin`. A team states it once in
+`guardana.yaml` instead (`plugins: {mode: allowlist, allow: [__DIST__]}`) and passes
+`--profile guardana.yaml`.
 
 `guardana rule test` grades every rule against the three samples it declares: one
 that must produce a finding, one that must stay clean, one where the rule must
@@ -38,7 +43,9 @@ decline. A rule with no samples is reported as unchecked, never as passing.
   so a positive sample is evidence rather than an opinion about tone. Keep that
   shape when you rewrite them.
 - **The manifest.** Add every new rule id to `provides`. `guardana pack validate`
-  fails when the two disagree, in either direction.
+  fails when the manifest declares an id nothing registers, or a rule another
+  installed distribution registers; an id registered and not declared is not an
+  error, and `pack lock` lists it as unlocked.
 - **The API range.** `extension_api` pins the extension API, not Guardana's version.
   When Guardana's extension API moves past the range, widen it here after checking
   what changed — a pack outside the range is refused in both directions.

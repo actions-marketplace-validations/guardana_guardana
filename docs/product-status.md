@@ -17,13 +17,93 @@ so this page is maintained as carefully as the code.
 
 | Component | Maturity | What that means in practice |
 |---|---|---|
-| Engine + built-in rules | **beta** | Stable enough to gate a build on. The public Python API still moves between minor releases. |
-| `guardana scan` | **beta** | Deterministic, offline, no false-positive theatre. The most mature part of the product. |
-| `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers — the last of those on both its tool manifest and its authorization surface, and never by calling a tool. Verdict quality depends on the evaluator you configure. |
+| Engine + built-in rules | **stable** | Covered by the compatibility promise and suitable to gate a build on. [Compatibility](compatibility.md) lists the supported surface. Everything else, including `Runner` and `guardana.cli.*`, is internal and may change in any release. |
+| Python API (`guardana.core.verify`) | **stable** | Runs what `guardana scan` and `guardana probe` run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is `guardana.core.verify.__all__`; a change to it is announced as breaking with what to write instead. Trace analysis, `monitor` and baselines run from the command line only. |
+| `guardana scan` | **stable** | Deterministic, offline, no false-positive theatre. |
+| `guardana probe` | **beta** | Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure. |
 | `guardana monitor` | **beta** | Scheduled **active** verification. Not passive traffic inspection, not inline. |
-| `guardana diff` | **beta** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |
+| `guardana diff` | **stable** | Compares two saved runs. The saved-run format is versioned and migratable — `guardana run migrate` reads every earlier schema. |
 | Collector (`guardana-server`) | **beta** | PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements. |
-| Extension API | **unstable by design** | Frozen at 1.0, and deliberately not before — see below. |
+| `guardana grade` | **beta** | Grades a recording — answers you supplied, or the exchanges `probe --keep-exchanges` kept — with your rules and no target request. MCP and A2A rules are `not_applicable` on a chat recording; canary and tool rules still skip for a missing capability, and a rule the recording does not answer is skipped as `not_recorded`. |
+| `guardana analyze-trace` | **beta** | Grades an execution your agent already performed, offline, from OpenTelemetry GenAI spans (OTLP/JSON or an SDK file exporter) or Guardana's native dialect, versioned by its own JSON schema. It checks trace rules and, with `--contract`, security contracts. A dimension the profile requires but the trace lacks is reported as missing coverage, never as a pass. |
+| Quality suites | **beta** | Gates pass rates on team-supplied versioned datasets, with repeated trials. Judge-graded suites and judge-error correction are [experimental](#released-and-experimental). No numeric aggregate gate or statistical comparison between suite runs. |
+| Extension API | **stable** | Covered by the [compatibility policy](compatibility.md): rules, evaluators, targets, taxonomies, renderers and reporters, including installed outputs for `--format` and `--reporter`. |
+
+The Python verification facade also supports grading saved recordings through
+`Verifier.grade`, alongside `Verifier.scan` and `Verifier.run`. See the
+[Python API](python-api.md#run-a-target) for all three entry points.
+
+## Released and experimental
+
+**Released (beta):** Quality suites use the deterministic assessors `exact_match`, `contains`, `regex`, `json_valid`, and `length`. They support versioned JSONL datasets (`name@version`), deterministic sampling (`sample: {size, seed}`), repeated trials per case, and a suite gate that passes, fails, or declines with `min_sample`. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.
+
+**Experimental:** Judge-graded suites use `answered` and `reference_judge`. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with `guardana calibrate --record`. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.
+
+**Released (beta):** [repository recipes](usage-recipe.md) that pin a team's checks and refuse a run whose pins moved, one set of connection settings across `probe`, `plan probe`, `target inspect`, `monitor` and every judge, and a tested [provider table](providers.md).
+
+**Released (beta):** MCP checks proven against servers built on the `mcp` SDK in both revisions, and the A2A checks against agents built on `a2a-sdk`; a capability a server does not offer is recorded as skipped `not_offered`, a coverage gap.
+
+**Released (stable):** an installed package adds a format for `--format` and a reporter for `--reporter` ([installed outputs](outputs.md)), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit `8` when an installed output fails. `examples/output_pack` is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own `output_api`. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on `monitor`, `import-observations` and `recipe run`.
+
+**Not released:** The five-user first-run study, the team regression loop and the live retrieval pilot remain open [adoption measures](#adoption-measures); the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.
+
+## Stable-release criteria
+
+From 1.0, the supported Python facade, rule, evaluator and target contracts,
+output contracts, CLI flags and exit codes, profile schema and collector
+envelope are a compatibility promise.
+[Compatibility](compatibility.md) defines the full surface.
+
+The first stable release required every criterion below.
+
+- Each of `1.0.0rc2`, `1.0.0rc3`, `1.0.0rc4` and `1.0.0rc5` shipped after its own full green release gate and green CI on the exact commit. `1.0.0rc5` was published and verified on 2026-10-20 at 11:49 UTC. Its seven-day period ended on 2026-10-27 at 11:49 UTC and was not restarted. Two outside reports named supported-surface defects: quadratic processing in a built-in rule let a crafted scanned file cause denial of service without changing a verdict, fixed with two more of that class in `1.0.0` rather than another candidate ([advisory](https://github.com/guardana/guardana/security/advisories/GHSA-42p6-v3q4-959q)); on Windows, a refused `--write-baseline` left a staging file beside the destination with correct exit code and verdict, fixed in the first patch release after `1.0.0` ([#209](https://github.com/guardana/guardana/issues/209)). Package code in `1.0.0` differs from `1.0.0rc5` only by the fixes listed in the changelog; [#145](https://github.com/guardana/guardana/issues/145) records every report and its disposition.
+- Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in `examples/retrieval_pilot/`, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.
+- The engineering criteria hold:
+  - Python consumers receive failed, incomplete and stopped outcomes as typed data; case outcomes and missing evidence survive serialization, redaction and export.
+  - Every built-in rule that can decline has finding, clean and inconclusive fixtures.
+  - Provider and adapter conformance covers system messages, tools, failure paths, budgets, usage and adapter limits.
+  - The collector envelope is versioned independently from the run schema; clients and storage migrate together.
+  - Older persisted documents and extension conformance pass the release gate, with migrations exercised on older run, dataset, profile, pack and collector documents.
+  - The supported surface, compatibility matrix, deprecation policy and conformance kit are published.
+
+The [release gate evidence note](https://guardana.dev/notes/release-gate-evidence-1-0-0) records the evidence on the `1.0.0` commit; [#215](https://github.com/guardana/guardana/issues/215) tracks the items no single test guards.
+
+The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.
+
+Six maintainer-run proofs are published as notes. The [clean-install offline first run](https://guardana.dev/notes/clean-install-offline-first-run) and [customization through published extension points](https://guardana.dev/notes/customization-through-published-extension-points) ran against 1.0.0rc5 from PyPI by the proofs workflow ([run](https://github.com/guardana/guardana/actions/runs/39424046832)). First-run Linux and macOS cells passed; all Windows cells passed and are required: there `guardana diff` displays the Windows path `model\weights.pkl` as a recorded known difference ([#167](https://github.com/guardana/guardana/issues/167)). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The [retrieval pilot](https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter), [regression loop](https://guardana.dev/notes/regression-loop-with-a-redacted-regression) and [collector recovery runbooks](https://guardana.dev/notes/collector-recovery-runbooks) passed against 1.0.0rc5 in a later [workflow run](https://github.com/guardana/guardana/actions/runs/40005613709). The pilot distinguished the fixed control from the broken tenant filter and document-obeying model. The regression loop retained a redacted failure through regrading, comparison and promotion with a rewritten question. Recovery covered a database upgrade from 0.41.0, rollback checks and Compose restores in place and onto a new volume, with data read back per tenant. The maintainer recorded the [security runbook drill](https://guardana.dev/notes/security-runbook-drill), covering a made-up report, TestPyPI release and withdrawal, disclosure on paper, and lessons; no real Guardana release was touched.
+
+[Issues](https://github.com/guardana/guardana/issues) track work; [milestones](https://github.com/guardana/guardana/milestones) group scope. The `1.0.1` milestone holds compatible corrections to package code that a patch can carry, `1.1.0` holds behaviour, report-shape and supported-surface changes for the next minor release that a patch cannot carry, and `next` holds documentation, evidence and process work that ships without a package release.
+
+The owner decides changes to release criteria and records each one here and in the changelog.
+
+### Adoption measures
+
+These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.
+
+Each is published only as a generated aggregate with consent. The generated [first-run](generated/first-run.md) and [application](generated/application-measures.md) measures read "not measured": 0 of 5 sessions and 0 of 2 teams. First-run and pilot invitations remain open.
+
+### After 1.0
+
+Paired statistical diff (M1) starts when two independent pilot teams use local
+`diff` on comparable saved before/after application runs for a documented ship
+decision, and one needs uncertainty beyond descriptive counts. Collector
+measurements (M3) start when two independent teams submit and read their own
+locked application runs in the optional collector and each asks the same
+cross-run question local files cannot answer. The [roadmap](../ROADMAP.md)
+preserves their full done conditions. Neither these items nor the Later
+possibilities block 1.0.
+
+## Product boundaries for future proposals
+
+The roadmap's eight [product constraints](../ROADMAP.md#product-constraints)
+govern proposals as well as releases.
+
+Ideas without a reproducible problem or acceptance test start in
+[Discussions Ideas](https://github.com/guardana/guardana/discussions/categories/ideas).
+Promotion to active work requires pilot pain, a reproducible failing case,
+an acceptance criterion and a review of the versioned contract it touches.
+The [contribution principles](../CONTRIBUTING.md#principles) and
+[threat model](threat-model.md) explain these boundaries in more detail.
 
 ## Known limitations
 
@@ -38,15 +118,66 @@ anything. That is a genuine test of the model's judgement — and it is **not** 
 test of *your* agent, with your framework, your prompts and your tool
 implementations.
 
-Grading a trace exported from your running agent is a different input, which
-`Trajectory` was shaped to accept. It is designed for, not built. **Application-awareness milestone.**
+`guardana analyze-trace` grades a recorded trace exported from a running agent.
+
+### Recorded answers are matched exactly, and only chat is recorded
+
+`guardana grade` answers a rule's question from a recording only when the recording holds
+exactly the messages the rule sends; whitespace or a reworded question is an unanswered
+question, which errors rather than passes. A probe keeps the chat exchanges of its plain pass
+and nothing else, so canary passes and tool offers cannot be graded again, while MCP and A2A rules are `not_applicable` on the chat recording. A
+pack's own endpoint target cannot keep exchanges. A reply redaction changed is never graded
+again. `grade` sends nothing to the collector.
+
+### A release gate cannot see a target that holds the wrong files
+
+`--preset release` fails when a selected check has a coverage gap or reaches no verdict. MCP and A2A rules on a chat endpoint are `not_applicable`, not coverage gaps; a chat rule missing tools or seeded fixtures can still leave `probe --preset release` `indeterminate`. A rule demanded by id remains a `demanded_check` shortfall even when its protocol is inapplicable. A profile can select rules the endpoint serves ([profiles](profiles.md#release-complete-coverage-or-no-pass)). A `scan` of a path that holds no file other than `.guardanaignore` files is `indeterminate` (exit `2`) under every preset, and `plan scan` refuses it. A scan cannot tell a directory holding the wrong files from the one the build meant to produce.
+
+### Some unreadable files stay unverified
+
+The secret scan and the MCP manifest scan report a text or JSON file over the 16 MiB read bound as unverified, not as a coverage gap.
+
+### Collector retries keep the first submission
+
+The collector treats a second submission with the same run id in the same project and environment as a duplicate and keeps the first, whatever the second holds.
+
+### Protocol coverage is narrow on purpose
+
+MCP is spoken in `2026-07-28` and `2025-11-25`; a server answering in an older revision is
+reported as sharing no revision, never graded in one Guardana does not speak. Task ids are
+graded only as a caller without a credential sees them, because creating a task would take
+a `tools/call` or a `SendMessage` on somebody's system. A registry entry is the file you
+supply, never fetched, and what a server reports about its version is its own claim; Server
+Cards (`.well-known/mcp.json`) are not read. An A2A agent is spoken to over the JSON-RPC
+binding of version `1.0` only, on the origin you named: HTTP+JSON, gRPC and an interface
+on another origin are not examined, and agent-card signatures are not verified.
+
+### An archive with more than 100,000 entries is not scanned
+
+`pickle_opcode` and `keras_lambda` refuse a `.zip`, `.tar` or `.keras` before opening it
+when listing it would cost more than listing a model. An archive of more than 100,000 entries
+is reported not scanned (exit `2`) even when it holds no model, such as an image dataset.
+Exclude it with `rules.paths_exclude` (the target's `.guardanaignore` cannot exclude an
+archive), or scan the model's directory instead. [`guardana scan`](usage-scan.md) lists every bound.
 
 ### `monitor` is scheduled, not passive
 
 It re-runs checks on an interval. It does not observe production traffic, cannot
-see what your real users are doing, and is not an inline control. A passive
-out-of-band tap is researched and deferred — the hard constraint is zero impact on
-model latency.
+see what your real users are doing, and is not an inline control. Watching live
+agent traffic is not planned here: it belongs to Guardana Control, a separate
+project.
+
+```mermaid
+flowchart LR
+  accTitle: Guardana and Guardana Control
+  accDescr: Guardana checks models, RAG pipelines, agents and MCP servers before release, and its verdict gates the release. While the agent runs, Guardana Control sits between the agent and its tools, decides each tool call and records evidence. Neither product needs the other.
+  classDef accent fill:#F0ECFF,stroke:#5B3DF5,color:#4A2FE0
+  SYS[Models · RAG<br>agents · MCP servers] --> GV[Guardana<br>scan · probe · diff]:::accent
+  GV ==>|release| AG[Agent in<br>production]
+  AG ==> GW[Guardana Control<br>decides each tool call]:::accent
+  GW ==> TL[Tools and<br>MCP servers]
+  GW --> EV[(Evidence)]
+```
 
 ### The collector stores and triages findings — it does not trend quality
 
@@ -59,23 +190,34 @@ a verified key or an unverified CLI claim, retention and deletion as commands, a
 a restore-tested backup procedure. The dashboard signs in with a read-scoped key
 held in an `HttpOnly`, `SameSite=Strict` cookie.
 
-What it does **not** hold is a measurement trend. It aggregates findings,
+What it does **not** hold is a measurement trend. The generated application coverage and supported-verdict share remain "not measured" until two independent teams have rows in [`docs/generated/application-measures.md`](generated/application-measures.md). It aggregates findings,
 `unverified` and errors — so it can answer "is this system accumulating security
-problems", and cannot yet answer "did quality improve". Assessments are recorded in
-the run document from 0.22.0; carrying them into the collector, with the sample
-sizes and confidence bounds a trend needs to be honest, is the next horizon.
+problems", and cannot answer "did quality improve". Assessments are recorded in
+the run document from 0.22.0. The collector carries neither assessments nor the
+sample sizes and confidence bounds an honest trend needs.
 
 ### RAG coverage is a slice, not a story
 
 `scenario.indirect_injection` tests the shape of retrieval-time injection through
-a scripted context. There is no live retriever target, so cross-tenant retrieval,
-document poisoning and tenant-filter bypass are **not** tested against your actual
-vector store. **Application-awareness milestone.**
+a scripted context. `guardana.trace.cross_tenant_retrieval` grades cross-tenant
+retrieval from a recorded trace. With [`--fixtures`](usage-fixtures.md),
+`guardana.tenancy.cross_tenant_answer` and `guardana.retrieval.poisoned_document` ask
+through the application's own index as each tenant; they see what reached a reply, not
+what was retrieved, and Guardana never queries a vector store itself.
+
+Both checks are verified against a reference application,
+[`examples/retrieval_pilot/`](../examples/retrieval_pilot/), whose tests run them with a
+broken tenant filter, an obeying model, a partly seeded index and the fixed application
+on every CI run. It is a reference, not a team's own retrieval target: until a team has run
+them on its own target, the team retrieval pilot remains an open
+[adoption measure](#adoption-measures); the reference run is a maintainer-run proof.
 
 ### Text only
 
 No image, PDF, audio or document carriers. Injection through an image or a PDF an
-agent reads is a real attack class and is **not covered**. **v1.3.**
+agent reads is a real attack class and is **not covered**. A proposal for a
+multimodal carrier needs a pilot's concrete input, expected result and bound
+before it becomes an implementation issue.
 
 ### "OpenAI-compatible" is not a guarantee
 
@@ -85,38 +227,61 @@ support is skipped and reported as skipped — never as a pass, and `guardana ta
 tells you which capabilities an endpoint answered for *before* you trust a run
 against it.
 
-What is still missing is a **tested conformance matrix**: the capability handshake
-reports what one endpoint answered, not which of vLLM, Ollama, SGLang, llama.cpp
-and TGI agree on streaming, finish reasons or usage metadata. Until that exists,
-treat "OpenAI-compatible" as a claim to check per deployment, not a guarantee.
+The [provider table](providers.md) is tested: one suite holds every built-in transport, the
+adapter and LangChain to it against a local double that speaks each wire shape and fails on
+cue. It describes Guardana's transports, not the servers behind them: whether vLLM, Ollama,
+SGLang, llama.cpp and TGI agree on streaming, finish reasons or usage metadata is still a
+claim to check per deployment, not a guarantee.
+
+### A recipe records what you declare about the subject
+
+`subject.kind` says whether an application or a model harness answered, and Guardana
+records it in every output without being able to check it: a URL does not say what is
+behind it. Guardana neither starts nor verifies the fixtures or test doubles your
+application runs with in CI; a recording subject is the one way a recipe runs with no live
+call at all. A check from a distribution installed from a directory or a URL is listed as
+unpinned, because its code can change under one version.
 
 ### Probabilistic verdicts have probabilistic limits
 
 A judge-graded verdict is a measurement with error. `guardana calibrate` reports
 Brier score and expected calibration error so you can see how much to trust it,
-and a policy can gate on confidence. A recorded calibration can go stale without
-anything noticing — re-measure after changing judge models.
+and a policy can gate on confidence. It also reports per-class `sensitivity` and
+`specificity`. A class with fewer than 30 graded samples or abstentions on at
+least half its samples gets a `RATE CAVEAT:` line. A qualifying calibration
+corrects a trials rate with the Rogan–Gladen method. When a condition is not met,
+such as fewer than 30 graded samples in a class or use of the starter corpus, the
+line states `uncorrected — judge error not measured` and names the reason. A
+recorded calibration can go stale without anything noticing — re-measure after
+changing judge models.
 
 ### Plugins are code you install
 
 Entry-point discovery imports installed packages. A malicious Guardana pack is a
-malicious Python package, with everything that implies. `--no-plugins` disables
-discovery — but also the built-ins, which makes safe mode expensive. A plugin
-allowlist (`--plugins builtins|allowlist|disabled`) is what fixes that, and a
-locked pack (`guardana pack lock`) pins the digest of every rule a pack provides.
-`--no-plugins` is a deprecated alias for `--plugins disabled`, understood only by
-`scan` and `plan scan`; every other command that loads plugins takes `--plugins`
-directly.
-Two limits remain: `--plugins all` is still the default, and a declarative pack
-format that executes no Python is **v1.0**. See the
-[threat model](threat-model.md).
+malicious Python package, with everything that implies. Every command therefore starts
+with `--plugins builtins`: Guardana's own distributions load, every other installed pack
+is refused before it is imported, and the refusal is recorded so the run says what it
+declined. A pack is admitted by name (`--plugins allowlist --allow-plugin`, or
+`plugins:` in a profile), `guardana doctor` lists what it would execute, and a locked
+pack (`guardana pack lock`) pins the digest of every rule it provides. A lock pins an evaluator or target only when that pack's own distribution registers it; `pack lock --check` reports another distribution's registration as `removed` with exit `1`. `--no-plugins` is
+a deprecated alias for `--plugins disabled`, understood only by `scan` and `plan scan`.
+Two limits remain: an admitted pack runs with your privileges, and a declarative pack
+format that executes no Python is decided but not built. See the [threat
+model](threat-model.md).
+
+### Quality suites
+
+Numeric values are recorded and rendered, but suites do not gate on their aggregate.
+The collector receives the target's request count, not what the judge spent; the saved run carries both.
+`guardana diff` pairs suite cases but does not statistically test the pass rate between runs.
+A calibration file holds one calibration per evaluator id.
 
 ### Cost is bounded, not predicted
 
 `guardana plan` prices a run before it sends anything, and
-`--max-requests`/`--max-cost`/`--max-duration` are hard ceilings that stop the run
-and mark it `indeterminate` rather than letting it report partial coverage as a
-pass. What a plan cannot do is predict a *reply's* token count, so a cost estimate
+`--max-requests`, `--max-input-tokens`, `--max-output-tokens` and `--max-duration` are
+hard ceilings that stop the run with exit `6` and an `indeterminate` gate rather than
+letting it report partial coverage as a pass. What a plan cannot do is predict a *reply's* token count, so a cost estimate
 is a bound on requests and a projection on tokens — a rule with unknown cost is
 counted as unknown and says so.
 
@@ -140,16 +305,16 @@ Four channels, because "nothing to report" has four meanings:
 | Channel | Meaning | What to do |
 |---|---|---|
 | `findings` | A check ran and found something | Fix it, or waive it with a reason |
-| `unverified` | A check ran and honestly could not reach a verdict | Investigate why — a judge outage, an empty reply, a capability gap |
+| `unverified` | A check ran and honestly could not reach a verdict | Investigate why — an empty reply, a judge reply that could not be read, a capability gap |
 | `errors` | A check **never ran** | Treat as a broken gate, not as a clean result |
-| `coverage shortfall` | Evidence you **demanded** was not available — a dimension your policy requires, or one your security contract needs | Instrument the producer, or stop demanding it. No `fail_on_*` setting makes this a pass |
+| `coverage shortfall` | Coverage the run needed was missing: evidence you **demanded** (a dimension your policy requires, or one your security contract needs), a model file the scan observed that no running rule read, a model or notebook a rule could not read, a target that held no file, or a rule that graded none of its cases (or fewer than `fail_on.min_graded_share`) | Instrument the producer, stop demanding it, run the rule that reads the file or exclude it, check the scanned path, or find out why the cases went ungraded. No `fail_on_*` setting makes this a pass |
 
 A run that reports zero findings and three errors has not told you the system is
 clean. It has told you it could not look.
 
 ## Where to go next
 
-- [Roadmap](../ROADMAP.md) — what is coming, in what order, with exit criteria
+- [Current work](https://github.com/guardana/guardana/issues) — issues, ownership and release scope
 - [Threat model](threat-model.md) — what Guardana defends against and what it does not
 - [Safe testing](safe-testing.md) — before you point it at anything that matters
 - [Features](../FEATURES.md) — everything that ships today

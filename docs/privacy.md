@@ -14,8 +14,14 @@ way a finding leaves the process goes through it.
 
 ## Defaults
 
-Every command defaults to `redacted`. Nothing is sent anywhere: there is no
-telemetry, no account, and the collector is opt-in in both directions.
+Every command defaults to `redacted`; artifact scans send nothing unless `--reporter` names a
+destination, and Guardana sends no
+telemetry and needs no account. Probes contact the named target and send graded exchanges
+to judges or guards under `evaluators:`; when an MCP target requires authorization, they
+also read its advertised protected-resource metadata and the metadata of the authorization
+server it names, possibly on other hosts. Guardana itself contacts nothing else; a package admitted with `--plugins` runs with your privileges and can open its own connections ([threat model, T3](threat-model.md#t3--a-malicious-plugin-or-rule-pack)). The collector, or a reporter
+an installed package adds, receives results only when `--reporter` names it, and a reporter never
+receives kept exchanges ([installed outputs](outputs.md#what-an-output-receives)). Before storing a submission, the collector also [redacts](usage-collector.md#what-the-collector-refuses-and-redacts-on-ingest) recognisable secrets in its evidence text using the engine's patterns. Those secrets stay out of the database even when a third-party sender or an older agent does not redact them. The collector's pages load no third-party browser assets. It serves its OpenAPI document at `/openapi.json` and bundles no interactive API viewer.
 
 ```yaml
 privacy:
@@ -26,6 +32,7 @@ privacy:
   hash_identifiers: true
   custom_patterns: []
   max_evidence_bytes: 16384
+  keep_exchanges: false       # true: probe keeps every chat exchange beside the run
 ```
 
 | Mode | What is kept |
@@ -38,6 +45,14 @@ privacy:
 including this one. There is no useful reading of "keep the credential": the
 finding is that a secret appeared, not what it was.
 
+**`custom_patterns` run in a separate process, within bounds.** Each pattern gets at most
+2 seconds per text; texts over 16 Mi characters are not searched. A pattern that misses either bound
+fails the redaction without releasing the text. When the run's results are redacted, nothing
+is written or sent and the command exits `5`, or the stop's code when the run had already
+stopped ([exit codes](exit-codes.md)). The error names the entry by position, such as
+`custom_patterns[0]`, never by its text, and states which bound it missed. A pattern that
+backtracks without end, such as `(a+)+$`, triggers this failure on a long enough run of `a`.
+
 `redact_secrets: false` is **refused at load time**, with a message saying why.
 Until 0.7.1 the switch existed and took effect only at `full` — so its single
 reachable outcome was writing a working credential into a report, while this page
@@ -46,9 +61,9 @@ keeps working, and so that anyone who set it gets told rather than ignored.
 
 ## Every channel, not just the findings
 
-A result has four channels, and the policy covers all of them: `findings`,
-`unverified`, `waived` — and **`errors`**, where a check that could not run records
-why. That last one carries an exception message, and an exception message is
+The policy covers every channel of a result: `findings`, `unverified`, `waived`,
+`assessments`, `observations`, `coverage_shortfall`, `suites` — and **`errors`**,
+where a check that could not run records why. That last one carries an exception message, and an exception message is
 written by whoever raised it: a third-party rule, a provider, a parser handed the
 model's own reply. An unparseable response puts 120 bytes of it in there, and a
 gateway refusing a request routinely quotes the credential it refused.
@@ -58,6 +73,44 @@ policy, so it reached the JSON report, the SARIF file and the collector envelope
 untouched. Under `metadata_only` the reason is replaced by a note rather than
 emptied, because an error with a blank reason reads as a check that failed for no
 reason instead of one whose reason this run declined to keep.
+
+The same holds for every string inside a result, not only evidence: a finding's
+title, its location and its verdict's rationale, every assessment, every
+observation's name, ref and attributes, coverage shortfalls and suite summaries. A
+judge's reply becomes a rationale, and an imported claim supplies a title and a
+ref, so each is the same untrusted text the evidence is. The redactor walks the
+result's fields rather than a list of them, so a field added later is covered
+without anyone naming it. Two kinds of string are treated differently:
+
+- **Narrative text** — evidence, an error's reason, a shortfall's detail, a
+  rationale — gets the whole policy: bounded in size, and under `metadata_only`
+  replaced by a note. An evidence summary's note carries a 12-character digest of
+  the summary as `redacted` would show it, because a baseline waiver matches on the
+  summary; without it, waiving one finding waived every finding of that rule in that
+  file.
+- **Names and locations** — a title, a `target_ref`, an observation's ref — lose
+  only the matched spans and are never emptied or truncated, so a reader can still
+  find the file: `configs/[redacted:openai-key:…]/settings.py:12`.
+
+An error message about a `--target` locator prints it without userinfo, without a
+fragment and with its query replaced by a placeholder, whatever the scheme.
+
+A run also withholds the values its target sends to authenticate, which no pattern may
+recognise: the API key, an adapter's values read from `${VAR}`, the value of each
+adapter header named for a credential (`Authorization`, `Proxy-Authorization`, `Cookie`,
+`*-Key`, `*-Token`, `*-Secret`, `*ApiKey`, compared case-insensitively with `_` read as `-`) with the token after a scheme word such as `Bearer`, the
+MCP bearer token from `--mcp-token-env`, what an installed target declares with [`sent_secrets()`](extending.md#adding-a-target), and
+what the command resolved or the Python API's `secrets` name. Each value of four
+characters or more is shown as `[redacted:credential]` in findings, rationales, every
+other text the redactor walks, recorded failures and kept exchanges, in every evidence
+mode and before the policy's own patterns run. A literal header such as `Content-Type: application/json` is not withheld.
+
+When an endpoint answers with an error status, the message quotes the start of its
+body under the run's own policy, with those values withheld. Under `metadata_only` it
+gives the status and the body's size only, and so does a target whose declaration of
+what it sends fails. A reply Guardana cannot use, an unreachable endpoint and a judge's
+failure are quoted the same way; under `metadata_only` the message names the failure and
+gives its size only.
 
 ## Redaction is never silent
 
@@ -70,7 +123,7 @@ A finding whose evidence was changed says so, in the text a reader sees:
 
 Truncation announces itself the same way. A report that quietly dropped the half
 of the evidence that mattered would look complete and would not be — the same
-dishonesty the `unverified` channel exists to prevent.
+dishonesty the `unverified` channel exists to prevent. A truncated evidence summary ends `… [truncated: evidence exceeded N bytes; <12 hex digest of the whole redacted text>]`, so findings differing only past the bound keep distinct fingerprints.
 
 ## Why placeholders are hashed
 
@@ -80,6 +133,10 @@ being stored. That matters more than it looks: a finding's **fingerprint** is
 computed from its evidence summary, and a baseline waiver matches on that
 fingerprint. A placeholder that changed between runs would silently expire every
 waiver you had.
+
+**A digest can confirm a guess.** Placeholder digests and `case_id` are unsalted SHA-256 truncated to 12 hex characters (48 bits). They stay the same across runs and machines so waivers and diff pairing work. Anyone holding a report can check a guess at a low-entropy redacted value, such as an email address or short identifier, or at a private dataset prompt. `hash_identifiers: false` writes a bare label instead of a digest in each redaction placeholder; it does not change case ids, which keep their digest because runs are paired on it. With this setting,
+a finding whose location holds a bare placeholder gets a collector identity tied to
+its run, so it never merges across runs and a waiver on it covers only that run.
 
 The **label** is the other half, and it is what tells you which key to rotate:
 
@@ -92,7 +149,13 @@ one. Until 0.7.1 they were applied one at a time, each reading the previous one'
 output, so the generic "token = value" pattern matched the *label* of the
 placeholder that had just replaced the secret and produced
 `[redacted:github-[redacted:credential-assignment:…]]`. Matches are now collected
-against the original text and spliced in once.
+against the original text and spliced in once. A generic match around a specific
+key leaves the key's placeholder as it is: `password=` followed by a GitHub token
+becomes `password=` and the token's placeholder. When the value reaches past the key,
+as in a GitHub token with more characters after it, the key and the rest of the value
+become one placeholder under the more specific label, so no part of a longer
+credential is left in the clear. A private-key header with no matching END line
+redacts the rest of that field.
 
 **A placeholder is recognised narrowly, and that narrowness is load-bearing.** A
 second pass skips spans this redactor already wrote — that is what makes redacting
@@ -100,8 +163,10 @@ twice idempotent — and the redactor's input is the model's reply, which is
 attacker-influenced by definition. Recognising `[redacted:` *anything* `]` would
 mean that anything able to make a model emit `[redacted:` around a credential
 carried it through untouched: the output format turned into a smuggling envelope.
-Only a lower-case label with an optional twelve-hex digest is skipped, and nothing
-that fits that shape is a secret, an address or an IP.
+Only a label Guardana itself writes, with an optional twelve-hex digest, is skipped;
+any other bracketed text is read by the patterns like the rest of the reply. A value
+that is itself twelve lower-case hex characters still fits the digest slot of a real
+label, so a custom pattern for such values cannot rely on catching it there.
 
 ## One seam, and why that is the whole design
 
@@ -116,8 +181,8 @@ places has thirty exceptions, and the one that matters is the one somebody forgo
 
 `scan`, `probe` and `monitor` also redact once, early — before a baseline is
 written or matched — because a fingerprint is computed from the evidence summary.
-Redaction is idempotent: a placeholder claims its own span before any pattern is
-offered the text, so a second pass cannot read the first pass's label as content.
+Redaction is idempotent: a pattern match that lies inside an existing placeholder is
+ignored, so a second pass cannot read the first pass's label as content.
 
 **`monitor` was the exception until 0.7.1**, and it was the worst one to have: it
 printed through a renderer built with no policy — so the library default, `full` —
@@ -161,6 +226,27 @@ history answerable while protecting nothing.
 If any of those names is itself sensitive in your organisation, do not pass it.
 Every field is optional and absent means "not known" — a run that declares nothing
 still reports its findings.
+
+## Kept exchanges
+
+`keep_exchanges: true`, or `probe --keep-exchanges`, writes every chat exchange of a
+probe's plain pass beside the saved run (`run.json` → `run.exchanges.jsonl`), so
+[`guardana grade`](usage-grade.md) can grade the same replies again. It is off by default
+because that file holds every reply, passes included, and widens what a leaked run
+exposes; whether to keep them is the operator's decision for their data.
+
+- Every input and reply passes this policy's redactor before it is written: matched
+  spans are replaced, with no size bound, because a truncated reply would be graded
+  wrongly later. Secrets are removed at every mode, `full` included, and so is every
+  value the target sends to authenticate, from replies and metadata alike; a metadata
+  value that held one is left out.
+- A reply the redactor changed is marked `altered`, and `grade` never grades it: a reply
+  that leaked a secret cannot be regraded into a pass.
+- `keep_exchanges: true` with `evidence_mode: metadata_only` is refused at load time:
+  the two settings contradict each other.
+- The system prompt, canary passes and tool offers are never kept. The collector never
+  receives the file, and the saved run records only its digest, its line count and how
+  many replies were altered.
 
 ## What is not solved yet
 

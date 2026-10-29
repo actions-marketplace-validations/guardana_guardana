@@ -75,8 +75,7 @@ class Identity:
     - `session` — which connection this was, and nothing more than that.
 
     The interesting failures are exactly where the first two diverge, which is why
-    they are separate fields rather than one `credential` string. See
-    `docs/design/mcp-authorization-depth.md`.
+    they are separate fields rather than one `credential` string.
     """
 
     actor: str | None = None

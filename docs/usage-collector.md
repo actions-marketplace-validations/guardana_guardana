@@ -21,6 +21,7 @@ and nothing is sent anywhere unless a run is given `--reporter`.
 ## Standing one up: three commands
 
 ```bash
+pip install "guardana-server[serve]"                    # the collector and the ASGI server serve needs
 export GUARDANA_DATABASE_URL=postgresql://guardana:secret@db:5432/guardana
 guardana-collector migrate
 guardana-collector bootstrap --org acme --project web   # prints the key, once
@@ -31,6 +32,10 @@ guardana-collector serve                                # http://127.0.0.1:8000
 because a security boundary that adds four commands to the first run is a boundary
 that makes a tool nobody starts. The granular commands below exist for the second
 team, not for the first one.
+
+`bootstrap` takes `--key-name TEXT` (default `first-key`): what to call the first
+key. It also takes `--scope [ingest|read]` (default `ingest` only): repeatable,
+exactly like `key create`.
 
 `serve` binds **loopback** unless told otherwise: `--host 0.0.0.0` is a decision,
 so it is one you type. It needs an ASGI server, which is an extra
@@ -47,11 +52,11 @@ Or as a container, where the same three commands are three `docker run`s:
 
 ```bash
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.27 migrate
+  ghcr.io/guardana/guardana-collector:1.0 migrate
 docker run --rm -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.27 bootstrap --org acme --project web
+  ghcr.io/guardana/guardana-collector:1.0 bootstrap --org acme --project web
 docker run -d -p 8000:8000 -e GUARDANA_DATABASE_URL="$GUARDANA_DATABASE_URL" \
-  ghcr.io/guardana/guardana-collector:0.27
+  ghcr.io/guardana/guardana-collector:1.0
 ```
 
 The image's default command is `serve --host 0.0.0.0 --port 8000`, and it does
@@ -150,7 +155,8 @@ blank and never `pass`.
 
 `finding list` groups every sighting by the identity the engine computes — the rule
 and where it was found, never the evaluator's rationale, which moves on every
-re-run — and shows how many runs saw it, first and last. That is the "has this been
+re-run — and shows how many runs saw it, first and last. `--environment E` lists only
+findings seen in E, filters before the limit, and counts runs within E. That is the "has this been
 there since Tuesday, or is it new" question.
 
 **Runs, not sightings.** One run's rule can report the same identity several times
@@ -159,10 +165,10 @@ and the identity is the rule plus the path — so counting rows would answer "ho
 often was this printed" while the column claims to answer the other question. A
 finding a single scan reported three times reads `1 runs`.
 
-**A retried job is stored once.** The same run id in the same project is accepted
-with `200` and `"duplicate": true` instead of being stored again: a retry is not a
-failure and must not turn a pipeline red, and counting it twice would make a
-regression answer from a duplicate. An agent older than 0.9 sends no run id,
+**A retried job is stored once.** The same run id in the same project and environment is accepted
+with `200` and `"duplicate": true`, keeping the first submission whatever the retry
+holds: a retry is not a failure and must not turn a pipeline red, and counting it twice
+would make a regression answer from a duplicate. An agent older than 0.9 sends no run id,
 identifies nothing, and is stored every time — which is honest, not clever.
 
 ## Triage: what somebody decided about a finding
@@ -173,12 +179,14 @@ date it lapses.
 
 ```bash
 guardana-collector finding list --project acme/web [--status open]
-guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner konrad
+guardana-collector finding status 1854bc20 --project acme/web --status acknowledged --owner alice
 guardana-collector finding waive  1854bc20 --project acme/web \
-  --approver konrad --reason "vendor fix due in September" --expires 2026-09-30
+  --approver alice --reason "vendor fix due in September" --expires 2026-09-30
 ```
 
-Identities are `sha256:…`, so every command takes a **unique prefix**, like git.
+Identities are `sha256:…`, so every command takes a **unique, non-empty hexadecimal
+prefix**, optionally beginning with `sha256:`, and matches it literally. A prefix of any
+other form is refused with exit `3`.
 An ambiguous one is refused with the candidates listed and nothing is changed:
 acting on the wrong finding is worse than being asked to type four more
 characters.
@@ -212,11 +220,10 @@ legitimate thing to do and a surprise is not.
 | Lives | next to the code, in git | in the collector, shared by the team |
 | Answers | "should this pipeline fail today" | "did anybody decide anything about this" |
 
-The collector never tells an agent what to do. A gate that asked a server whether
-to fail would be a gate that fails open when the network does — so if you want a
-build to stop failing, that is still `guardana baseline`
-([usage-baseline.md](usage-baseline.md)). Exporting a project's collector waivers
-*as* a baseline file is a natural next step and is deliberately not here yet.
+The collector never tells an agent what to do. A gate that relies on a server to decide
+whether to fail fails open when the network fails. To stop a build from failing, use
+`guardana baseline` ([usage-baseline.md](usage-baseline.md)). The collector does not export
+its waivers as a baseline file.
 
 ## The audit log
 
@@ -233,15 +240,17 @@ recorded — a log that grows with every dashboard refresh is a log nobody reads
 | Kind | Example | Worth |
 |---|---|---|
 | `key` | `key:prod-ci (id 4)` | **verified** — the credential was presented and matched |
-| `cli` | `cli:konrad@ops-1` | **asserted** — an operator with database access said so |
+| `cli` | `cli:alice@ops-1` | **asserted** — an operator with database access said so |
 
-A CLI actor is the operating-system user, taken from the environment rather than
-typed, and `--actor` overrides it for a shared operations account. It is not
-authentication: anybody who can reach the database can write any name. It is
-recorded anyway, because "what happened, roughly when, by which route" is the
-question a log usually answers — and labelling an assertion as proof would be the
-same false green this tool refuses in a verdict. Real identities arrive with users
-and RBAC.
+A CLI actor is the operating-system user, taken from the environment rather than typed.
+`--actor` overrides it for a shared operations account. This is not authentication: anybody
+who can reach the database can write any name. The log still records the actor because a log
+usually answers what happened, roughly when, and by which route. Labelling this assertion as
+proof would be the same false green the tool refuses in a verdict. The
+collector has no user accounts or role-based access control, so the log records no verified
+person.
+
+- **The audit log is not tamper-evident.** It has no per-row signature or hash chain. Anyone with database write access can edit or delete rows. It records actions; it does not prove them.
 
 `api_keys.created_by` is filled by the same actor, and a stored submission now
 records **which key wrote it**.
@@ -267,6 +276,11 @@ a collector that removes evidence because nobody said not to.
 **Applying is a command, never a background job.** There is no scheduler in the
 collector, so "what deleted my evidence" is answerable from the audit log rather
 than from source. Run it yourself, or from a cron you wrote.
+
+`apply` reports and audits the submissions it actually deletes, so concurrent
+passes never claim the same rows. `--dry-run` reports how many would go at that moment.
+A read overlapping a retention pass returns each submission with its findings
+as they stood when the read began, never emptied halfway through.
 
 Two things retention deliberately does not touch:
 
@@ -314,15 +328,15 @@ guardana-collector project rename --project acme/web --to api
 ```
 
 **The project comes from the key, never from the envelope.** If the envelope named
-it, the runner would declare where it writes — and a credential that does not bound
-the write is not a boundary at all. It is also why the envelope stays at v5 and why
-nothing in the engine changed: an agent and a collector upgrade independently, and
-no fleet has to move in step with a collector. The cost is real and accepted: a
-team with ten projects needs ten keys in CI.
+it, the runner would declare where it writes — and a credential that does not
+bound the write is not a boundary at all. Adding key-scoped projects required no
+envelope change or engine change: an agent and a collector upgrade independently,
+and no fleet has to move in step with a collector. The cost is real and accepted:
+a team with ten projects needs ten keys in CI.
 
-**There is no command that deletes an organization or a project**, and the foreign
-keys are `on delete restrict`. Removing tenant data is retention, and it deserves
-to be designed there rather than smuggled in here.
+**Deleting an organization or a project is its own command**
+([below](#deleting-a-project-an-organization-or-a-typo)), and the foreign keys are
+`on delete restrict`, so nothing cascades by accident.
 
 **Renaming is safe.** A key hangs off a project's identity, not its name, so
 `project rename` does not invalidate anything.
@@ -351,6 +365,16 @@ tenant column on a database serving two teams folds their evidence into one
 undifferentiated pile, so the down migration counts the tenants across the
 submissions *and* the keys first and raises rather than doing it.
 
+## What the collector refuses and redacts on ingest
+
+`POST /findings` redacts recognisable secrets with engine patterns and `[redacted:<label>:<12 hex digits>]`; a value reaching past a recognised key becomes one placeholder with it; placeholders the engine writes remain unchanged. Redacted fields: `source`; every finding and unverified result's title, target reference, evidence summary/detail and verdict rationale; every error's source, stage and reason; the missing items of every skipped rule. Ids, identity, rule ids, taxonomy, evaluator ids, run summary and declared deployment fields remain as sent (deployment fields are operator declarations; see the privacy guide).
+
+Post-redaction overflow (4,096 characters: `source`/error sources; 65,536: other text fields) returns `422`; nothing is stored. A v8 envelope without `findings`, `unverified`, `errors` or `summary` also returns `422`, naming the missing field.
+
+Across accepted envelope versions, published-schema violations return `422`, one error entry (`loc`, `msg`, `input`) per value: severity outside exact-case `INFO`/`LOW`/`MEDIUM`/`HIGH`/`CRITICAL`; verdict outcome outside `pass`/`fail`/`inconclusive`; confidence outside [0,1] or nonfinite; negative counts; negative/infinite wall time; gate outside `pass`/`fail`/`indeterminate`; evidence mode outside `metadata_only`/`redacted`/`full`; a skip reason outside `missing_capability`/`unsafe_mode`/`not_applicable`/`not_recorded`/`not_offered`; an identity that is present but not `sha256:` followed by 64 lower-case hex digits. Permitted `null` remains accepted.
+
+Data stored earlier reads back unchanged, including any secret it holds; redaction applies to new submissions. The dashboard never ranks an unknown severity as the worst.
+
 ## Limits: how much one caller may send, and how often
 
 | Variable | Default | What it bounds |
@@ -373,8 +397,14 @@ implied, because a limit somebody believes is global and is not is worse than on
 they know to put a reverse proxy in front of. For a real global limit, rate-limit
 at the proxy that already terminates your TLS.
 
-An unauthenticated caller is charged by peer address, an authenticated one by its
-credential — so one noisy agent cannot spend a whole fleet's allowance.
+A credential is charged on its own only after the collector has accepted it; every
+other request — no key, a rejected key, a key no route checked — is charged to the
+peer address. One noisy agent cannot spend a whole fleet's allowance, and a client
+inventing a new token per request cannot buy a fresh one. Key acceptance and
+usage are separate: a route that checks no key, such as `/healthz` or `/readyz`,
+leaves its count unchanged. A key refused by one route and accepted again resumes
+its existing minute. The limiter tracks at
+most 10,000 callers per process. A key is counted once regardless of the case or surrounding spaces in its `Bearer` scheme; an Authorization header with a scheme other than `Bearer` is charged to the peer address.
 
 ## Choosing where submissions go
 
@@ -410,7 +440,9 @@ guardana-collector key revoke <prefix>
 **`--project` is required, and this command does not guess** even when exactly one
 project exists. Issuing a credential against a tenant nobody named has the same
 shape as a default credential, and `bootstrap` already covers the case where there
-is only one.
+is only one. `--expires-in-days` must be at least `1`; a smaller value exits `3` and
+stores nothing. `key list` shows each key as `active`, `expired` or `revoked`, with
+its expiry.
 
 ```bash
 export GUARDANA_COLLECTOR_TOKEN=gdn_…                                # never a flag: see below
@@ -428,7 +460,11 @@ credential on a command line lands in shell history, in `ps`, and in the echoed
 command of most CI logs — the same reason `probe` takes `--api-key-env` rather
 than `--api-key`. A collector that rejects a submission says so as a warning
 naming the status, because a whole fleet quietly failing to report while a
-dashboard shows stale data as current is the failure that matters.
+dashboard shows stale data as current is the failure that matters. What the
+collector says back, and why it could not be reached, is printed with that key
+withheld, recognisable secrets redacted and control characters dropped, so a
+collector that echoes the `Authorization` header cannot put the key in a CI log or
+rewrite the terminal.
 
 **`--reporter` takes the collector's URL, not a route.** The reporter appends the
 ingest path itself, so `server://https://collector.example.com` is the whole thing
@@ -470,19 +506,56 @@ guardana-collector key create --project acme/web --name panel --scope read
 # then open the collector and paste the key once
 ```
 
-The key goes into an `HttpOnly`, `SameSite=Strict` cookie the page itself cannot
-read; `key revoke` ends the session, and an expiring key ends it on its own. There
-are no user accounts — those arrive with RBAC and replace this.
+The key is stored in an `HttpOnly`, `SameSite=Strict` cookie that the page itself cannot read.
+`key revoke` ends the session, and the session also ends when the key expires. There are no
+user accounts: the key is the page's only identity.
+
+**The cookie holds the read-scoped API key itself.** Stealing it gives read access until the key is revoked or expires. It is marked `Secure` only when the request reaches the collector as `https`, directly or through a trusted `X-Forwarded-Proto`; over plain http the key travels in clear. It is a browser-session cookie with no remember-me, refresh or idle timeout. Bound its lifetime with `--expires-in-days` on the panel key.
 
 **The cookie authenticates reads and nothing else.** Ingest takes a bearer header
 only, so a page on another origin cannot make a signed-in browser submit findings.
 That is enforced in the guard rather than left to `SameSite`, because a control
 that rests on one browser flag fails the day somebody adds an exception for a
-proxy ([design](design/panel-sessions.md)).
+proxy.
 
 A signed-in browser sees exactly what the key sees: one project, and one
 environment when the key is pinned to one. It cannot reach further than a `curl`
 with the same key.
+
+The panel's `/stats` aggregates the newest 1,000 submissions of that project, not
+its whole history, so a refresh costs the same on a collector that has held a
+project for years. The response says which: `window.limit` is the bound, and
+`window.complete` is `false` when older submissions exist that the totals leave
+out. `guardana-collector run list --limit N` still lists the older runs.
+
+`/stats` also counts what runs did not check. `totals.skipped` counts rules skipped
+for any reason except `not_applicable`. A bare rule id from an agent older than skip
+reasons also counts because it gives no reason. `by_gate` counts submissions per
+recorded gate, using `not_recorded` when a run sent none. Each `by_source` row carries
+its `skipped` count and its newest run's `gate` (`null` when that run sent none).
+The page gives skipped checks and indeterminate gates their own tiles and lists
+each beside the findings. A run with a skipped check or an undecided gate therefore
+never reads as "No findings".
+
+`GET /stats` responds only while the dashboard is mounted, to a read key or a signed-in
+browser:
+
+```bash
+curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/stats
+```
+
+| Key | What it holds |
+|---|---|
+| `window` | `{limit, complete}`: the bound, `1000`, and whether every submission fitted inside it |
+| `totals` | `{submissions, sources, findings, unverified, errors, skipped}` over the window. `submissions` counts submissions and `sources` distinct sources; `findings`, `unverified` and `errors` count entries; `skipped` counts skipped rules whose reason is not `not_applicable` |
+| `by_severity` | findings per severity name |
+| `by_gate` | submissions per recorded gate, with `not_recorded` for a run that sent none |
+| `by_source` | one row per source, most findings first: `{source, findings, unverified, errors, skipped, gate, worst_severity, last_seen}`; `gate` is the newest run's |
+| `by_rule` | the 10 rules with the most findings, as `{rule_id, count}` |
+| `series` | up to 24 equal time buckets across the window, each `{t, findings, unverified, errors}`; empty when nothing is stored |
+
+`last_seen` and `t` are Unix times in seconds, taken when the collector received a submission;
+a bucket's `t` is its start time.
 
 ### A database outage is not a rejected key
 
@@ -500,6 +573,77 @@ write. It exists for evaluating Guardana on a laptop, and it has to be typed:
 combined with choosing the ephemeral store, that is two explicit switches for the
 toy configuration and none for the real one.
 
+## The HTTP API
+
+The optional collector stores and serves results submitted by Guardana runs. It starts no scan, probe or other job. Runs execute where Guardana runs (the CLI, CI, the Python API), and the CLI submits them with `--reporter server://<collector URL>`.
+
+`/openapi.json` lists routes, key permissions and refusals: `401` for a missing or unaccepted key, `403` for insufficient permission, and `503` when the database cannot be reached to check the key.
+
+The collector serves no interactive API viewer because FastAPI's default viewers load scripts, styles and fonts from third-party hosts. `/docs`, `/redoc` and `/docs/oauth2-redirect` return `404`. To browse the API, download the document (`curl --fail --show-error "$COLLECTOR_URL/openapi.json" -o openapi.json`) and open it in an OpenAPI viewer installed on your machine.
+
+| Route | Permission | Session cookie accepted |
+| --- | --- | --- |
+| `POST /findings` | `ingest` | No |
+| `GET /findings` | `read` | Yes |
+| `GET /trend` | `read` | Yes |
+| `GET /stats` (dashboard only) | `read` | Yes |
+| `/healthz`, `/readyz` | None (public) | — |
+| `/catalog`, `/` (dashboard only) | None (public) | — |
+| `POST /session`, `DELETE /session` (dashboard only) | None; `POST` takes a `read` key in its body | — |
+| `/openapi.json` | None (public) | — |
+
+Send keys as `Authorization: Bearer <key>`. Read routes also accept the `guardana_session` cookie set by the dashboard after `POST /session`; a `Bearer` header takes precedence. Permissions belong to keys, not OAuth2 scopes.
+
+With `GUARDANA_ALLOW_UNAUTHENTICATED=1`, no route requires a key and the OpenAPI document declares no security requirement.
+
+`--reporter` sends the whole versioned envelope: gate, run id and findings. Its schema is [`schemas/collector-envelope-v8.schema.json`](../schemas/collector-envelope-v8.schema.json).
+
+This example posts a hand-written synthetic envelope to show its shape:
+
+```bash
+export INGEST_KEY=gdn_…   # a key with the ingest permission
+export READ_KEY=gdn_…     # a key with the read permission
+curl -s -X POST https://collector.example.com/findings \
+  -H "Authorization: Bearer $INGEST_KEY" -H "Content-Type: application/json" \
+  -d '{"schema_version": 8, "source": "ci/acme-web",
+       "findings": [{"rule_id": "acme.synthetic_check", "severity": "HIGH",
+                     "title": "Synthetic finding", "target_ref": "app/settings.py:3",
+                     "evidence": {"summary": "a synthetic example"}}],
+       "unverified": [], "errors": [],
+       "summary": {"rules_run": 1, "rules_executed": ["acme.synthetic_check"],
+                   "rules_skipped": [], "max_severity": "HIGH", "unverified": 0, "errors": 0}}'
+curl -s -H "Authorization: Bearer $READ_KEY" "https://collector.example.com/findings?limit=1"
+curl -s -H "Authorization: Bearer $READ_KEY" https://collector.example.com/trend   # {"HIGH": 1} on a fresh project
+```
+
+### Reading results back
+
+`GET /findings` returns the newest submissions the key may read, newest first, as a JSON list
+of envelopes in their stored form. It takes two query parameters:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `limit` | `100` | how many submissions, from `1` to `1000`; anything else is refused with `422` |
+| `source` | none | only submissions whose `source` is exactly this value |
+
+There is no cursor or offset. A reader gets at most the newest 1,000 matching submissions;
+older submissions are not accessible through this route.
+`guardana-collector run list --limit N` lists older runs for an operator with database access.
+`GET /trend` returns finding counts by severity across everything the key's project stores.
+
+### What the envelope leaves out
+
+The envelope is smaller than the saved run and has its own version (8). The collector keeps
+only what the envelope contains: `source`, `findings`, `unverified`, `errors`, a `summary`
+(`rules_run`, `rules_executed`, `rules_skipped` as `{rule_id, reason, missing}`,
+`max_severity`, and the `unverified` and `errors` counts), the declared `deployment`, and a
+`run` block (`run_id`, `started_at`, `completed_at`, `tool_version`, `gate`,
+`evidence_mode`, `requests`, `input_tokens`, `output_tokens`, `wall_time_seconds`). It does
+not contain waived findings, observations, assessments, the file listing, coverage shortfalls,
+why a run stopped, a skip's `detail`, or the manifest's rule, suite and trial records. A
+`gate` of `indeterminate` means the run did not pass; the saved run explains why. A tool that
+needs the whole result reads the saved run ([reading results](reading-results.md)).
+
 ## Migrations
 
 ```bash
@@ -509,7 +653,10 @@ guardana-collector rollback    # undo the most recent (--steps N for more)
 ```
 
 Exit codes match [the table the rest of the tool uses](exit-codes.md): `0` did
-what was asked, `1` the database said no, `3` the command was pointed at nothing.
+what was asked, `1` the database said no, `3` the command was pointed at nothing,
+`4` the database could not be reached. Every command that needs the database,
+`status` included, exits `4` when the connection cannot be opened; an error after
+it opened is `1`. `serve` opens its own connections and starts without one.
 
 **Every migration ships a rollback**, checked when the migration set is loaded
 rather than when it is needed. A schema change that cannot be undone is an upgrade
@@ -523,7 +670,7 @@ no version describes.
 **A Postgres advisory lock covers the whole run**, so two replicas starting
 together cannot both apply the same version.
 
-### Three things the runner refuses
+### Four things the runner refuses
 
 | Refused | Why |
 |---|---|
@@ -535,6 +682,11 @@ together cannot both apply the same version.
 Rolling back `0004` needs no refusal: it drops labels, which loses information and
 merges no tenants, and the submissions themselves stay.
 
+`rollback --steps N` undoes one migration at a time, each in its own transaction.
+A refusal at `0003` comes after the later migrations are already rolled back.
+The command exits `1`; `migrate` applies them again, but labels dropped by rolling
+back `0004` stay lost.
+
 ## Health and readiness are two questions
 
 ```bash
@@ -544,7 +696,7 @@ curl -s localhost:8000/readyz    # the schema this build expects is the one pres
 
 `/readyz` returns `503` while a migration is pending, so a rolling deploy does not
 send traffic at a schema that is not there yet — and returns `503` again after a
-rollback, which is the direction that matters during an incident.
+rollback, which is the direction that matters during an incident. `/`, `/healthz` and `/readyz` also answer `HEAD` with the status and headers `GET` gives and no body, so a `HEAD` monitor sees the same `503`.
 
 Under `GUARDANA_STORAGE=memory` it reports `"storage": "memory"` rather than a
 plain "ready". A fleet view that cannot tell durable from ephemeral will read one
@@ -581,10 +733,20 @@ To look at nothing but the dashboard, skip all of it — `GUARDANA_STORAGE=memor
 with `GUARDANA_ALLOW_UNAUTHENTICATED=1` still starts a collector with a working
 page, no database, no organization and no key.
 
-A collector that is unreachable never changes a gate's exit code — the scan
-already ran and its verdict stands on its own. A collector that *rejects* a
-submission is different and says so, because a whole fleet silently failing to
-report while a dashboard shows stale data as current is the failure that matters.
+A submission counts as delivered only when the collector answers with its own
+acknowledgement — a JSON object whose `status` is `ok`, with an integer `stored` and a
+boolean `duplicate`, which every collector that accepts envelope 8 sends. Any other `2xx`,
+from a proxy, a health check or another service at the collector's address, is
+`could not submit to reporter: the response was not a collector acknowledgement`.
+
+By default a collector that is unreachable or does not acknowledge never changes a gate's
+exit code — the scan already ran and its verdict stands on its own. A collector that
+*rejects* a submission says so, because a whole fleet silently failing to report while a
+dashboard shows stale data as current is the failure that matters. A pipeline whose run
+only counts once the collector holds it sets [`delivery.required`](profiles.md#delivery) in
+its profile: then each of those is an `error:` and the command exits `8`, with the verdict
+printed. The client honours the proxy variables (`HTTPS_PROXY`, `NO_PROXY`): the collector
+is a destination the operator names, reached through the operator's network.
 
 ## Contributing to the collector
 
@@ -608,7 +770,5 @@ protocol and fails on any method that does not take a tenant scope first.
 
 ## See also
 
-- [`design/collector-persistence.md`](design/collector-persistence.md) — why persistence is shaped the way it is
-- [`design/collector-tenancy.md`](design/collector-tenancy.md) — the organization/project boundary that is being built next
 - [`architecture.md`](architecture.md#the-coreserver-boundary) — why the engine never imports this
 - [`privacy.md`](privacy.md) — evidence is redacted by the agent before it is sent

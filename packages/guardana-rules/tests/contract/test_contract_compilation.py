@@ -10,6 +10,7 @@ import pytest
 from contract_fixtures import contract
 from guardana.core.contract import ContractError
 from guardana.core.report import ShortfallKind, SkipReason
+from guardana.core.safety import Detection
 from guardana.core.trace import Dimension
 from guardana.rules.contract import compile_contract, compile_contracts
 
@@ -116,6 +117,13 @@ def test_the_digest_moves_when_an_assertion_is_weakened() -> None:
 def test_a_compiled_assertion_declares_it_sends_nothing() -> None:
     """`plan` prints "plus N rules of unknown cost", and reading a file is not unknown."""
     assert compile_contract(contract(_SHELL), None).rules[0].estimated_requests == 0
+
+
+def test_a_compiled_assertion_states_a_checked_fact() -> None:
+    """An assertion compares values the producer recorded, so a finding is never a lead."""
+    rules = compile_contract(contract(_SHELL, _PAY), None).rules
+
+    assert {rule.meta.detection for rule in rules} == {Detection.INVARIANT}
 
 
 def test_the_shipped_example_contract_loads_and_compiles() -> None:

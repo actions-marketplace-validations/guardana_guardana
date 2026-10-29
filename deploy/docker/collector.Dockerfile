@@ -14,17 +14,33 @@
 # in the morning wants one instruction (`guardana-collector rollback`), not a
 # restart with a different environment variable.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed AS builder
 
 WORKDIR /src
+COPY deploy/docker/build-requirements.txt deploy/docker/collector-requirements.txt ./
 COPY packages/guardana-server packages/guardana-server
 COPY LICENSE LICENSE
 
-RUN python -m venv /opt/guardana \
-    && /opt/guardana/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/guardana/bin/pip install --no-cache-dir "./packages/guardana-server[serve]"
+# The same install as the CLI image: locked, hash-checked wheels only, the package
+# built by the locked backend outside the shipped venv and installed by its own digest,
+# and `pip check` as the proof that the locked set is complete. The `serve` extra is in
+# the exported set, not here.
+RUN python -m venv /opt/build \
+    && /opt/build/bin/pip install --no-cache-dir --only-binary=:all: \
+        --require-hashes --no-deps -r build-requirements.txt \
+    && /opt/build/bin/pip wheel --no-cache-dir --no-deps --no-build-isolation \
+        --wheel-dir /src/wheels ./packages/guardana-server \
+    && python -m venv /opt/guardana \
+    && /opt/guardana/bin/pip install --no-cache-dir --only-binary=:all: \
+        --require-hashes --no-deps -r collector-requirements.txt \
+    && sha256sum /src/wheels/*.whl > /src/wheels.sha256 \
+    && sed -E 's/^([0-9a-f]{64}) [ *](.+)$/\2 --hash=sha256:\1/' /src/wheels.sha256 \
+        > /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip check
 
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana-collector" \

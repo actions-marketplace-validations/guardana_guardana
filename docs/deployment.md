@@ -42,14 +42,17 @@ half-upgraded collector never quietly serves traffic.
 
 ## Standing one up
 
+Copy `deploy/env.example` to `deploy/.env` and fill in every value: it has no
+defaults. Then migrate the schema, start the collector and bootstrap the first tenant:
+
 ```bash
 cp deploy/env.example deploy/.env
-$EDITOR deploy/.env                    # it has no defaults; fill them in
+$EDITOR deploy/.env
 
 docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
 docker compose -f deploy/docker-compose.yml up -d
 docker compose -f deploy/docker-compose.yml run --rm collector \
-  bootstrap --org acme --project web   # prints the key, once
+  bootstrap --org acme --project web
 ```
 
 `bootstrap` creates the organization, the project and the first API key together.
@@ -60,8 +63,8 @@ through every path that reads it.
 Check what you have:
 
 ```bash
-curl -fsS http://127.0.0.1:8000/healthz    # the process answers
-curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+curl -fsS http://127.0.0.1:8000/healthz
+curl -fsS http://127.0.0.1:8000/readyz
 ```
 
 They are separate on purpose. `/healthz` is liveness. `/readyz` is the one that
@@ -101,11 +104,14 @@ collector.example.com {
 }
 ```
 
+If the proxy connects from outside loopback, set `FORWARDED_ALLOW_IPS` in the collector's environment to the client address shown in its access log for a forwarded request. Uvicorn trusts `X-Forwarded-Proto` and `X-Forwarded-For` only from those addresses; the default is `127.0.0.1,::1`. This applies to a proxy in another container or a host proxy reaching a Compose published port through Docker's gateway. Without that trust, the dashboard session cookie lacks `Secure` and per-address limits count requests as coming from the proxy. Never use `*` on a port others can reach, since callers could claim `https` and any client address.
+
 Then point pipelines at the public name — the URL keeps its own scheme, and a
-bare `host:port` is refused rather than guessed:
+bare `host:port` is refused rather than guessed. Keep the token in a masked secret
+CI variable:
 
 ```bash
-export GUARDANA_COLLECTOR_TOKEN=gdn_…     # a masked/secret CI variable
+export GUARDANA_COLLECTOR_TOKEN=gdn_…
 guardana scan . --ai-system support-agent --environment production \
   --reporter server://https://collector.example.com
 ```
@@ -114,31 +120,44 @@ guardana scan . --ai-system support-agent --environment production \
 
 ```bash
 docker compose -f deploy/docker-compose.yml pull
+docker compose -f deploy/docker-compose.yml stop collector
 docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate
 docker compose -f deploy/docker-compose.yml up -d
+curl -fsS https://collector.example.com/readyz
 ```
 
-In that order, and never with the middle step skipped. What protects you if it
+In that order, and never with the migration skipped. The old collector stops before the
+schema changes: an old collector left running keeps writing into a schema
+written by a newer build. The new image starts only after migration. Send traffic back once `/readyz` answers. What protects you if it
 goes wrong is built into the migration runner: every migration ships a rollback,
 each runs in its own committed transaction under an advisory lock, and the runner
 **refuses** a migration edited after it was applied, one numbered below the
 highest applied, or a database written by a newer build than the one you are
-running. So a collector pointed at a database from the future stops rather than
-writing into it.
+running. A running collector pointed at a database from a newer build stays
+up and answers `/readyz` with `503`. That readiness response keeps traffic away:
+use it to route traffic at the proxy or orchestrator. Keep the collector stopped until
+the image and schema match.
 
 To undo one step:
 
 ```bash
 docker compose -f deploy/docker-compose.yml --profile migrate run --rm migrate rollback --steps 1
-docker compose -f deploy/docker-compose.yml status   # or: guardana-collector status
+docker compose -f deploy/docker-compose.yml run --rm collector status
 ```
 
-Roll the *image* back to the matching tag at the same time. A collector older
+Outside Compose, the second command is `guardana-collector status`. Roll the *image*
+back to the matching tag at the same time. A collector older
 than its schema is exactly the situation `/readyz` and the version check exist to
-stop, and they will stop it.
+report: `migrate` and `status` refuse such a database, and `/readyz` answers `503`.
+Neither stops the process or refuses its writes. Keep the collector stopped until
+the two match.
 
-**Pin the image to a minor tag** (`:0.21`) rather than `latest`. You want fixes
-without a schema you did not plan for; `latest` gives you both.
+**Pin the image to a minor tag**: use
+`ghcr.io/guardana/guardana-collector:1.0` instead of `latest`, as
+`deploy/docker-compose.yml` does, for patch fixes without a new collector
+schema. `latest` can move to a new minor and schema. Candidates carry only
+exact version tags, such as `1.0.0rc3`; `latest` and the moving minor stay on
+the last stable release.
 
 ## Backups, and restoring one
 
@@ -152,27 +171,36 @@ Take one:
 
 ```bash
 set -a; . deploy/.env; set +a
+BACKUP="guardana-$(date -u +%Y-%m-%d).dump"
 docker compose -f deploy/docker-compose.yml exec -T db \
   pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom \
-  > "guardana-$(date -u +%Y-%m-%d).dump"
+  > "$BACKUP"
 ```
 
 Restore it — into an **empty** database, which is what a rebuild on a new machine
-actually looks like:
+actually looks like. Name the dump to restore. The sequence checks that it reads,
+stops the collector to prevent writes mid-restore, recreates the database,
+restores, and waits up to about 30 seconds for `/readyz` (storage reachable,
+schema current). Each step requires the preceding step to succeed. An unreadable
+dump stops everything before the database is dropped. A failed restore leaves the
+collector stopped. If `/readyz` does not answer `200` in that time, the sequence
+exits non-zero with the collector running. Set `BACKUP` to the dump to restore:
 
 ```bash
-docker compose -f deploy/docker-compose.yml stop collector     # nothing writes mid-restore
+set -a; . deploy/.env; set +a
+BACKUP=guardana-2026-08-05.dump
 
+docker compose -f deploy/docker-compose.yml exec -T db pg_restore --list < "$BACKUP" > /dev/null &&
+docker compose -f deploy/docker-compose.yml stop collector &&
 docker compose -f deploy/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres \
+  -v ON_ERROR_STOP=1 \
   -c "drop database if exists \"$POSTGRES_DB\" with (force)" \
-  -c "create database \"$POSTGRES_DB\""
-
+  -c "create database \"$POSTGRES_DB\"" &&
 docker compose -f deploy/docker-compose.yml exec -T db \
   pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists \
-  < guardana-2026-08-05.dump
-
-docker compose -f deploy/docker-compose.yml start collector
-curl -fsS http://127.0.0.1:8000/readyz     # storage reachable, schema current
+  < "$BACKUP" &&
+docker compose -f deploy/docker-compose.yml start collector &&
+curl -fsS --retry 30 --retry-delay 1 --retry-all-errors http://127.0.0.1:8000/readyz
 ```
 
 Three things this procedure is deliberate about:
@@ -197,6 +225,68 @@ database reports the same applied migrations as the original.
 Keep the dump somewhere your `deploy/.env` is not. A backup stored beside the
 credentials for the system it came from is one theft, not two.
 
+## Rotating an API key
+
+Rotate on a schedule, when someone who held a key leaves, and at once when a key
+may have leaked. Both keys work until the old one is revoked, allowing pipelines to switch without a gap in key validity.
+
+1. **Issue** the new key for the same project, with the same `--scope` and
+   `--environment` as the one it replaces. `key list` shows both: the scopes, and the
+   environment in brackets after the project. Repeat them, because `--scope` defaults
+   to `ingest` alone and a key created without `--environment` may write to any
+   environment of the project. `key create` prints the new key once:
+
+   ```bash
+   docker compose -f deploy/docker-compose.yml run --rm collector key list --project acme/web
+   docker compose -f deploy/docker-compose.yml run --rm collector \
+     key create --project acme/web --name github-actions-2 \
+     --scope ingest --environment production
+   ```
+
+2. **Deploy** it: replace `GUARDANA_COLLECTOR_TOKEN` in every pipeline that used
+   the old key, and let one run report with it.
+3. **Revoke** the old key by the prefix `key list` shows:
+
+   ```bash
+   docker compose -f deploy/docker-compose.yml run --rm collector key list --project acme/web
+   docker compose -f deploy/docker-compose.yml run --rm collector key revoke <old-prefix>
+   ```
+
+4. **Confirm** the old key is refused. An empty body stores nothing whatever the
+   answer: `401` means the key is revoked, and `422` means it still works.
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://collector.example.com/findings \
+     -H "Authorization: Bearer $OLD_KEY" -H 'Content-Type: application/json' -d '{}'
+   ```
+
+Rotation changes who may write, never what was written: the runs the old key
+sent stay in the project. A key belongs to one project, so a team with several
+projects rotates each key on its own.
+
+## If the database credential leaks
+
+1. Change the role password and restrict the hosts it may connect from.
+2. Update `GUARDANA_DATABASE_URL` and restart every replica. Run `guardana-collector status` to confirm the new credential works.
+3. Treat the stored findings as disclosed and tell each project's owners.
+4. Run `guardana-collector key list`, then revoke every key nobody issued with `guardana-collector key revoke`.
+
+Database read access exposes every project. Write access can add API keys, rewrite submissions and edit the audit log. Stored API keys are digests, so the leak does not expose existing keys.
+
+## Which test exercises each procedure
+
+A procedure nobody has run is a belief. Each of these is run by a PostgreSQL test
+in `packages/guardana-server/tests/`, which CI refuses to skip; deletion is
+described in [`usage-collector.md`](usage-collector.md).
+
+| Procedure | Test |
+|---|---|
+| backup and restore | `test_backup_restore.py` |
+| upgrade, roll back one step, migrate forward | `test_migrations.py` |
+| upgrade from the schema of an older release, then ingest every envelope a published release wrote | `test_upgrade_from_previous_release.py` |
+| key rotation | `test_key_rotation.py` |
+| retention, and deleting a project or an organization | `test_retention_and_deletion.py` |
+
 ## What to watch
 
 Two limits are on by default and worth knowing before a fleet meets them:
@@ -208,15 +298,21 @@ limit, rate-limit at the proxy that already terminates TLS.
 | Signal | Why |
 |---|---|
 | `/readyz` | the only endpoint that knows about storage and pending migrations |
-| container restarts | a collector that cannot reach its database exits rather than serving half a service |
+| `503` from `/readyz` and from authenticated routes | A collector that cannot reach its database stays running and answers `503`. It does not exit, so container restarts do not show a database outage. |
 | `guardana-collector status` | which migrations are applied, and whether any are pending |
 | disk on the `guardana-data` volume | retention is per project and **off until you set it**: submissions accumulate until a policy or a delete removes them |
 
 That last row is the one to act on. `guardana-collector retention set --project
-ORG/PROJECT --keep-days N` bounds the growth, and `retention apply` removes what
-the policy says is too old. Without a policy the volume grows for as long as agents
-report: `--forever` is the default on purpose, because silently deleting a
-customer's evidence is the worse failure.
+ORG/PROJECT --keep-days N` records a policy and deletes nothing; `retention apply`
+removes what the policy says is too old, and only when it runs. Without a policy the
+volume grows for as long as agents report: `--forever` is the default on purpose,
+because silently deleting a customer's evidence is the worse failure. To bound the
+growth, run `apply` on a schedule and alert when it fails:
+
+```bash
+# cron, daily at 03:00; --dry-run first, by hand, to see what would go
+0 3 * * * cd /srv/guardana && docker compose -f deploy/docker-compose.yml run --rm collector retention apply --project acme/web || logger -t guardana "retention apply failed"
+```
 
 ## What this deployment does not give you yet
 
@@ -224,8 +320,8 @@ Being explicit, because a deployment guide that oversells is worse than none:
 
 - **no user accounts** — the read-only panel signs in with a read-scoped API key
   rather than with a person's identity, so "who looked at this" is answerable only
-  down to the credential. OIDC/SSO and roles are a roadmap item, not a setting you
-  have missed;
+  down to the credential. OIDC/SSO and human roles are not built; see the
+  roadmap's [Later list](../ROADMAP.md#later) for conditional possibilities;
 - **no quality trend** — the collector aggregates findings, `unverified` and
   errors. It does not yet store the measurement channel, so it can say a system is
   accumulating security problems and cannot say whether its answers got better;
@@ -240,8 +336,8 @@ What this list no longer contains, because it shipped: finding lifecycle, waiver
 audit log, retention and deletion, and a restore-tested backup procedure. Each is
 in [`docs/usage-collector.md`](usage-collector.md).
 
-These are the collector's open items on the [roadmap](../ROADMAP.md), and none of
-them is worked around silently: each is absent, and says so.
+These collector features are absent, and their absence is not silently worked
+around; see the [roadmap](../ROADMAP.md) for future direction.
 
 ## Running it without Compose
 
@@ -251,7 +347,7 @@ The image is the unit; Compose is a convenience:
 docker run -d --name guardana-collector \
   -e GUARDANA_DATABASE_URL="postgresql://guardana:…@db.internal:5432/guardana" \
   -p 127.0.0.1:8000:8000 \
-  ghcr.io/guardana/guardana-collector:0.27
+  ghcr.io/guardana/guardana-collector:1.0
 ```
 
 Or without a container at all — `pip install "guardana-server[serve]"`, then

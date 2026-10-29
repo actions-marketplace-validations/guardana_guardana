@@ -6,58 +6,78 @@
 <title>guardana diff — Guardana documentation</title>
 <meta name="description" content="guardana diff: compare two saved runs, fail on deterioration">
 <link rel="canonical" href="https://guardana.dev/docs/usage-diff">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html" aria-current="page">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,67 +98,113 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana diff</code> — is this worse than last time?</h1><p class="lede"><code>guardana diff</code>: compare two saved runs, fail on deterioration</p><p><code>scan</code>, <code>probe</code> and <code>monitor</code> all answer <em>how is it now</em>. This one answers the
-question a team actually has at every change — a new model, an edited system
-prompt, one more tool wired into an agent: <strong>is it worse than it was?</strong></p>
-<p>That is what turns security testing from a launch ritual into part of the change
-process. A regression stops the deploy, and a comparison that cannot honestly be
-made says so instead of going green.</p>
+<details class="mnav">
+<summary>Menu · <b>guardana diff</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html" aria-current="page">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana diff</code> — is this worse than last time?</h1><p class="lede"><code>guardana diff</code>: compare two saved runs, fail on deterioration</p><p><code>guardana diff</code> compares runs when you need to see whether a change made results worse. <code>scan</code>, <code>probe</code>, and <code>monitor</code> check current results. A regression can stop a deploy; an incomparable pair is reported as such.</p>
 <h2 id="save-a-run-then-compare-two">Save a run, then compare two</h2>
 <pre><code class="language-bash">guardana probe --url http://localhost:11434 --model llama3 \
   --format json --output monday.json
@@ -149,6 +216,8 @@ guardana probe --url http://localhost:11434 --model llama4 \
 
 guardana diff monday.json friday.json
 </code></pre>
+<p>A side that cannot be read — not a regular file, over 256 MiB, or not a Guardana run — makes
+the pair incomparable (exit <code>2</code>).</p>
 <p>Use <code>--output</code> rather than a shell redirect. A redirect in PowerShell writes
 UTF-16, which the reader on the other end cannot parse, and the corruption
 surfaces a day later far from its cause.</p>
@@ -169,12 +238,12 @@ guardana diff before.json after.json
 <tbody>
 <tr>
 <td><code>0</code></td>
-<td>Nothing got worse</td>
+<td>No regression meets both the policy's severity bar and <code>min_confidence</code>, and none lacks evidence; regressions below either bar are still printed</td>
 <td>pass</td>
 </tr>
 <tr>
 <td><code>1</code></td>
-<td>A regression above your policy's bar</td>
+<td>A regression meets both the policy's severity bar and <code>min_confidence</code>, or lacks evidence to weigh</td>
 <td><strong>fail</strong></td>
 </tr>
 <tr>
@@ -186,9 +255,14 @@ guardana diff before.json after.json
 </table></div>
 <p><code>2</code> is not a softer <code>0</code>. A comparison nobody could make and a comparison that
 found nothing wrong are opposite answers, and only one of them is safe to print
-next to a green build. You will see <code>2</code> for a run saved by Guardana 0.5 or
-earlier (no schema version), a truncated file, two different kinds of target, two
-runs with no rule in common, or a pair of arguments passed in the wrong order.</p>
+next to a green build. You will see <code>2</code> for a run with no schema version, a truncated file, a current-schema
+run missing a required key or whose channel lengths disagree with <code>result_summary</code>,
+two different kinds of target, two runs with no rule in common, a pair of arguments
+passed in the wrong order, or when either run executed rules but every rule declined,
+verifying nothing.</p>
+<p>You will also see <code>2</code> when either run recorded an error — a refused pack, a rule that
+raised, a file nobody could read. Those checks never ran, so a finding missing from that
+run is unknown rather than fixed, and the error's source is named.</p>
 <p>You will also see <code>2</code> when a rule made a different number of attempts per case in the
 two runs — <code>trials changed 1 → 5</code> names it. More attempts find more failures, so the
 difference is sampling, not a regression, and the rule is left out of the comparison
@@ -227,6 +301,10 @@ the rule itself — which is why swapping <code>llama3</code> for <code>llama4</
 <td><code>coverage_lost</code></td>
 <td>A rule that ran before did not run this time. Whatever it would have found is unknown, not absent.</td>
 </tr>
+<tr>
+<td><code>left_scan</code></td>
+<td>The file that held a problem, or a check that could not grade, is not among the files the second run listed. Printed as <code>LEFT THE SCAN</code>.</td>
+</tr>
 </tbody>
 </table></div>
 <p>And the other direction, reported but never failing the build: <code>resolved</code>,
@@ -236,6 +314,14 @@ the rule itself — which is why swapping <code>llama3</code> for <code>llama4</
 <p><strong>A waiver is not a fix.</strong> Adding a finding to a baseline reports as
 <code>waiver_changed</code>, never as <code>resolved</code>. The problem did not go away; a person
 decided to accept it.</p>
+<p><strong>A file that left the scan is not a fixed one.</strong> Against files, a finding is
+<code>resolved</code> only when the second run listed its file and the rule found nothing there.
+A file the second run did not list — deleted, moved into a skipped directory like
+<code>build/</code>, renamed, or excluded by <code>.guardanaignore</code> or <code>rules.paths_exclude</code> — is
+<code>left_scan</code>, and the detail names the exclude when one matches. Removing a malicious
+file is a real fix, and the comparison still cannot tell it from hiding the file, so
+the second run is the evidence: it lists what it read. A second run saved before
+schema 12 records no listing, and a finding that disappeared from it reads as before.</p>
 <p><strong>A narrower run is not a better one.</strong> If the second run used a tighter profile,
 its missing findings are <code>coverage_lost</code> — a regression — not progress. This is
 the failure mode the whole feature is built around, and the reason a saved run
@@ -246,12 +332,10 @@ findings yesterday, four today&quot; it would trip constantly, someone would swi
 off, and a scanner nobody runs is the worst outcome available.</p>
 <p>So the comparison works on <strong>state</strong>, not on tallies: a model either fails a check
 or it does not, and that is far steadier than how many prompts it failed. A
-changed count is reported and never gates on its own. Under a static scan nothing
-is lost by that — a genuinely new problem lands in a new file, which is a new
-check and a regression in its own right.</p>
+falling count is reported as <code>count_changed</code> and never gates on its own. When both runs record file scope, a rising count with more unwaived static findings at the same rule and file is an <code>appeared</code> regression, as is an unwaived finding whose evidence the earlier run does not report there, even if the count stays the same. Findings that differ only in characters their evidence hides cannot be told apart.</p>
 <p>The second filter is confidence. Your policy's <code>min_confidence</code> applies to
 regressions backed by a graded verdict, so a shaky judge cannot stop a deploy.</p>
-<p><strong>Neither filter applies to <code>blinded</code> or <code>coverage_lost</code></strong>, and severity is the one
+<p><strong>Neither filter applies to <code>blinded</code>, <code>coverage_lost</code> or <code>left_scan</code></strong>, and severity is the one
 that mattered. An ungraded result carries confidence 0.0 by definition, and it keeps
 whatever severity its rule declares — so an artifact nobody could read is a <code>LOW</code>
 that every default <code>severity</code> bar filtered away, and the comparison printed &quot;worse&quot;
@@ -294,7 +378,8 @@ one:</p>
   • 3 case(s) produced a value before and could not be graded this time
     (guardana.prompt.jailbreak#b94d…) — a smaller sample, not a better result
 </code></pre>
-<p><code>--format json</code> carries the same numbers under <code>measurement</code>.</p>
+<p><code>--format json</code> carries the same numbers under <code>measurement</code>. The comparison document is
+version 3, described by <a href="https://guardana.dev/schemas/diff/v3.schema.json"><code>diff/v3.schema.json</code></a>.</p>
 <h2 id="was-it-the-model-or-was-it-the-test">Was it the model, or was it the test?</h2>
 <p>A saved run records a digest of every rule that ran. If a rule's own definition
 changed between the two runs — someone added prompts, sharpened an expectation —
@@ -303,9 +388,33 @@ for a test that got harder.</p>
 <p>The digest covers a rule's <em>declaration</em>. It cannot see a change inside the Python
 of a plugin rule; the recorded tool version is what covers that, and a run made by
 a different Guardana version is flagged in the notes.</p>
+<p>A rule <strong>graded differently</strong> in the two runs — another evaluator, or a judge whose
+recorded identity (model, endpoint, samples) changed — is left out of the comparison:
+its findings are neither new nor resolved and its measurements are not paired, and the
+comparison is incomplete (exit <code>2</code>) with a note naming it, as for a rule whose trials per
+case changed. A judge identity recorded on one side only is unknown, not a change.</p>
+<p>When one run is a <a href="usage-grade.html"><code>guardana grade</code></a> of the exchanges the other kept, or
+both graded the same recording, a note says both runs graded the same recorded replies
+and names the digest: a difference between them is not the system answering differently.
+Only a digest of the whole file counts.</p>
+<p>When both runs were started from a recipe and the recipes declared different subjects, one
+an <code>application</code> and the other a <code>model_harness</code>, a note names both: a model reached
+without the application's prompt, tools and data answers differently, so a difference may be
+that rather than the system changing. A run started without a recipe declared nothing, and
+no note is added.</p>
+<p>When both runs recorded a profile digest, a provider wire, an adapter digest or a system-prompt
+digest and they differ, a note names the settings that changed: a difference between the runs
+may come from that rather than from the system. A setting one run did not record is unknown,
+and no note is added for it.</p>
+<p>Two runs given different <a href="usage-fixtures.html">fixtures</a> — another file digest, or the same
+file under another <code>markers</code> algorithm — or fixtures on one side only are an incomplete
+comparison (exit <code>2</code>), not a note: an item one run asked about the other never did, so a
+finding on it that disappears would otherwise read as a fixed leak. A run migrated from
+schema 14 was given no fixtures.</p>
 <h2 id="in-ci">In CI</h2>
 <pre><code class="language-yaml">- name: Save this run
-  run: guardana scan . --format json --output current.json
+  # exit 1 is a finding the comparison will judge; 2 and above still stop the job
+  run: guardana scan . --format json --output current.json || test $? -eq 1
 
 - name: Compare against the last green run
   run: guardana diff baseline.json current.json --preset ci
@@ -333,8 +442,10 @@ inventory, not a gate.</li>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-diff.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

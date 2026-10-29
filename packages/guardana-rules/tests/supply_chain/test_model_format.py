@@ -1,9 +1,24 @@
 import json
 from pathlib import Path
 
+from guardana.core.report import Finding, ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES
 from guardana.rules.supply_chain.model_format import ModelFormatRule
+
+
+def _unverified(findings: list[Finding]) -> list[Finding]:
+    return [f for f in findings if f.verdict is not None and f.verdict.outcome == "inconclusive"]
+
+
+def _unread(ctx: RuleContext) -> list[str]:
+    return [
+        gap.name
+        for gap in ctx.shortfalls()
+        if gap.kind is ShortfallKind.UNEXAMINED_COMPONENT
+        and gap.detail.startswith("guardana.supply_chain.model_format could not read it: ")
+    ]
 
 
 def test_safetensors_wellformed_not_flagged(tmp_path: Path) -> None:
@@ -14,14 +29,20 @@ def test_safetensors_wellformed_not_flagged(tmp_path: Path) -> None:
     assert findings == []
 
 
-def test_safetensors_corrupt_header_low(tmp_path: Path) -> None:
-    # declared header length (way larger than the file) makes the header
-    # structurally corrupt; must be at most INFO, never HIGH.
+def test_a_safetensors_header_longer_than_the_file_is_not_scanned_and_named(
+    tmp_path: Path,
+) -> None:
     blob = (10_000).to_bytes(8, "little") + b"{}"
-    (tmp_path / "bad.safetensors").write_bytes(blob)
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
-    assert all(f.severity.name != "HIGH" for f in findings)
-    assert all(f.severity.name == "INFO" for f in findings)
+    path = tmp_path / "bad.safetensors"
+    path.write_bytes(blob)
+    ctx = RuleContext()
+
+    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), ctx))
+
+    assert [f.title for f in findings] == ["safetensors file not scanned"]
+    assert _unverified(findings) == findings
+    assert _unread(ctx) == [str(path)]
+    assert str(path) in ctx.examined_paths()
 
 
 def test_safetensors_large_valid_header_not_flagged(tmp_path: Path) -> None:
@@ -92,6 +113,47 @@ def test_safetensors_absurd_header_length_is_bounded(tmp_path: Path) -> None:
     # bytes (i.e. it must return promptly).
     blob = (2**60).to_bytes(8, "little") + b"{}"
     (tmp_path / "absurd.safetensors").write_bytes(blob)
-    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    ctx = RuleContext()
+    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), ctx))
     assert len(findings) == 1
-    assert findings[0].severity.name == "INFO"
+    assert _unverified(findings) == findings
+    assert _unread(ctx) == [str(tmp_path / "absurd.safetensors")]
+
+
+_XXE = b'<!DOCTYPE r [<!ENTITY x SYSTEM "file:///etc/passwd">]><r>&x;</r>'
+
+
+def test_an_xml_model_padded_past_the_read_bound_is_unverified_not_clean(tmp_path: Path) -> None:
+    """A comment longer than the bound pushes the DOCTYPE out of the part that is read."""
+    path = tmp_path / "model.pmml"
+    path.write_bytes(b"<!--" + b"x" * MAX_SCAN_BYTES + b"-->" + _XXE)
+    ctx = RuleContext()
+
+    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), ctx))
+
+    assert [f.title for f in findings] == ["XML model file not scanned"]
+    assert _unverified(findings) == findings
+    assert _unread(ctx) == [str(path)]
+    assert str(path) in ctx.examined_paths()
+
+
+def test_an_xml_document_past_the_read_bound_is_unverified_and_no_model_component(
+    tmp_path: Path,
+) -> None:
+    """Only PMML is a model the inventory lists; any other XML stays a finding alone."""
+    (tmp_path / "data.xml").write_bytes(b"<!--" + b"x" * MAX_SCAN_BYTES + b"-->")
+    ctx = RuleContext()
+
+    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), ctx))
+
+    assert [f.title for f in findings] == ["XML model file not scanned"]
+    assert ctx.shortfalls() == ()
+
+
+def test_a_truncated_xml_model_reports_what_it_saw_and_what_it_did_not(tmp_path: Path) -> None:
+    (tmp_path / "model.pmml").write_bytes(_XXE + b"<!--" + b"x" * MAX_SCAN_BYTES + b"-->")
+
+    findings = list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.severity.name for f in findings] == ["HIGH", "LOW"]
+    assert [f.title for f in _unverified(findings)] == ["XML model file not scanned"]

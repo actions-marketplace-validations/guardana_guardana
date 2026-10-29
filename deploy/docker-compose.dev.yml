@@ -2,8 +2,8 @@
 #
 # Deliberately not a production deployment. There is no TLS, no reverse proxy, and
 # the credentials below are in a file in a public repository — which is exactly why
-# they are only ever pointed at a throwaway database. The production Compose file
-# lands with the hardening item, and it will generate its own secrets.
+# they are only ever pointed at a throwaway database. `deploy/docker-compose.yml` is the
+# deployment, with its secrets in an `.env` beside it.
 #
 #   docker compose -f deploy/docker-compose.dev.yml up -d
 #   export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana
@@ -21,7 +21,8 @@ services:
       POSTGRES_DB: guardana_test
     ports:
       # 55439 rather than 5432, so this never fights a PostgreSQL you already run.
-      - "55439:5432"
+      # Loopback only: the credentials are public, so the port must not reach the network.
+      - "127.0.0.1:55439:5432"
     volumes:
       - guardana-pgdata:/var/lib/postgresql/data
       # Creates the `guardana` database this file's own instructions point at.

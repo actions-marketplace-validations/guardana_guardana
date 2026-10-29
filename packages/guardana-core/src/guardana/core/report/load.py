@@ -11,8 +11,9 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from guardana.core.assessment import Assessment, AssessmentStatus, Direction
+from guardana.core.assessment import Assessment, AssessmentStatus, Direction, UnmeasuredReason
 from guardana.core.evaluator.base import Outcome, Verdict
+from guardana.core.formats._stream import read_regular
 from guardana.core.manifest.load import ManifestLoadError, manifest_from_dict
 from guardana.core.manifest.migrations import (
     migrate_v1,
@@ -21,6 +22,17 @@ from guardana.core.manifest.migrations import (
     migrate_v4,
     migrate_v5,
     migrate_v6,
+    migrate_v7,
+    migrate_v8,
+    migrate_v9,
+    migrate_v10,
+    migrate_v11,
+    migrate_v12,
+    migrate_v13,
+    migrate_v14,
+    migrate_v15,
+    migrate_v16,
+    migrate_v17,
 )
 from guardana.core.manifest.model import RunManifest
 from guardana.core.manifest.usage import RunUsage
@@ -33,12 +45,24 @@ from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.report.skipped import SkippedRule
 from guardana.core.report.stop import StopReason
 from guardana.core.severity import Severity
+from guardana.core.target.scope import (
+    ExcludePattern,
+    ExcludeSource,
+    FileScope,
+    KeptModel,
+    SkippedDirectory,
+    SkippedModels,
+)
 from guardana.core.taxonomy import TaxonomyRef, resolve_recorded
 from guardana.core.usage import TargetUsage
+
+MAX_REPORT_BYTES = 256 * 1024 * 1024
+"""Bytes read from one saved run; a larger file is refused before any of it is parsed."""
 
 _OUTCOMES = frozenset({"pass", "fail", "inconclusive"})
 _ASSESSMENT_STATUSES = frozenset(str(s) for s in AssessmentStatus)
 _DIRECTIONS = frozenset(str(d) for d in Direction)
+_UNMEASURED_REASONS = frozenset(str(r) for r in UnmeasuredReason)
 _MIGRATIONS = {
     1: migrate_v1,
     2: migrate_v2,
@@ -46,6 +70,17 @@ _MIGRATIONS = {
     4: migrate_v4,
     5: migrate_v5,
     6: migrate_v6,
+    7: migrate_v7,
+    8: migrate_v8,
+    9: migrate_v9,
+    10: migrate_v10,
+    11: migrate_v11,
+    12: migrate_v12,
+    13: migrate_v13,
+    14: migrate_v14,
+    15: migrate_v15,
+    16: migrate_v16,
+    17: migrate_v17,
 }
 """One step forward per version, keyed by the version the document *is*.
 
@@ -91,13 +126,32 @@ def load_report(path: Path) -> RunReport:
     including every run a user still has on disk — rather than reading it as a run
     that found nothing. An older *declared* version is migrated forward in memory
     instead, because refusing it would strand the evidence somebody kept.
+
+    Only a regular file is read, opened without waiting on a writer, and one over
+    `MAX_REPORT_BYTES` is refused before it is parsed.
     """
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        data = read_regular(path, MAX_REPORT_BYTES)
     except OSError as exc:
         raise ReportLoadError(f"cannot read run {path}: {exc}") from exc
+    if len(data) > MAX_REPORT_BYTES:
+        raise ReportLoadError(
+            f"{path} is over the {MAX_REPORT_BYTES}-byte ceiling for a saved run; it is "
+            f"refused rather than read in part"
+        )
+    try:
+        raw = json.loads(data.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ReportLoadError(f"{path} is not a readable Guardana run: {exc}") from exc
+    return report_from_dict(raw, path)
+
+
+def report_from_dict(raw: object, path: Path) -> RunReport:
+    """Read a run already parsed from JSON, exactly as `load_report` reads the file at `path`.
+
+    `path` only names the document in a refusal. A writer checks with this that what
+    it is about to save is a run the reader will accept.
+    """
     if not isinstance(raw, dict):
         raise ReportLoadError(f"{path} is not a Guardana run: the top level must be an object")
     migrated_from = _check_version(raw, path)
@@ -110,10 +164,172 @@ def load_report(path: Path) -> RunReport:
         # unreadable file is not.
         if migrated_from is not None:
             raw = migrate_forward(raw, migrated_from)
-        manifest = manifest_from_dict(raw.get("run"))
+        else:
+            _require_fields(raw, path)
+        manifest = manifest_from_dict(raw.get("run"), migrated_from=migrated_from)
     except ManifestLoadError as exc:
         raise ReportLoadError(f"{path}: {exc}") from exc
-    return RunReport(manifest=manifest, result=_result(raw, manifest, path))
+    result = _result(raw, manifest, path)
+    if migrated_from is None:
+        _check_counts(result, manifest, path)
+    return RunReport(manifest=manifest, result=result)
+
+
+_REQUIRED_FIELDS: dict[tuple[str, ...], tuple[str, ...]] = {
+    (): (
+        "schema_version",
+        "run",
+        "findings",
+        "unverified",
+        "waived",
+        "errors",
+        "observations",
+        "assessments",
+        "scope",
+    ),
+    ("run",): (
+        "run_id",
+        "created_at",
+        "started_at",
+        "completed_at",
+        "migrated_from",
+        "source",
+        "guardana",
+        "target",
+        "deployment",
+        "configuration",
+        "execution",
+        "usage",
+        "rules",
+        "evaluators",
+        "coverage",
+        "result_summary",
+        "privacy",
+        "exchanges",
+        "recording",
+        "recipe",
+        "fixtures",
+    ),
+    ("run", "source"): ("kind", "provider", "run_url"),
+    ("run", "guardana"): ("version", "commit", "distribution_versions"),
+    ("run", "target"): (
+        "type",
+        "ref",
+        "fingerprint",
+        "fingerprint_inputs",
+        "capabilities",
+        "document",
+    ),
+    ("run", "deployment"): (
+        "ai_system",
+        "environment",
+        "deployment_id",
+        "commit_sha",
+        "image_digest",
+        "model_digest",
+        "model_name",
+        "model_revision",
+    ),
+    ("run", "configuration"): (
+        "profile_name",
+        "profile_digest",
+        "system_prompt_digest",
+        "tool_manifest_digest",
+        "retriever_digest",
+        "dataset_digest",
+        "adapter_digest",
+        "provider",
+        "plugins",
+    ),
+    ("run", "execution"): (
+        "concurrency",
+        "timeout_seconds",
+        "seed",
+        "temperature",
+        "max_requests",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_duration_seconds",
+        "max_requests_per_minute",
+        "trials",
+    ),
+    ("run", "usage"): (
+        "requests",
+        "input_tokens",
+        "output_tokens",
+        "requests_missing_token_counts",
+        "estimated_cost",
+        "wall_time_seconds",
+        "judge",
+    ),
+    ("run", "coverage"): ("digest", "taxonomies", "protocols", "shortfall"),
+    ("run", "result_summary"): (
+        "findings",
+        "unverified",
+        "waived",
+        "errors",
+        "observations",
+        "rules_run",
+        "rules_skipped",
+        "max_severity",
+        "gate",
+        "stopped_by",
+        "assessments",
+        "measured",
+    ),
+    ("run", "privacy"): ("evidence_mode", "redaction_policy_digest"),
+}
+"""Every key the current schema's published document requires, by the object holding it.
+
+The writer emits each of them on every run, so one missing from a run of this schema was
+deleted or never written, and a reader that defaulted it would read a stopped run as
+complete, a coverage gap as none, or a skipped rule as run.
+"""
+
+
+def _require_fields(raw: dict[str, Any], path: Path) -> None:
+    """Refuse a current-schema run without a key its writer always emits.
+
+    A nested object that is absent or null is checked no further here: its own key's
+    presence is checked one level up, and the published schema says which may be null.
+    An older schema keeps the reading its migration documents.
+    """
+    missing: list[str] = []
+    for where, keys in _REQUIRED_FIELDS.items():
+        holder: object = raw
+        for key in where:
+            holder = holder.get(key) if isinstance(holder, dict) else None
+        if isinstance(holder, dict):
+            missing += [".".join((*where, key)) for key in keys if key not in holder]
+    if missing:
+        raise ReportLoadError(
+            f"{path} is schema {REPORT_SCHEMA_VERSION} and has no {', '.join(missing)}; "
+            f"every run of this schema records each of them, so it is refused rather "
+            f"than read as empty"
+        )
+
+
+def _check_counts(result: ScanResult, manifest: RunManifest, path: Path) -> None:
+    """Refuse a current-schema run whose channels hold other counts than its summary."""
+    summary = manifest.result_summary
+    recorded = {
+        "findings": (summary.findings, len(result.findings)),
+        "unverified": (summary.unverified, len(result.unverified)),
+        "waived": (summary.waived, len(result.waived)),
+        "errors": (summary.errors, len(result.errors)),
+        "observations": (summary.observations, len(result.observations)),
+        "assessments": (summary.assessments, len(result.assessments)),
+    }
+    differing = [
+        f"{channel} holds {held} where run.result_summary counts {counted}"
+        for channel, (counted, held) in recorded.items()
+        if counted != held
+    ]
+    if differing:
+        raise ReportLoadError(
+            f"{path} disagrees with its own summary: {'; '.join(differing)} — it is refused "
+            f"rather than read as either"
+        )
 
 
 def _check_version(raw: dict[str, Any], path: Path) -> int | None:
@@ -171,13 +387,124 @@ def _result(raw: dict[str, Any], manifest: RunManifest, path: Path) -> ScanResul
         usage=_target_usage(manifest.usage),
         protocols=dict(manifest.coverage.protocols),
         assessments=_assessments(raw.get("assessments"), path),
-        # Read off the stored summaries, the one place the document records K. A rule
-        # without one made a single attempt per case, which is what an absent key means.
+        # Read off the stored summaries, the places the document records K: a suite that ran
+        # in its own summary, any other repeating rule in its trial summary. A rule with
+        # neither made a single attempt per case, which is what an absent key means; a suite
+        # the run cut off keeps no K, as the run that wrote it kept none.
         trials_per_case={
-            rule.id: rule.trial_summary.trials_per_case
-            for rule in manifest.rules
-            if rule.trial_summary is not None
+            **{
+                rule.id: rule.suite.trials_per_case
+                for rule in manifest.rules
+                if rule.suite is not None and rule.id in rules_run
+            },
+            **{
+                rule.id: rule.trial_summary.trials_per_case
+                for rule in manifest.rules
+                if rule.trial_summary is not None
+            },
         },
+        suites={rule.id: rule.suite for rule in manifest.rules if rule.suite is not None},
+        scope=_scope(raw, path),
+    )
+
+
+_EXCLUDE_SOURCES = frozenset(str(source) for source in ExcludeSource)
+
+
+_SCOPE_KEYS = frozenset(
+    {"files", "excludes", "ignored_directories", "kept_models", "skipped_models"}
+)
+
+
+def _scope(raw: dict[str, Any], path: Path) -> FileScope | None:
+    """Read what a file run listed and excluded, refusing a shape no writer produces.
+
+    An absent key reads as unknown, like null, never as "listed nothing": a document
+    written by hand would otherwise turn every finding into one whose file left the scan.
+    """
+    block = raw.get("scope")
+    if block is None:
+        return None
+    if not isinstance(block, dict) or set(block) != _SCOPE_KEYS:
+        raise ReportLoadError(
+            f"{path}: 'scope' must be null or an object with {', '.join(sorted(_SCOPE_KEYS))}"
+        )
+    return FileScope(
+        files=_str_tuple(block["files"], "scope.files", path),
+        excludes=None if block["excludes"] is None else _excludes(block["excludes"], path),
+        ignored_directories=_str_tuple(
+            block["ignored_directories"], "scope.ignored_directories", path
+        ),
+        kept_models=_kept_models(block["kept_models"], path),
+        skipped_models=None
+        if block["skipped_models"] is None
+        else _skipped_models(block["skipped_models"], path),
+    )
+
+
+def _excludes(raw: object, path: Path) -> tuple[ExcludePattern, ...]:
+    if not isinstance(raw, list):
+        raise ReportLoadError(f"{path}: 'scope.excludes' must be null or a list")
+    patterns = []
+    for entry in raw:
+        if (
+            not isinstance(entry, dict)
+            or set(entry) != {"pattern", "source", "file"}
+            or not isinstance(entry["pattern"], str)
+            or entry["source"] not in _EXCLUDE_SOURCES
+            or not (entry["file"] is None or isinstance(entry["file"], str))
+        ):
+            raise ReportLoadError(
+                f"{path}: every entry in 'scope.excludes' needs a string pattern, a source "
+                f"of {sorted(_EXCLUDE_SOURCES)} and a file that is a string or null"
+            )
+        patterns.append(
+            ExcludePattern(entry["pattern"], ExcludeSource(entry["source"]), entry["file"])
+        )
+    return tuple(patterns)
+
+
+def _kept_models(raw: object, path: Path) -> tuple[KeptModel, ...]:
+    if not isinstance(raw, list) or not all(
+        isinstance(entry, dict)
+        and set(entry) == {"path", "pattern"}
+        and isinstance(entry["path"], str)
+        and isinstance(entry["pattern"], str)
+        for entry in raw
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.kept_models' must be a list of objects with a string path and pattern"
+        )
+    return tuple(KeptModel(entry["path"], entry["pattern"]) for entry in raw)
+
+
+def _skipped_models(raw: object, path: Path) -> SkippedModels:
+    if (
+        not isinstance(raw, dict)
+        or set(raw) != {"directories", "searched_all"}
+        or not isinstance(raw["searched_all"], bool)
+        or not isinstance(raw["directories"], list)
+        or not all(_skipped_directory(entry) for entry in raw["directories"])
+    ):
+        raise ReportLoadError(
+            f"{path}: 'scope.skipped_models' must be null or an object with a boolean "
+            f"searched_all and directories, each a string path and a positive model_files"
+        )
+    return SkippedModels(
+        directories=tuple(
+            SkippedDirectory(entry["path"], entry["model_files"]) for entry in raw["directories"]
+        ),
+        searched_all=raw["searched_all"],
+    )
+
+
+def _skipped_directory(entry: object) -> bool:
+    return (
+        isinstance(entry, dict)
+        and set(entry) == {"path", "model_files"}
+        and isinstance(entry["path"], str)
+        and type(entry["model_files"]) is int
+        and entry["model_files"] > 0
     )
 
 
@@ -210,23 +537,27 @@ def _assessment(raw: object, path: Path) -> Assessment:
             f"{path} records an assessment with direction {direction!r}; this build "
             f"knows {sorted(_DIRECTIONS)}"
         )
-    return Assessment(
-        case_id=_str(block, "case_id", path),
-        assessor=_str(block, "assessor", path),
-        subject_ref=_str(block, "subject_ref", path),
-        status=AssessmentStatus(status),
-        rule_id=str(block.get("rule_id") or ""),
-        passed=_optional_bool(block.get("passed")),
-        value=_optional_float(block.get("value")),
-        unit=_optional_str(block.get("unit")),
-        direction=None if direction is None else Direction(str(direction)),
-        threshold=_optional_float(block.get("threshold")),
-        confidence=_optional_float(block.get("confidence")),
-        dataset=_optional_str(block.get("dataset")),
-        rationale=str(block.get("rationale") or ""),
-        tags=_str_tuple(block.get("tags"), "assessments[].tags", path),
-        trial=_trial(block.get("trial"), path),
-    )
+    try:
+        return Assessment(
+            case_id=_str(block, "case_id", path),
+            assessor=_str(block, "assessor", path),
+            subject_ref=_str(block, "subject_ref", path),
+            status=AssessmentStatus(status),
+            rule_id=str(block.get("rule_id") or ""),
+            passed=_optional_bool(block.get("passed")),
+            value=_optional_float(block.get("value")),
+            unit=_optional_str(block.get("unit")),
+            direction=None if direction is None else Direction(str(direction)),
+            threshold=_optional_float(block.get("threshold")),
+            confidence=_optional_float(block.get("confidence")),
+            dataset=_optional_str(block.get("dataset")),
+            rationale=str(block.get("rationale") or ""),
+            tags=_str_tuple(block.get("tags"), "assessments[].tags", path),
+            trial=_trial(block.get("trial"), path),
+            reason=_reason(block, path),
+        )
+    except ValueError as exc:
+        raise ReportLoadError(f"{path}: {exc}") from exc
 
 
 def _trial(raw: object, path: Path) -> int | None:
@@ -240,6 +571,25 @@ def _trial(raw: object, path: Path) -> int | None:
     if isinstance(raw, bool) or not isinstance(raw, int) or raw < 1:
         raise ReportLoadError(f"{path}: an assessment's 'trial' must be 1 or more, got {raw!r}")
     return raw
+
+
+def _reason(block: dict[str, Any], path: Path) -> UnmeasuredReason | None:
+    """Read why an assessment went unmeasured, refusing a reason this build cannot place.
+
+    The key is required, null included: a trial read back without its reason would lose
+    whether the recording lacked a reply or the evaluator declined.
+    """
+    if "reason" not in block:
+        raise ReportLoadError(f"{path}: an assessment's 'reason' is missing; null says unknown")
+    raw = block["reason"]
+    if raw is None:
+        return None
+    if not isinstance(raw, str) or raw not in _UNMEASURED_REASONS:
+        raise ReportLoadError(
+            f"{path} records an assessment with reason {raw!r}; this build knows "
+            f"{sorted(_UNMEASURED_REASONS)} — upgrade whichever side is older"
+        )
+    return UnmeasuredReason(raw)
 
 
 def _optional_bool(raw: object) -> bool | None:

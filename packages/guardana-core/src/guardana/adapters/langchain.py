@@ -142,7 +142,9 @@ class LangChainToolTransport(LangChainTransport):
                 f"{type(bound).__name__}, which cannot be invoked"
             )
         reply = invoke([_as_langchain(m, ref) for m in messages])
-        return ToolCallReply(text=_reply_text(reply), tool_calls=_tool_calls(reply))
+        return ToolCallReply(
+            text=_reply_text(reply), tool_calls=_tool_calls(reply), usage=_usage_of(reply)
+        )
 
 
 def _bind(model: LangChainModel, tools: Sequence[ToolSpec], ref: str) -> object:

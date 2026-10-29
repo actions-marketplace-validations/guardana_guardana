@@ -40,6 +40,15 @@ _PRESETS: dict[str, Profile] = {
         policy=Policy(fail_on=FailOn(severity=Severity.HIGH, fail_on_inconclusive=True)),
         privacy=_PRIVACY,
     ),
+    # A release gate vouches for every check it selected: one that was skipped,
+    # declined to a verdict or errored fails it alongside a HIGH finding.
+    "release": Profile(
+        name="release",
+        policy=Policy(
+            fail_on=FailOn(severity=Severity.HIGH, fail_on_inconclusive=True, fail_on_skipped=True)
+        ),
+        privacy=_PRIVACY,
+    ),
 }
 
 PRESET_NAMES = tuple(_PRESETS)

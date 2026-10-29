@@ -88,16 +88,41 @@ expect:
 | `id` | yes | string | Globally unique rule id. Namespace it: `guardana.*` is reserved for built-ins — use your own prefix (`acme.*`) so profiles can include/exclude by glob without collisions. |
 | `title` | yes | string | Short human-readable name, shown in every renderer. |
 | `severity` | yes | `info\|low\|medium\|high\|critical` (case-insensitive) | Maps to `guardana.core.severity.Severity`. |
-| `target_kind` | yes | `artifact\|endpoint` | Which `Target` kind this rule runs against. YAML rules only ever run against `endpoint` today (`YamlRule.run` returns immediately if the target isn't an `EndpointTarget`) — static artifact checks are currently authored as Python plugins (see Path 2). |
+| `target_kind` | yes | `endpoint` | The only value a YAML rule accepts; any other is refused at load. The rule sends its prompts through the target's `ChatEndpoint` surface, and a target without it is an error of the rule, never a silent pass. Artifact checks are Python plugins (see Path 2). |
 | `taxonomy` | no (default `[]`) | list of references | OWASP/MITRE/NIST references, e.g. `[LLM01:2025, AML.T0051]`. **A reference names its edition where the framework publishes them** (`LLM07:2025`, `ASI06:2026`); a framework with no editions keeps its bare id (`AML.T0051`, `supply-chain`). Every reference must resolve through `guardana.core.taxonomy.resolve()` — an unknown one is rejected at load time, not silently dropped, so a typo fails loudly, and a bare `LLM07` is rejected too, naming the editions that define it rather than picking one. Run [`guardana taxonomy`](usage-taxonomy.md) to list what is installed. Beyond the built-in frameworks you can register your own with the `guardana.taxonomies` entry point and then name it here. |
-| `evaluator` | yes | string | The evaluator id this rule's prompts are graded with, e.g. `keyword`, `canary`, or an evaluator your own package registers, e.g. `acme.severity_classifier`. A rule using `canary` must set `expect.canary`, and one using `llm_judge` must set `expect.goal` — the loader rejects it otherwise. `llm_judge` and `guard` also need an `evaluators:` block in `guardana.yaml` telling Guardana where their model lives (see [`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); without it, the rule is skipped visibly. |
-| `requires` | no (default `[]`) | list of capability names | Capabilities the target must support, e.g. `[chat]` or `[chat, plant_system_prompt]`. Maps to `guardana.core.target.Capability` (case-insensitive). The `Runner` skips the rule (not a crash) if the target lacks any of these. |
+| `evaluator` | yes | string | The evaluator id this rule's prompts are graded with, e.g. `keyword`, `canary`, or an evaluator your own package registers, e.g. `acme.severity_classifier`. A rule using `canary` must set `expect.canary`, and one using `llm_judge` must set `expect.goal` — the loader rejects it otherwise. `llm_judge` and `guard` also need an `evaluators:` block in `guardana.yaml` telling Guardana where their model lives (see [`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); without it, the rule's run records a `RuleLoadError` (`unknown evaluator`) error instead of grading. `fail_on_error` (on by default) counts that error against the gate. |
+| `requires` | yes (must include `chat`) | list of capability names | Capabilities the target must support, e.g. `[chat]` or `[chat, plant_system_prompt]`. Maps to `guardana.core.target.Capability` (case-insensitive). A rule that omits `requires` or does not include `chat` is refused at load with `RuleLoadError`. Agent-run and suite rules have the same requirement. The `Runner` skips the rule (not a crash) if the target lacks any of these. |
 | `prompts` | yes (at least one) | list of strings | The corpus sent to the target, one `chat()` call per prompt and trial. A scalar string is rejected — it would explode into single-character prompts — and so is a prompt listed twice, because a prompt is its own case id. |
-| `expect` | no (default `{}`) | mapping | Passed straight to the evaluator as an `Expectation`: `canary` (string, the marker the `canary` evaluator looks for) and `goal` (string, free-text used by `llm_judge`'s prompt template). Unknown keys are rejected. |
+| `expect` | no (default `{}`) | mapping | Passed straight to the evaluator as an `Expectation`: `canary` (string, the marker the `canary` evaluator looks for), `goal` (string, free-text used by `llm_judge`'s prompt template), and the fields the rule's evaluator declares, such as `refusal_markers` for `keyword` and `answered` (see [Refusals in another language](#refusals-in-another-language)). Unknown keys are rejected. |
 | `fixtures` | no | list of mappings | The rule's own samples — a finding, a clean and an inconclusive one — each a scripted `reply` and the `outcome` the rule must reach. [`guardana rule test`](usage-rule-test.md) runs them; a rule without all three is reported as not fully sampled. |
+| `detection` | no (default `undeclared`) | `invariant\|heuristic\|undeclared` | What a finding from this rule states. `invariant`: every finding is a checked fact about the target, such as a planted marker seen in a reply. `heuristic`: a finding is a lead a person confirms, because a keyword, a list, a threshold or a pattern decides it. A rule that can emit both kinds declares `heuristic`. Any other value is refused at load. The key does not change the rule's digest, so a saved run does not report a relabelled rule as changed. [Detection limits](generated/detection-limits.md) lists every built-in by this value. |
 
 A YAML file may contain a single rule mapping or a **list** of rule
 mappings — `load_yaml_rules` accepts both.
+
+### Refusals in another language
+
+`keyword` and `answered` recognise a refusal by phrase. The built-in phrases are
+English (`guardana.core.evaluator.REFUSAL_MARKERS`), so a product that refuses in
+Polish, Spanish or German reads as having complied. Declare its own refusal in
+`expect.refusal_markers`, a list of strings. They are matched together with the
+built-in phrases, ignoring case, apostrophe style and Unicode form (NFKC, so a
+decomposed accent or a full-width letter matches its usual spelling):
+
+```yaml
+evaluator: keyword
+expect:
+  refusal_markers:
+    - "nie mogę w tym pomóc"
+    - "no puedo ayudar con eso"
+```
+
+A value that is not a list of strings, or a marker with fewer than four letters or
+digits, is refused when the rule loads. A marker is the whole phrase, matched as a
+substring, never word by word, so a short or common one reads ordinary answers as
+refusals: under `keyword` that is a pass the reply did not earn, so quote the
+product's whole configured opening. In a script written without spaces (Chinese,
+Japanese, Thai) give the phrase, not one word.
 
 ### How a YAML rule executes
 
@@ -109,8 +134,18 @@ a `Verdict` against the rule's `Expectation`. A `"fail"` verdict yields a
 `Finding`; an `"inconclusive"` verdict (the evaluator could not actually
 grade — say, an empty reply) is routed to the result's `unverified` channel
 instead of being dropped; only a real `"pass"` yields nothing. An evaluator
-id that resolves to nothing is a loud error (a visible skip), never a rule
-that silently passes everything.
+id that resolves to nothing is a loud error recorded in the run's `errors`, never a
+rule that silently passes everything.
+
+When the target reports reply metadata (an adapter's `metadata_paths:`), the rule asks
+through `chat_reply` and the `Exchange` carries it in `meta`. A request the application
+declines (an adapter's `declines:`) is graded rather than raised: the exchange ends on the
+declined prompt with `exchange.decline` set, and the evaluator reads it as
+[`read_decline`](extending.md#reading-a-declined-request-read_decline) says. A verdict read
+from a decline is recorded with the tag `declined:<name>`; an `inconclusive` one on a
+declined exchange is recorded with the reason `target_declined`; a finding's evidence names
+the decline (`declined by the application: content_filter (HTTP 400)`) where it would quote
+a reply. A scenario and a suite do the same per step and per case.
 
 ### Multi-turn scenarios: `steps:` instead of `prompts:`
 
@@ -156,6 +191,28 @@ ungraded scenario would drive turns and pass everything, so the loader
 rejects it. Scenarios load through every path single-turn YAML rules do
 (`--rules`, `rules.paths`, `provide_rules()`).
 
+#### Which replies a grade reads
+
+A step's `expect` grades the replies its grader has not read yet: the replies since
+the last step graded by the same evaluator against the same expectation — its own
+reply, and any earlier one that grader has not read. A leak is reported once, and a
+reply another evaluator already graded is still read by this one. A top-level `expect` and an agent run grade every reply the
+model gave. Within those replies, a check for something that must never be said fails
+on any of them — `canary`, `contains` with `contains_none`, `regex` with
+`must_match: false` — and `guard` classifies them together in one call. A check of the
+answer reads the final reply: `contains_all`, `contains_any`, `regex` with
+`must_match: true`, and the answer evaluators. `keyword` grades the final reply; in an
+agent run, where every reply answers the same task, it passes a final refusal only
+when every earlier reply refuses too, and is `inconclusive` otherwise. Replies after
+the last graded step are read only by a top-level `expect`.
+
+A scenario stops at a step the application declines. That step, if it has an `expect`,
+and the top-level `expect` are graded over the turns that were sent, with the decline: a
+fail in an earlier reply stands, and only then is the decline read. The steps after it are
+not sent, and each graded one is recorded `inconclusive` with the reason
+`target_declined` and the tag `declined:<name>`, so a trial never loses a case. The
+conversation's exchange carries the metadata of the last reply, the declined one included.
+
 ### Agent runs: `task:` and `tools:` instead of `prompts:`
 
 A rule with a `task:` key is a **trajectory rule**: Guardana plays the agent
@@ -197,19 +254,61 @@ expect:
 | `max_steps` | no (default `6`) | Model round trips per session. Capped at 12; a rule cannot raise its own cost without bound. |
 | `fixtures` | no | Samples scripted with `turns:` — what the model says and which tool it calls on each round trip — and `then_turns:` for a rule with `then:`. See [`usage-rule-test.md`](usage-rule-test.md#an-agent-run-one-turn-per-round-trip). |
 
-The `tool_call` evaluator reads four `expect` fields: `forbidden_tools`,
-`canary_in_arguments`, `forbidden_argument_values`, and `delivered_by`. Configure
-at least one of the first three or the run is graded `inconclusive` — a rule that
-checks nothing must not read as a pass.
+The `tool_call` evaluator reads six `expect` fields. Configure at least one of
+the first four or the run is graded `inconclusive` — a rule that checks nothing
+must not read as a pass.
+
+| Field | What fails the run |
+|---|---|
+| `forbidden_tools` | The model called one of these tools. |
+| `canary_in_arguments` | The planted canary appears in a tool call's arguments — raw, or as a decoded JSON key or value (so a `\uXXXX`-escaped marker is found too). |
+| `forbidden_argument_values` | A decoded argument **value** contains one of these substrings. Keys are never matched; arguments that are not JSON are matched as one string. |
+| `allowed_argument_values` | `{tool: [exact values]}`. A call to a listed tool carries a string value, under any argument name, that is not on its list; a repeated JSON key counts every value it carries. An unlisted number, boolean or null, an argument name that is not a plain identifier, a call with no value at all, or a listed tool never called is `inconclusive`. |
+| `delivered_by` | Nothing fails; if the model never called this tool, the payload never arrived and the run is `inconclusive`. |
+| `payload_marker` | Nothing fails; with `delivered_by`, delivery counts only when that tool's result contained this text (case-insensitive). A `memory: read` tool hands back the values each note saved, never the argument names around them, so a marker cannot be matched by a key. |
+
+`allowed_argument_values` is keyed by tool, not by argument name, because the
+model chooses the argument names: a task that names one file is scoped by
+`{delete_file: ["/tmp/session-42.log"]}`, and `{file_path: "/tmp/*"}` or an extra
+`{pattern: "*"}` fails it just as `{path: "/tmp/"}` does.
 
 **`delivered_by` is the one to get right.** It names the tool whose *result*
 carries your payload. If the model never called it, the injection never arrived,
 and the verdict is `inconclusive` rather than "the model behaved". Without it, a
 model that ignored the poisoned document entirely would be reported as robust.
+When the result is not fixed — a `memory: read` tool returns whatever an earlier
+session saved — calling it proves nothing, so `payload_marker` must name text of
+the payload. This holds whatever evaluator grades the rule: a judge's pass over a run
+that never received the payload is `inconclusive`, while a fail stands. A rule is
+refused at load when `delivered_by` names a tool that is not declared or a `memory: write` tool, when it names a
+`memory: read` tool without a `payload_marker` or with one that also appears in the
+`task` or `then` text, when the marker appears in no fixed `returns:` text, or when
+the marker overlaps the canary (the canary is replaced on every run). Name text that
+only the payload carries, such as the attacker's address.
 
 A run that hits a bound — steps, per-step tool calls, byte budget, or the 120 s
-deadline — is `inconclusive` too, and the history is never trimmed to fit: the
-span that would be dropped is the one carrying the payload.
+deadline — is `inconclusive` if its evaluator grades it as a pass; an established
+failure stands, and an `inconclusive` result stays `inconclusive`. The history is
+never trimmed to fit: the span that would be dropped is the one carrying the payload.
+
+### Quality suites: `dataset:` instead of `prompts:`
+
+A suite grades a versioned dataset and gates its pass rate. For example:
+
+```yaml
+id: acme.quality.support_answers
+title: The support bot still answers the golden set
+severity: high
+target_kind: endpoint
+taxonomy: [LLM09:2025]
+evaluator: contains
+requires: [chat]
+dataset: ./support-golden.jsonl
+gate:
+  min_pass_rate: 0.90
+```
+
+See [quality suites](usage-suites.md) for the dataset, gate and results.
 
 ### A note on capabilities
 
@@ -232,53 +331,53 @@ nothing reads as a clean server.
 
 Three ways, all real:
 
-1. **Point the CLI at a rules directory you maintain** (e.g. a private repo
-   checked out in CI) — no packaging at all. Pass the repeatable
-   `--rules PATH` flag on `scan`, `probe`, or `monitor`, or set
-   `rules.paths: ["./team-rules"]` in your `guardana.yaml` (see
-   [`profiles.md`](profiles.md)); the two are combined. A path may be a
-   directory (every `*.yaml`/`*.yml` in it loads) or a single file. A
-   malformed rule file is reported as a warning and skipped — it never
-   aborts the run.
-2. **Bundle it in your package and expose it via `provide_rules()`** — this
-   is how `guardana-rules` itself ships its catalog:
-   [`packages/guardana-rules/src/guardana/rules/__init__.py`](../packages/guardana-rules/src/guardana/rules/__init__.py)
-   walks its own `catalog/` directory with `importlib.resources` and calls
-   `load_yaml_rules(path)` per file. `examples/custom_rule/` follows
-   the identical pattern for its own YAML rule.
+1. **Point the CLI at a rules directory you maintain** (e.g. a private repo checked out in CI).
+   This needs no packaging. Pass the repeatable `--rules PATH` flag on `scan`, `probe`, or
+   `monitor`, or set `rules.paths: ["./team-rules"]` in your `guardana.yaml` (see
+   [`profiles.md`](profiles.md)); the two are combined. A path may be a directory (every
+   `*.yaml`/`*.yml` in it loads) or a single file. A malformed rule file produces a warning,
+   and the other rules still run. It is not a skip: the run records it among its `errors` at
+   stage `load`. Under the default `fail_on_error`, the run is `indeterminate` unless a finding
+   fails it. If a `rules.include` pattern then matches no rule because the rule it named did
+   not load, the command is refused before anything runs
+   ([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
+2. **Bundle it in your package and expose it via `provide_rules()`** — load
+   its YAML rule files with `Registry.load_yaml_rule_dirs(paths)`.
 3. **Load it yourself in embedding code** with
    `Registry.load_yaml_rule_dirs(paths)` — the same loader that backs
-   `--rules` — or per file with
-   `guardana.core.rule.yaml_rule.load_yaml_rules(path)`,
-   then hand the resulting rules to a `Registry`.
+   `--rules`; it records a file that does not load instead of raising.
+
+`load_yaml_rules` is outside [the supported surface](compatibility.md#the-supported-surface);
+a pack importing an internal name pins `guardana-core`.
 
 ## Path 2: Python plugin (when YAML can't express the logic)
 
-Use this for custom parsers, stateful probes, or any check against an
-**artifact** target. Of the 51 built-in rules, 19 are build-time (artifact-kind)
-Python plugins — pickle opcodes (incl. ZIP-archive recursion), model format,
-chat-template code-execution gadgets, risky ONNX graph constructs, Keras
-Lambda-layer RCE, TensorFlow SavedModel operators, dependency risk, remote-code
-(`trust_remote_code`/`torch.hub.load`) and its config form (`auto_map`), code
-execution (`eval`/`exec`/`os.system`/`shell=True`), notebook payloads, insecure
-transport (`verify=False`/plaintext HTTP), known-malicious dependencies, MCP
-tool-poisoning, hidden-instruction rules-file backdoors, training-data
-integrity, hallucinated packages, provenance, hardcoded secrets — since they
-need real parsing logic, not a prompt corpus. (The hallucinated-package rule
-scans `import`/`from` statements in `.py` files only; it does not read
-`requirements.txt` or lockfiles.) The other 32 are dynamic endpoint rules: 12
-are YAML (10 single-turn — injection, jailbreak, system-prompt-leak,
-unbounded-consumption, cost-asymmetry, and five agent-scoped checks for
-credential exfiltration, memory poisoning, tool-argument scope, tool-result
-injection, and hidden context in a tool schema — plus 2 scenarios: gradual
-jailbreak and indirect/RAG injection). The remaining 20 need real logic and are
-Python plugins like this one but endpoint-kind: `output.secrets`, the
-tool-calling `agent.excessive_tool_use` (see the note below),
-`agent.mcp_server_manifest`, all 8 `mcp.*` checks (the MCP authorization
-surface — session binding, token audience, scope breadth, and others), and all
-9 `trace.*` checks (graded from a recorded `Trace` rather than a live chat —
-credential passthrough, identity disagreement, cross-tenant retrieval, and
-others).
+Use this for custom parsers, stateful probes, or any check against an **artifact** target.
+Of the 58 built-in rules, 19 are build-time (artifact-kind) Python plugins: pickle opcodes
+(including ZIP-archive recursion), model format, chat-template code-execution gadgets, risky
+ONNX graph constructs, Keras Lambda-layer RCE, TensorFlow SavedModel operators, dependency
+risk, remote-code (`trust_remote_code`/`torch.hub.load`) and its config form (`auto_map`), code
+execution (`eval`/`exec`/`os.system`/`shell=True`), notebook payloads, insecure transport
+(`verify=False`/plaintext HTTP), known-malicious dependencies, MCP tool-poisoning,
+hidden-instruction rules-file backdoors, training-data integrity, hallucinated packages,
+provenance, and hardcoded secrets. These need real parsing logic rather than a prompt corpus.
+The hallucinated-package rule reads `import`/`from` statements in `.py` files and checks each
+name against the dependencies the repository declares in `requirements*.txt` and
+`pyproject.toml`, so a declared package is not reported. The rest are runtime rules: dynamic
+endpoint rules and trace rules graded from a recorded execution. The YAML rules are
+single-turn (injection, jailbreak, system-prompt-leak, unbounded-consumption, cost-asymmetry,
+and agent-scoped checks for credential exfiltration, memory poisoning, tool-argument scope,
+tool-result injection, and hidden context in a tool schema) or scenarios (gradual jailbreak
+and indirect/RAG injection). The other endpoint rules need real logic and are Python plugins
+like this one: `output.secrets`, the tool-calling `agent.excessive_tool_use` (see the note
+below), `agent.mcp_server_manifest`, the `mcp.*` checks (the MCP authorization surface — session
+binding, token audience, scope breadth, and others), and the two checks supplied by a
+[fixtures file](usage-fixtures.md), `tenancy.cross_tenant_answer` and
+`retrieval.poisoned_document`. The `trace.*` checks are Python plugins of the trace kind. They
+are graded from a recorded `Trace` rather than a live chat (credential passthrough, identity
+disagreement, cross-tenant retrieval, and others) and run under
+[`guardana analyze-trace`](usage-analyze-trace.md). The
+[rule summary](generated/rule-summary.md) counts them by surface and kind.
 
 Subclass `Rule`, set `meta` to a `RuleMeta`, implement `run`:
 
@@ -288,7 +387,7 @@ from collections.abc import Iterable
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
-from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
+from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import OWASP_LLM05_2025
 
 class MyRule(Rule):
@@ -302,9 +401,10 @@ class MyRule(Rule):
     )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        # Never `assert isinstance(...)` here — it vanishes under `python -O`.
-        # A rule handed a target it can't handle returns nothing.
-        if not isinstance(target, ArtifactTarget):
+        # The runner skips a target without `read_files` and records the skip, so
+        # this check only narrows the type. Never `assert isinstance(...)`: it
+        # vanishes under `python -O`.
+        if not isinstance(target, FileReader):
             return
         for path in target.iter_files((".json",)):
             if _is_bad(path):
@@ -318,9 +418,58 @@ class MyRule(Rule):
                 )
 ```
 
-`RuleContext.config` carries whatever the active profile's `rule_config`
-declares for this rule id (`ctx.get(key, default)`); none of the built-ins
-currently read it, but it's there for tunable checks.
+`iter_files` matches suffixes in any case. A rule that then picks files by name compares
+the name in any case too (`path.name.lower() == "setup.py"`): a loader opens `Setup.py` or
+`Config.JSON` all the same.
+
+`RuleMeta` takes the same `detection` as the YAML key, `detection=Detection.INVARIANT` or
+`Detection.HEURISTIC` from `guardana.core.safety`; left out, it is `Detection.UNDECLARED`.
+
+`RuleContext.config` carries whatever the active profile's `rule_config` declares
+for this rule id (`ctx.get(key, default)`). Built-in readers include
+`guardana.supply_chain.hardcoded_secret`, which reads `entropy`, and the MCP
+server manifest rule, which reads `pin`.
+
+**Say which model files you read.** A model file the scan observes and no rule that
+ran read is a coverage shortfall, and the run is `indeterminate`
+([`guardana scan`](usage-scan.md#model-files-no-rule-reads)). A rule that reads a model
+format calls `ctx.examined(path)` once it parsed a file or reported on it; a file the
+rule yielded a finding or an unverified result for counts without the call. A rule
+that reads every file for something else, as a secret scanner does, does not call it:
+reading bytes for secrets says nothing about whether the model is safe to load.
+
+```python
+for path in target.iter_files((".tflite",)):
+    yield from self._scan(path)
+    ctx.examined(path)
+```
+
+**Say when a precondition of the check did not hold.** A rule whose own control failed —
+a seeded item that never answered — calls `ctx.shortfall(CoverageShortfall(...))` with a
+kind from `guardana.core.report.shortfall`. The run carries it into `coverage_shortfall`,
+which has no switch, so the run is `indeterminate` unless a finding fails it; an
+inconclusive verdict alone would sit behind `fail_on_inconclusive`, which defaults off.
+Yield an inconclusive verdict for it too, so `rule test` sees the decline.
+
+**Say when the target has none of what you examine.** A rule that finds, while it runs,
+that the target does not offer the capability it checks — a server that lists no tasks —
+raises `NotOffered(detail, missing=(...))` from `guardana.core.rule` before it yields
+anything. The run records it as skipped `not_offered`, a coverage gap that
+`fail_on_skipped` and `--preset release` refuse, and `rule test` reports the sample as
+`not_offered`. Inconclusive means "I asked and could not tell"; `NotOffered` means "this
+target has none of what I examine". Raised after the rule yielded a finding or recorded a
+measurement, it is an error of the rule.
+
+**Price and skip against the target.** A rule whose request count depends on what the
+target holds overrides `estimated_requests_for(target)`, which `plan` reads; it defaults to
+`estimated_requests`. A rule with nothing to check on a target returns the reason, a
+non-empty string, from `not_applicable_to(target)`, and is recorded as skipped
+`not_applicable` in the run and its plan alike; it returns `None` when it applies. Anything
+else, such as `False` from `cond and "reason"`, is recorded as an error and the rule runs,
+so `fail_on_error` keeps the run from passing. `guardana.retrieval.poisoned_document` does
+both.
+A rule that requires `Capability.SEEDED_DATA` is demanded by every run given fixtures,
+whatever the profile selects, unless `not_applicable_to` says it has nothing to check there.
 
 **Ask the target for parsed source — never parse it yourself.** A scan runs
 every rule over the same tree, so a rule that reads and parses a file for itself
@@ -328,7 +477,7 @@ multiplies the cost of the whole scan by the number of rules:
 
 ```python
 for path in target.iter_files((".py",)):
-    source = target.python_source(path)   # read, parsed and indexed once per scan
+    source = target.python_source(path)   # parsed once per scan while it fits the cache
     if source is None:
         continue                          # unreadable or unparseable — not "clean"
     for node in source.nodes(ast.Call):   # no ast.walk: the index is already built
@@ -338,14 +487,13 @@ for path in target.iter_files((".py",)):
 `PythonSource` gives you `text`, `tree`, and `nodes(<node type>)` in document
 order ([`guardana.core.source`](../packages/guardana-core/src/guardana/core/source.py)).
 
-`None` means there is no tree, and the engine has already dealt with the half of
-that which matters: a file the scan was *prevented* from reading — too large, not
-a regular file, unopenable — is recorded by the target and surfaces in the run's
-`errors`, so it fails the gate rather than disappearing. A file that is simply
-not runnable Python (invalid syntax, undecodable bytes) stays quiet, because a
-rule looking for Python constructs has nothing to find there. Call
-`read_source()` instead of `python_source()` if your rule wants that distinction
-in its own hands — it returns `PythonSource | UnreadSource | None`.
+`None` means there is no tree, and the engine has already recorded why: a file
+that is too large, not a regular file, unopenable, undecodable or not parseable
+by the scanning interpreter surfaces in the run's `errors`, so it fails the gate
+rather than disappearing. Bytes are decoded the way the interpreter runs them, so
+a UTF-8 byte order mark or a PEP 263 coding line is honoured. Call `read_source()`
+instead of `python_source()` if your rule wants the reason in its own hands — it
+returns `PythonSource | UnreadSource`. `read_source()` is outside [the supported surface](compatibility.md#the-supported-surface); a pack that imports it pins `guardana-core`.
 
 **Worth copying as a pattern:** the AST-based supply-chain rules are written to
 be read. Each is one short file that pulls its nodes off the shared index,
@@ -389,8 +537,9 @@ measurement, not only the failure:
 
 ```python
 from guardana.core.assessment import case_id_for, from_verdict
+from guardana.core.evaluator import grade
 
-verdict = evaluator.evaluate(exchange, self.expectation)
+verdict = grade(evaluator, exchange, self.expectation)
 ctx.record(
     from_verdict(
         verdict,
@@ -408,10 +557,21 @@ prompts reads exactly like three out of four hundred. `guardana diff` pairs the
 two runs case by case and refuses to compare a case whose assessor or dataset
 changed.
 
+`case_id_for`, `from_verdict` and `grade` are outside the
+[supported surface](compatibility.md#the-supported-surface). A pack that imports them pins the
+exact `guardana-core` version it was tested with.
+
 Recording is optional, and staying silent is not a failure. A rule that reads a
 file and finds nothing has not *measured* anything; inventing an assessment for it
-would put hundreds of empty passes into the denominator of every rate. See
-[`design/assessment-channel.md`](design/assessment-channel.md).
+would put hundreds of empty passes into the denominator of every rate.
+
+A Python rule that sends to a guarded application catches `RequestDeclined`
+(`guardana.core.target`) around the send only, never around grading, builds the declined
+`Exchange` (`decline=exc.decline`, ending on the declined user turn) and grades it with
+`grade_decline`, which also says whether the verdict came from the decline. Pass
+`reason=UnmeasuredReason.TARGET_DECLINED` to `from_verdict` for a declined exchange and
+`tags=(decline.tag,)` when the verdict came from it. A rule that does not catch it is
+recorded as a rule error, never a pass.
 
 ## Namespacing rule ids
 
@@ -442,10 +602,13 @@ exception, and carries on with the other rules — but the gate **fails** on it 
 default, because a check that did not run must never read as a check that passed.
 Findings you already yielded before raising are kept.
 
-Two exceptions to that. `KeyboardInterrupt` and `SystemExit` are deliberately not
-caught, so Ctrl-C still works. And raising `RuleLoadError` means "I could not be
-resolved for this run" — a missing evaluator, say — which is a configuration
-state rather than a defect, so it is recorded as a *skip*.
+Two exceptions to that. `KeyboardInterrupt` is deliberately not caught, so Ctrl-C
+still works; `SystemExit` (a `sys.exit()` or an argparse `--help` inside your rule) is
+recorded as your rule's error like any other exception, never as the end of the run, at
+any `--concurrency`. And raising `RuleLoadError` means "I could not be
+resolved for this run" — a missing evaluator, say. That is a configuration state
+rather than a defect in your code, and it is still recorded in `errors`: a check
+that could not be resolved did not run.
 
 The practical consequence for you: do not swallow your own errors to be polite.
 Letting an exception out is now the honest thing to do — it is reported, it is
@@ -511,24 +674,6 @@ def test_stays_silent_when_the_model_refuses() -> None:
     assert not list(MyRule().run(target, RuleContext()))
 ```
 
-### What happens when your rule raises
-
-Nothing catastrophic, and nothing silent. The runner catches any `Exception` your
-rule throws, records it in the result's `errors` channel with your rule id and the
-exception, and carries on with the other rules — but the gate **fails** on it by
-default, because a check that did not run must never read as a check that passed.
-Findings you already yielded before raising are kept.
-
-Two exceptions to that. `KeyboardInterrupt` and `SystemExit` are deliberately not
-caught, so Ctrl-C still works. And raising `RuleLoadError` means "I could not be
-resolved for this run" — a missing evaluator, say — which is a configuration
-state rather than a defect, so it is recorded as a *skip*.
-
-The practical consequence for you: do not swallow your own errors to be polite.
-Letting an exception out is now the honest thing to do — it is reported, it is
-attributed to your rule, and it stops a build from going green on a check that
-never happened.
-
 ## Testing a rule that reads a model file
 
 Artifact rules get the mirror image: builders that write a crafted model, so a
@@ -551,11 +696,13 @@ it. A rule that silently skips a file it failed to read is reporting "clean" abo
 something it never looked at, which is the one failure mode this project treats as
 unacceptable.
 
-The parsing itself is not your job: `guardana.core.formats` ships bounded,
-fail-closed readers for GGUF, safetensors and ONNX, and its contract is in
-[`model-formats.md`](model-formats.md).
+You do not need to write the parsing code: `guardana.core.formats` provides bounded,
+fail-closed readers for GGUF, safetensors and ONNX. Its contract is in
+[`model-formats.md`](model-formats.md). The readers are outside the
+[supported surface](compatibility.md#the-supported-surface). A pack that imports them pins the
+exact `guardana-core` version it was tested with.
 [`examples/custom_rule/src/acme_rules/approved_model.py`](../examples/custom_rule/src/acme_rules/approved_model.py)
-is a complete rule built that way — every line of it is policy.
+is a complete rule built this way; every line of it is policy.
 
 ## Reporting what a request cost (optional)
 

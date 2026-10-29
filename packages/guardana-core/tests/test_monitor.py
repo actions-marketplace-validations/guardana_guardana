@@ -1,7 +1,9 @@
 from guardana.core.evaluator import Verdict
+from guardana.core.gate import GateOutcome
 from guardana.core.monitor import Alert, Monitor, MonitorConfig
 from guardana.core.profile import FailOn, Policy
 from guardana.core.report import CheckError, Evidence, Finding, ScanResult
+from guardana.core.report.skipped import SkippedRule, SkipReason
 from guardana.core.severity import Severity
 
 _WATCHED = ("guardana.ep.rule0", "guardana.ep.rule1")
@@ -283,3 +285,15 @@ def test_alerts_when_a_check_starts_failing_to_run_even_under_a_lenient_gate() -
 
     assert [a.cycle for a in alerts] == [1]
     assert "could not run" in alerts[0].reason
+
+
+def test_an_alert_carries_the_gate_it_was_raised_on() -> None:
+    # A cycle whose only open question is a skip is refused by a policy failing on
+    # skips; the alert has to say so, because the result alone renders it clean.
+    skipped = SkippedRule("guardana.ep.tools", SkipReason.MISSING_CAPABILITY, ("call_tools",), "")
+    strict = Policy(fail_on=FailOn(fail_on_skipped=True))
+
+    [alert] = _watch(ScanResult((), _WATCHED, (skipped,)), policy=strict)
+
+    assert alert.reason == "gate failed"
+    assert alert.gate is GateOutcome.INDETERMINATE

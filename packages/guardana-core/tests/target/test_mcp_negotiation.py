@@ -3,17 +3,18 @@
 The revision published on 2026-07-28 removed the `initialize` handshake and
 protocol sessions, and made every request carry its own version. A client that
 guessed would be wrong half the time and would write the guess into a run
-manifest, so the guess is what these tests are about — see
-`docs/design/mcp-protocol-eras.md`.
+manifest, so the guess is what these tests are about.
 """
 
 from collections.abc import Mapping
 from typing import Any
 
 import pytest
+from _offline import refuse_name_lookups
 from guardana.core.target import McpError, McpServerTarget
 from guardana.core.target._mcp_http import RawReply
 from guardana.core.target._mcp_wire import (
+    INITIALIZED,
     LATEST_VERSION,
     LEGACY_VERSION,
     META_CLIENT_CAPABILITIES,
@@ -21,6 +22,8 @@ from guardana.core.target._mcp_wire import (
     META_PROTOCOL_VERSION,
 )
 from guardana.core.testing import ScriptedMcpServer
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 ROUTABLE = "https://93.184.215.14/mcp"
 TOOLS = [{"name": "read_file", "description": "Read a file."}]
@@ -37,7 +40,7 @@ def _meta_of(body: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def test_a_modern_server_is_discovered_and_never_handshaken() -> None:
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     assert [t.name for t in target.list_tools()] == ["read_file"]
 
@@ -47,11 +50,11 @@ def test_a_modern_server_is_discovered_and_never_handshaken() -> None:
 
 def test_a_legacy_server_falls_back_to_the_handshake_it_still_expects() -> None:
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS)
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     assert [t.name for t in target.list_tools()] == ["read_file"]
 
-    assert _methods(server) == ["server/discover", "initialize", "tools/list"]
+    assert _methods(server) == ["server/discover", "initialize", INITIALIZED, "tools/list"]
     assert target.protocols() == {"mcp": LEGACY_VERSION}
 
 
@@ -82,7 +85,7 @@ def test_a_legacy_server_that_answers_an_era_ambiguous_method_is_not_read_as_mod
             )
 
     server = _AnswersAnything(ROUTABLE, tools=TOOLS)
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     target.list_tools()
 
@@ -96,17 +99,17 @@ def test_an_unsupported_version_error_names_a_revision_and_the_client_retries_wi
     server = ScriptedMcpServer(
         ROUTABLE, tools=TOOLS, protocol_versions=[LEGACY_VERSION], credential=None
     )
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     target.list_tools()
 
     assert target.protocols() == {"mcp": LEGACY_VERSION}
-    assert _methods(server) == ["server/discover", "initialize", "tools/list"]
+    assert _methods(server) == ["server/discover", "initialize", INITIALIZED, "tools/list"]
 
 
 def test_no_revision_in_common_is_refused_by_name_and_claims_no_coverage() -> None:
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, protocol_versions=["2031-01-01"])
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     with pytest.raises(McpError, match="no revision in common"):
         target.list_tools()
@@ -119,7 +122,7 @@ def test_a_modern_request_states_its_version_in_the_body_and_in_the_header() -> 
     # reject the request with `HeaderMismatch`, so a client holding two copies of
     # one fact would eventually grade a rejection it caused itself.
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
-    McpServerTarget(ROUTABLE, sender=server).list_tools()
+    McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
 
     listing = server.bodies[-1]
     _, _, headers = server.requests[-1]
@@ -137,14 +140,14 @@ def test_a_modern_request_declares_no_client_capabilities() -> None:
     model completion or to prompt a human on the server's behalf.
     """
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
-    McpServerTarget(ROUTABLE, sender=server).list_tools()
+    McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
 
     assert _meta_of(server.bodies[-1])[META_CLIENT_CAPABILITIES] == {}
 
 
 def test_a_legacy_request_carries_no_per_request_metadata() -> None:
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS)
-    McpServerTarget(ROUTABLE, sender=server).list_tools()
+    McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
 
     listing = server.bodies[-1]
     _, _, headers = server.requests[-1]
@@ -162,7 +165,7 @@ def test_a_modern_conversation_never_sends_a_session_header() -> None:
         protocol_versions=[LATEST_VERSION, LEGACY_VERSION],
         session_ids=["issued-to-a-legacy-client"],
     )
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     target.list_tools()
 
@@ -191,7 +194,7 @@ def test_an_interim_result_is_refused_rather_than_read_as_an_empty_manifest() ->
     server = _AsksForInput(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
 
     with pytest.raises(McpError, match="asked for client input"):
-        McpServerTarget(ROUTABLE, sender=server).list_tools()
+        McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
 
 
 def test_an_unrecognised_result_type_is_refused_rather_than_guessed_past() -> None:
@@ -209,14 +212,17 @@ def test_an_unrecognised_result_type_is_refused_rather_than_guessed_past() -> No
     server = _Invents(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
 
     with pytest.raises(McpError, match="unrecognised resultType"):
-        McpServerTarget(ROUTABLE, sender=server).list_tools()
+        McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
 
 
 def test_a_result_with_no_result_type_is_read_as_complete() -> None:
     # Required of a client, and the only reason a legacy server keeps working.
     server = ScriptedMcpServer(ROUTABLE, tools=TOOLS)
 
-    assert [t.name for t in McpServerTarget(ROUTABLE, sender=server).list_tools()] == ["read_file"]
+    assert [
+        t.name
+        for t in McpServerTarget(ROUTABLE, sender=server, discovery_sender=server).list_tools()
+    ] == ["read_file"]
 
 
 def test_a_challenge_on_the_probe_leaves_the_era_open_and_the_handshake_settles_it() -> None:
@@ -239,7 +245,7 @@ def test_a_challenge_on_the_probe_leaves_the_era_open_and_the_handshake_settles_
             return reply
 
     server = _RefusesTheProbe(ROUTABLE, tools=TOOLS, protocol_versions=[LATEST_VERSION])
-    target = McpServerTarget(ROUTABLE, sender=server)
+    target = McpServerTarget(ROUTABLE, sender=server, discovery_sender=server)
 
     assert [t.name for t in target.list_tools()] == ["read_file"]
 

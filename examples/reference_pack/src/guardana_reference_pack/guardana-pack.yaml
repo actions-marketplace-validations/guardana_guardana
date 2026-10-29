@@ -1,0 +1,28 @@
+# Checked by `guardana pack validate` against what the entry points register, and
+# pinned by `guardana-lock.yaml` beside `pyproject.toml`. Compatibility is decided by
+# the two API ranges below, never by a Guardana version.
+schema_version: 3
+name: guardana-reference-pack
+extension_api: ">=2,<3"
+output_api: ">=1,<2"
+
+description: >
+  One of every extension point, written against the supported surface only: a YAML
+  rule graded by the pack's own evaluator, a Python rule over requirement files, a
+  target that lists them, a control catalogue, a Markdown format and a reporter that
+  writes it to a directory.
+
+provides:
+  rules:
+    - reference.prompt.codename_disclosure
+    - reference.supply_chain.unpinned_requirement
+  evaluators:
+    - reference.marker
+  targets:
+    - ReferenceRequirementsTarget
+  taxonomies:
+    - REFERENCE-CONTROLS
+  renderers:
+    - reference-summary
+  reporters:
+    - reference-file

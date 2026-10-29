@@ -9,11 +9,10 @@ project refuses everywhere else, reached through triage instead of through a rul
 Waivers expire, and expiry is evaluated when the finding is read. The collector
 has no scheduler, so a status that only becomes correct once a job runs is a
 status that is quietly wrong in between.
-
-Design: `docs/design/finding-lifecycle-and-waivers.md`.
 """
 
 import datetime
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -47,6 +46,10 @@ class LifecycleError(RuntimeError):
 
 class UnknownIdentityError(LifecycleError):
     """No finding in this project starts with the given identity prefix."""
+
+
+class InvalidIdentityPrefixError(LifecycleError):
+    """The prefix is not hexadecimal, so it cannot be the start of any identity."""
 
 
 class AmbiguousIdentityError(LifecycleError):
@@ -115,6 +118,15 @@ def record_sighting(
         )
 
 
+_PREFIX = re.compile(r"(?:sha256:)?(?P<hex>[0-9a-fA-F]+)")
+_DIGEST = "sha256:"
+
+
+def _like_literal(text: str) -> str:
+    """`text` with its LIKE metacharacters escaped by a backslash, the pattern's escape."""
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 def _resolve(
     connection: "Connection[tuple[object, ...]]", project: str, prefix: str
 ) -> tuple[int, str, int]:
@@ -123,9 +135,17 @@ def _resolve(
     Both forms are accepted: the full `sha256:…` and the short hex the listing
     prints. A command that refuses what its own output shows is a command people
     use once — and copying the eight characters off the screen is exactly what
-    somebody triaging will do.
+    somebody triaging will do. Anything that is not hexadecimal is refused, since
+    an empty or wildcard prefix would select whichever finding happened to be alone.
     """
     organization, name = parse_project_reference(project)
+    shape = _PREFIX.fullmatch(prefix)
+    if shape is None:
+        raise InvalidIdentityPrefixError(
+            f"{prefix!r} is not an identity prefix: give the hexadecimal digits the "
+            "listing prints, optionally after sha256:"
+        )
+    pattern = _like_literal(_DIGEST + shape["hex"].lower()) + "%"
     with connection.cursor() as cursor:
         cursor.execute(
             """
@@ -134,11 +154,11 @@ def _resolve(
             join projects p on p.id = t.project_id
             join organizations o on o.id = p.organization_id
             where o.slug = %s and p.slug = %s
-              and (t.identity like %s || '%%' or t.identity like 'sha256:' || %s || '%%')
+              and t.identity like %s escape '\\'
             order by t.identity
             limit 11
             """,
-            (organization, name, prefix, prefix),
+            (organization, name, pattern),
         )
         matches = cursor.fetchall()
     if not matches:
@@ -264,6 +284,16 @@ left join submissions s on s.id = f.submission_id and s.project_id = t.project_i
 where (%s::text is null or o.slug || '/' || p.slug = %s)
   and (
     %s::text is null
+    or exists (
+      select 1
+      from findings ef
+      join submissions es on es.id = ef.submission_id
+      where ef.identity = t.identity and ef.channel = 'findings'
+        and es.project_id = t.project_id and es.environment = %s
+    )
+  )
+  and (
+    %s::text is null
     or (%s = 'open' and (t.status = 'open'
                          or (t.status = 'accepted_risk' and t.waiver_expires < %s)))
     or (%s = 'accepted_risk' and t.status = 'accepted_risk' and t.waiver_expires >= %s)
@@ -295,6 +325,8 @@ def list_tracked(  # noqa: PLR0913 — one connection and four independent filte
     afterwards: filtering a limited page in Python returns fewer rows than asked
     for while more exist, which is a listing that quietly lies about how much there
     is. A lapsed waiver therefore matches `open`, and never `accepted_risk`.
+    `environment` is applied the same way: only findings seen in that environment are
+    listed, and their counts are that environment's.
     """
     day = today or datetime.datetime.now(tz=datetime.UTC).date()
     reference = None if project is None else "/".join(parse_project_reference(project))
@@ -306,6 +338,8 @@ def list_tracked(  # noqa: PLR0913 — one connection and four independent filte
                 environment,
                 reference,
                 reference,
+                environment,
+                environment,
                 status,
                 status,
                 day,

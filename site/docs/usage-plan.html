@@ -6,58 +6,78 @@
 <title>guardana plan — Guardana documentation</title>
 <meta name="description" content="guardana plan: what a run would cost, before it costs anything">
 <link rel="canonical" href="https://guardana.dev/docs/usage-plan">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html" aria-current="page">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,68 +98,120 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana plan</code> — what a run would cost, before it costs anything</h1><p class="lede"><code>guardana plan</code>: what a run would cost, before it costs anything</p><p>Probing a hosted model costs money, and the number nobody could state before 0.7
-was the upper bound. <code>guardana plan</code> states it, and <strong>sends no request to do so</strong>.</p>
+<details class="mnav">
+<summary>Menu · <b>guardana plan</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html" aria-current="page">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana plan</code> — what a run would cost, before it costs anything</h1><p class="lede"><code>guardana plan</code>: what a run would cost, before it costs anything</p><p><code>guardana plan</code> estimates request costs when you need to budget a probe or scan without sending a request.</p>
 <pre><code class="language-bash">guardana plan probe --url https://api.example.com --model gpt-4o-mini
 </code></pre>
-<pre><code class="language-text">14 rule(s) would run, 9 skipped.
-requests: at least 14, at most 47
+<pre><code class="language-text">14 rule(s) would run, 16 skipped.
+requests: at least 14, at most 47 — plus up to 94 retries
+  a request refused for a rate limit or a server error is retried up to 2 times, and each retry counts toward --max-requests
 trials: 1 attempt(s) per case, counted in the requests above
+judge calls: none — no selected rule grades with a judge
 
 No request was sent to produce this estimate.
 </code></pre>
@@ -155,6 +228,11 @@ files, never a model, and declares that about itself — see
 artifact rule that stays silent about its cost is not assumed to be free; it
 shows up in <code>unknown_cost</code> exactly like an undeclared endpoint rule would.</p>
 <p><code>--format json</code> gives the same numbers to a pipeline, with a <code>schema_version</code>.</p>
+<p><code>plan scan</code>, <code>plan probe</code> and <code>plan grade</code> accept only <code>human</code> and <code>json</code>.
+Any other <code>--format</code> exits <code>3</code>
+before reading configuration, discovering plugins or building the target.
+<code>run inspect</code> also accepts only these formats and refuses others before reading
+the saved run.</p>
 <h2 id="flags">Flags</h2>
 <p><code>plan scan</code> and <code>plan probe</code> both discover plugins to build the same registry the
 run they are pricing would use, so both take the same plugin-trust flags
@@ -169,6 +247,36 @@ run they are pricing would use, so both take the same plugin-trust flags
 </thead>
 <tbody>
 <tr>
+<td><code>--profile PATH</code></td>
+<td>none (built-in default profile)</td>
+<td>Path to a <code>guardana.yaml</code> policy file; all three subcommands</td>
+</tr>
+<tr>
+<td><code>--preset [ci|pre-training|monitor|release]</code></td>
+<td>none</td>
+<td>Named policy preset (mutually exclusive with <code>--profile</code>); all three subcommands</td>
+</tr>
+<tr>
+<td><code>--format [human|json]</code></td>
+<td><code>human</code></td>
+<td>Output format; all three subcommands</td>
+</tr>
+<tr>
+<td><code>--rules PATH</code></td>
+<td>none</td>
+<td>Directory or file of custom YAML rules; repeatable; all three subcommands</td>
+</tr>
+<tr>
+<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
+<td><code>builtins</code>, or the profile's <code>plugins:</code></td>
+<td>Which installed plugins to load — same meaning as on <code>probe</code>; all three subcommands</td>
+</tr>
+<tr>
+<td><code>--allow-plugin TEXT</code></td>
+<td>none</td>
+<td>Distribution to trust; repeatable, needs <code>--plugins allowlist</code>; all three subcommands</td>
+</tr>
+<tr>
 <td><code>--target SCHEME://LOCATOR</code></td>
 <td>none</td>
 <td>Build a trusted installed target of the kind selected by <code>plan scan</code> or <code>plan probe</code></td>
@@ -179,29 +287,94 @@ run they are pricing would use, so both take the same plugin-trust flags
 <td>Repeatable, non-secret configuration passed to that target</td>
 </tr>
 <tr>
-<td><code>--plugins [all|builtins|allowlist|disabled]</code></td>
-<td><code>all</code></td>
-<td>Which installed plugins to load — same meaning as on <code>probe</code></td>
+<td><code>--url TEXT</code>, <code>--model TEXT</code></td>
+<td>—</td>
+<td><code>plan probe</code> only: the endpoint the probe would call, as on <code>probe</code></td>
 </tr>
 <tr>
-<td><code>--allow-plugin TEXT</code></td>
+<td><code>--mcp TEXT</code></td>
 <td>none</td>
-<td>Distribution to trust; repeatable, needs <code>--plugins allowlist</code></td>
+<td><code>plan probe</code> only: price an MCP server at this http(s) URL instead of a model endpoint</td>
+</tr>
+<tr>
+<td><code>--mcp-registry-entry PATH</code></td>
+<td>none</td>
+<td><code>plan probe</code> only: the registry <code>server.json</code> <code>probe --mcp-registry-entry</code> would compare, read and refused (exit <code>3</code>) as there; needs <code>--mcp</code></td>
+</tr>
+<tr>
+<td><code>--a2a TEXT</code></td>
+<td>none</td>
+<td><code>plan probe</code> only: price an A2A agent, named by the http(s) URL of its card (ending in <code>.json</code>) or its origin, instead of a model endpoint; any other path is refused (exit <code>3</code>) — see <a href="#pricing-an-a2a-agent">Pricing an A2A agent</a>. Refused with the endpoint flags and <code>--mcp</code> (exit <code>3</code>)</td>
+</tr>
+<tr>
+<td><code>--provider [openai|ollama|tgi]</code></td>
+<td><code>openai</code></td>
+<td><code>plan probe</code> only: the wire protocol, as on <code>probe</code>; any other name is refused (exit <code>3</code>)</td>
+</tr>
+<tr>
+<td><code>--adapter PATH</code></td>
+<td>none</td>
+<td><code>plan probe</code> only: the adapter file <code>probe --adapter</code> would use, with the same refusals; its <code>${VAR}</code> headers are not read, so a plan needs no secret</td>
+</tr>
+<tr>
+<td><code>--system-prompt-file PATH</code></td>
+<td>none</td>
+<td><code>plan probe</code> only: the system prompt <code>probe</code> would plant; a file that cannot be read is refused (exit <code>3</code>)</td>
+</tr>
+<tr>
+<td><code>--fixtures PATH</code></td>
+<td>none</td>
+<td><code>plan probe</code> only: price the seeded checks from this <a href="usage-fixtures.html">fixtures file</a> — see <a href="#pricing-seeded-data">Pricing seeded data</a>. No tenant key is read; refused with <code>--mcp</code>, <code>--a2a</code> and <code>--target</code></td>
+</tr>
+<tr>
+<td><code>--safety [passive|active|side-effecting]</code></td>
+<td><code>active</code></td>
+<td><code>plan probe</code> only: how far rules may reach, as on <code>probe</code></td>
+</tr>
+<tr>
+<td><code>--allow-destructive</code></td>
+<td>off</td>
+<td><code>plan probe</code> only: permit rules that can destroy or alter something the target owns, as on <code>probe</code></td>
 </tr>
 <tr>
 <td><code>--trials INTEGER</code></td>
 <td><code>1</code> (or <code>trials:</code> in the profile)</td>
-<td><code>plan probe</code> only: price the run at this many attempts per case, as <code>probe --trials</code> would make them</td>
+<td><code>plan probe</code> and <code>plan grade</code>: price the run at this many attempts per case, as <code>probe --trials</code> and <code>grade --trials</code> would make them</td>
+</tr>
+<tr>
+<td><code>--max-requests INTEGER</code></td>
+<td>the profile's <code>budgets:</code></td>
+<td><code>plan probe</code> and <code>plan grade</code>: check the plan against this request ceiling; on <code>plan grade</code> it is the ceiling each judge is held to</td>
+</tr>
+<tr>
+<td><code>--max-input-tokens</code>, <code>--max-output-tokens</code>, <code>--max-duration</code></td>
+<td>the profile's <code>budgets:</code></td>
+<td><code>plan probe</code> only: the ceilings <code>probe</code> would apply. A token ceiling on a transport that reports no token counts (an adapter, <code>--provider tgi</code>) is refused (exit <code>3</code>), as <code>probe</code> refuses it</td>
+</tr>
+<tr>
+<td><code>--max-requests-per-minute INTEGER</code></td>
+<td>the profile's <code>budgets:</code></td>
+<td><code>plan probe</code> only: the pace <code>probe</code> would keep. The plan states the wall time it needs and refuses a <code>--max-duration</code> below it (exit <code>3</code>) — see <a href="#checking-against-a-budget">Checking against a budget</a></td>
+</tr>
+<tr>
+<td><code>--no-plugins</code></td>
+<td>off</td>
+<td><code>plan scan</code> only: deprecated alias for <code>--plugins disabled</code></td>
 </tr>
 </tbody>
 </table></div>
+<p>No subcommand reads <code>--api-key-env</code>, a judge's <code>api_key_env</code> or an adapter's <code>${VAR}</code>
+headers: a plan contacts nothing, so it needs no secret.</p>
 <p><code>plan scan</code> also keeps <code>--no-plugins</code> as a deprecated alias for <code>--plugins disabled</code>,
 exactly like <code>guardana scan</code> does.</p>
 <p>Target construction is configuration-only: <code>plan</code> calls the same
 <code>from_locator</code> classmethod as the real command, but a conforming target does not
-contact the system until a run or inspection starts.</p>
+contact the system until a run or inspection starts. An installed endpoint target that
+can plant a system prompt (<code>SystemPromptPlanter</code>) is planned as <code>probe</code> runs it: each
+canary rule is priced against a view with its canary planted and every other rule
+against the target itself, so the plan lists the rules the probe then runs.</p>
 <h2 id="where-the-numbers-come-from">Where the numbers come from</h2>
-<p>Every rule declares an upper bound on the requests it will send
+<p>Each built-in rule shape declares an upper bound on the requests it will send
 (<code>Rule.estimated_requests</code>): a YAML rule knows how many prompts it has, a
 scenario how many steps, an agent rule its step budget. The plan sums the rules
 the profile selects and the target can satisfy — the same selection the runner
@@ -213,6 +386,11 @@ exactly like an endpoint rule can. The 19 built-in artifact rules declare the
 zero themselves, on their own base class in <code>guardana-rules</code> — not a public
 extension point, so a third-party artifact rule declares its own
 <code>estimated_requests</code> rather than inheriting theirs.</p>
+<p><strong>Retries are not in the ceiling.</strong> A chat endpoint sends a request again, up to two
+times, when it is refused for a rate limit or a server error, and every retry counts
+toward <code>--max-requests</code>. The human output names how many retries the ceiling could
+add; the JSON <code>requests.max</code> leaves them out. An MCP plan names none: its transport does
+not retry.</p>
 <p>The declaration is <strong>measured, not trusted</strong>, on both sides of that split. A
 gate in <code>guardana-rules</code> runs every shipped endpoint rule against a model that
 never refuses, counts the requests it actually sends, and fails if any rule
@@ -226,17 +404,38 @@ way, the ceiling is a claim somebody checks, not a promise.</p>
 rules will not repeat, so the count is the run's, not an estimate of it:</p>
 <pre><code class="language-bash">guardana plan probe --mcp https://mcp.example.com --trials 5
 </code></pre>
-<pre><code class="language-text">9 rule(s) would run, 14 skipped.
-requests: at least 9, at most 59
+<pre><code class="language-text">10 rule(s) would run, 20 skipped.
+requests: at least 10, at most 77
 trials: 5 attempt(s) per case, counted in the requests above
-  9 rule(s) make one attempt per case whatever --trials says, because their verdict does not depend on a sampled reply:
+  10 rule(s) make one attempt per case whatever --trials says, because their verdict does not depend on a sampled reply:
     • guardana.agent.mcp_server_manifest
     • guardana.mcp.unauthenticated_access
     …
 </code></pre>
 <p><code>--format json</code> carries the same facts as <code>trials.per_case</code> and <code>trials.single_attempt</code>
-(plan schema <code>2</code>, <a href="https://github.com/guardana/guardana/blob/main/schemas/plan-v2.schema.json"><code>schemas/plan-v2.schema.json</code></a>). See
+(plan schema <code>4</code>, <a href="https://github.com/guardana/guardana/blob/main/schemas/plan-v4.schema.json"><code>schemas/plan-v4.schema.json</code></a>). See
 <a href="usage-probe.html#repeated-trials"><code>usage-probe.md</code></a> for what a trial is.</p>
+<h2 id="pricing-judge-calls">Pricing judge calls</h2>
+<p>A rule graded by a judge configured under <code>evaluators:</code> — <code>llm_judge</code>,
+<code>reference_judge</code> or <code>guard</code> — spends judge calls as well as target requests, and
+each judge meter is bounded by <code>max_requests</code> on its own. <code>plan probe</code> builds those
+judges from the profile, sends them nothing, and prices each meter: the verdicts a
+rule grades (<code>Rule.graded_verdicts</code>: prompts × K, cases × K for a suite, graded steps
+× K for a scenario, sessions × K for an agent run) times the calls one verdict costs
+(<code>Evaluator.judge_calls_per_verdict</code>: <code>min_agreement</code> for <code>llm_judge</code> and
+<code>reference_judge</code>, which share one meter; <code>1</code> for <code>guard</code>).</p>
+<pre><code class="language-text">requests: at least 1, at most 90
+judge calls: at most 270
+  llm_judge, reference_judge (one judge, its own meter): at most 270 call(s) against a budget of 100
+⚠ this plan does not fit its request budget — the run would stop early,
+  and a run that stops early reports no verdict
+</code></pre>
+<p>That is a 30-case suite graded by <code>reference_judge</code> at <code>--trials 3</code> with
+<code>min_agreement: 3</code>. A rule or evaluator that does not declare its judge calls is
+named under the judge line like an unknown-cost rule; while a judge is configured,
+such a plan does not claim to fit. <code>plan scan</code> never prices judges, because <code>scan</code>
+never builds one. In JSON, <code>judge_calls</code> carries <code>max</code>, <code>meters</code>, <code>unknown_cost</code> and
+<code>complete</code>, and is <code>null</code> for <code>plan scan</code>. Judge tokens are not predicted.</p>
 <h2 id="plan-the-run-you-are-going-to-make">Plan the run you are going to make</h2>
 <p><code>plan probe</code> takes <code>--safety</code> and <code>--allow-destructive</code>, with the same meaning
 they have on <code>probe</code>. They are not decoration: the runner refuses a rule that
@@ -246,25 +445,58 @@ would go on to refuse. The selection is now literally the runner's, called from
 one place, so a second copy cannot drift from the first.</p>
 <pre><code class="language-bash">guardana plan probe --url https://api.example.com --model m --safety passive
 </code></pre>
+<h2 id="pricing-seeded-data">Pricing seeded data</h2>
+<p><code>plan probe --fixtures FILE</code> prices the two checks a <a href="usage-fixtures.html">fixtures file</a>
+brings from the file itself: the tenant check at one request per seeded item and tenant per
+trial, and the poisoned-document check at one request per poisoned document per trial. A
+rule whose cost depends on what the target holds declares it through
+<code>Rule.estimated_requests_for(target)</code>; without fixtures both checks are skipped for a
+missing capability and cost nothing.</p>
+<pre><code class="language-bash">guardana plan probe --url https://support.example.test --model support-bot \
+  --fixtures guardana-fixtures.yaml --trials 2
+</code></pre>
+<p>Each tenant is resolved as the probe would resolve it, without reading its key, so a
+fixtures file the probe would refuse is refused here too (exit <code>3</code>). A run given fixtures
+must complete every installed rule that checks seeded data and has something to check, so
+a plan that would not select one — a profile that excludes it, <code>--safety passive</code> — names
+it as a coverage shortfall and exits <code>3</code>.</p>
 <h2 id="pricing-an-mcp-server">Pricing an MCP server</h2>
 <p><code>plan probe --mcp</code> prices an MCP run the same way, and it is where this command
-earns its keep. Reading a manifest costs three requests; the authorization checks
-send around a dozen, which is exactly the number somebody wants before pointing
-this at production.</p>
+earns its keep: it states the most an MCP run can send before anything is pointed at
+production, and <a href="usage-probe.html#cost">the probe page</a> lists what those requests are.
+<code>--mcp-registry-entry FILE</code> adds the registry comparison, which
+sends nothing beyond the opening the other checks already buy.</p>
 <pre><code class="language-bash">guardana plan probe --mcp https://mcp.example.com/mcp
 </code></pre>
-<p><strong>The ceiling is higher than any run spends, on purpose.</strong> Each rule declares what
+<p><strong>The ceiling is usually higher than a run spends, on purpose.</strong> Each rule declares what
 it would cost <em>alone</em>, because a plan cannot know which rule runs first — and the
 first one to look buys an observation the rest then share — including the single
 <code>server/discover</code> call that settles which revision of the protocol the server
-speaks. A whole MCP probe declares around sixty requests and spends around a
-dozen. An upper bound that is too
+speaks, so a whole MCP probe declares several times what it spends. An upper bound that is too
 high refuses a budget that would have fitted, which is the safe direction to be
 wrong in; the other way round is a ceiling that lets a run overspend.</p>
 <p><strong>An stdio server is priced by refusing.</strong> Working out what one would cost means
 starting it, and starting the thing under examination is the one thing this
 command must not do. <code>guardana probe --mcp … --allow-exec</code> is where that intent is
 stated out loud.</p>
+<h2 id="pricing-an-a2a-agent">Pricing an A2A agent</h2>
+<pre><code class="language-bash">guardana plan probe --a2a https://agent.example.com
+</code></pre>
+<pre><code class="language-text">3 rule(s) would run, 27 skipped.
+requests: at least 3, at most 14
+</code></pre>
+<p>The three A2A rules declare fourteen requests between them; a run shares the card and
+each read, and sends at most nine. No token variable is read, so a plan needs no
+secret.</p>
+<h2 id="pricing-a-grade">Pricing a grade</h2>
+<p><code>plan grade RECORDING</code> previews <a href="usage-grade.html"><code>guardana grade</code></a>: it selects the rules
+the grade would run, lists every rule the recording does not answer as skipped
+<code>not_recorded</code>, prices the judge calls, and counts no target request, because every answer
+comes from the recording. It takes <code>--profile</code>, <code>--preset</code>, <code>--rules</code>, <code>--plugins</code>,
+<code>--allow-plugin</code>, <code>--trials</code>, <code>--max-requests</code> and <code>--format</code>, and refuses an unreadable
+recording with exit <code>3</code>.</p>
+<pre><code class="language-bash">guardana plan grade answers.jsonl --rules rules/ --profile guardana.yaml
+</code></pre>
 <h2 id="when-the-plan-does-not-know">When the plan does not know</h2>
 <p>A rule that declares no request count — anything third-party that has not
 implemented <code>estimated_requests</code> — is <strong>named, not counted as free</strong>:</p>
@@ -278,17 +510,87 @@ requests: at least 7, at most 22 — plus 2 of unknown cost
 <p>A plan with an unknown-cost rule never reports that it fits a budget, whatever
 the numbers look like. Its ceiling is not a ceiling.</p>
 <h2 id="checking-against-a-budget">Checking against a budget</h2>
-<p>If the profile (or a flag) sets <code>max_requests</code> and the worst case exceeds it, the
-plan says so and exits <code>3</code> — invalid configuration, found before the run rather
-than halfway through it:</p>
+<p>If the profile (or a flag) sets <code>max_requests</code> and the worst case — of the target
+or of any judge meter — exceeds it, the plan says so and exits <code>3</code> — invalid
+configuration, found before the run rather than halfway through it:</p>
 <pre><code class="language-text">⚠ this plan does not fit its request budget — the run would stop early,
   and a run that stops early reports no verdict
 </code></pre>
+<p>A token ceiling a judge's transport cannot enforce is refused with <code>3</code> too, the same
+way <code>probe</code> refuses it.</p>
+<p>With <code>max_requests_per_minute</code> set, the plan states the wall time the estimated
+requests need at that pace. The first request goes at once and each further one
+<code>60 / N</code> seconds later, so the time is one less than the requests, times <code>60 / N</code>: the
+estimated target requests — a rule of unknown cost counted once — or the calls of the
+busiest judge meter, whichever is larger. Retries and the time each reply takes are not
+counted, so the real run takes longer. A <code>max_duration</code> that is not more than that
+time exits <code>3</code>, since the run would stop before its last request, and <code>fits_budget</code> is
+<code>false</code> in the JSON:</p>
+<pre><code class="language-text">wall time: 580s for the estimated requests at 6 request(s) per minute, retries not counted
+⚠ this plan does not fit its time budget — 300s is not more than the 580s its requests need at 6 per minute, so the run would stop early, and a run that stops early reports no verdict
+</code></pre>
+<p>The JSON carries both as <code>budgets.max_requests_per_minute</code> and
+<code>budgets.minimum_wall_time_seconds</code>, null when no rate is set.</p>
+<h2 id="a-run-that-could-not-pass">A run that could not pass</h2>
+<p>A <code>rules.include</code> pattern that matches no registered rule refuses the plan with exit <code>3</code>
+before selection, just as it refuses the run. This applies even when another pattern
+matches, whatever <code>fail_on</code> says (<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>).
+The check covers every rule the run would register, including rules loaded by
+<code>--rules</code> and <code>rules.paths</code> and assertions of the profile's <code>contracts:</code>. It also covers
+every pass a probe splits into, so a canary rule priced in its own pass still matches
+its pattern.</p>
+<p>The plan exits <code>3</code> as well when the run it describes could not pass, and says why
+on stderr, one line per cause:</p>
+<ul>
+<li><strong>no rule would run</strong> — every include pattern matches a rule, but the exclusions, the
+flags and the target select none, and a run that verifies nothing reports no verdict;</li>
+<li><strong>a coverage shortfall</strong> — a check the run's fixtures demand that it would not select,
+a graded recording whose run stopped, or, for <code>plan scan</code>, a path that holds no file
+other than <code>.guardanaignore</code> files (<code>empty_target</code>, the shortfall <code>scan</code> records);</li>
+<li><strong>a rule it would skip while <code>fail_on.fail_on_skipped</code> is on</strong> — a capability the
+target does not declare, or a safety mode that refuses the rule. A rule about a protocol
+the target does not speak (an MCP or A2A rule against a chat endpoint, a chat rule
+against an MCP server or an A2A agent) is skipped <code>not_applicable</code> and is not one;</li>
+<li><strong>a file under <code>calibrations:</code> that would stop the run</strong> — missing, unreadable, or
+measuring an evaluator another file measures too;</li>
+<li><strong>an error the run would record before its first rule</strong> — a rule file that does not
+load, a plugin the trust mode refuses (the line names the distribution and how to
+admit it: <code>--plugins allowlist --allow-plugin &lt;distribution&gt;</code>, the profile's
+<code>plugins:</code>, or <code>--plugins all</code>), a rule whose <code>expect:</code> block its evaluator cannot grade, or a
+capability the target declares without implementing. The plan reads these from the
+same function the run does, so the two never list different errors.</li>
+</ul>
+<p>With <code>fail_on.fail_on_error: false</code> the errors are printed as a warning and the plan
+keeps its exit code, as the run would pass them. The JSON document on stdout is the
+same either way.</p>
+<p>The plan decides with the gate's own list of what leaves a run unanswered, applied to the
+rules it would run, the rules it would skip and the errors it would record, so the plan and
+the run cannot disagree about a skip, an error or an empty selection. The
+<a href="profiles.html#release-complete-coverage-or-no-pass"><code>release</code> preset</a> turns
+<code>fail_on_skipped</code> on.</p>
 <h2 id="what-it-cannot-tell-you">What it cannot tell you</h2>
 <p>Capabilities are read from what the target declares locally, so an endpoint that
 turns out not to support tool calls will skip more rules than the plan predicted.
 Asking the endpoint would make this command cost money, which is the one thing it
 must not do. <code>guardana target inspect</code> is where that question belongs.</p>
+<p>Whether a check reaches a verdict is known only when it runs. With
+<code>fail_on_inconclusive</code> or <code>fail_on_skipped</code> on, as in <code>--preset release</code>, the plan says so
+on stderr, whether or not it refuses:</p>
+<pre><code class="language-text">note: fail_on_inconclusive is on — only the run can tell whether a check declines to reach a verdict, so this plan cannot promise a pass
+note: fail_on_skipped is on — an endpoint may turn out not to support what it declares, and the run would then skip more rules than this plan lists
+</code></pre>
+<p>The second note appears for <code>plan probe</code> only.</p>
+<p>How many cases each rule grades is known only after the run too. A rule that attempted
+cases and graded none is an <code>ungraded_cases</code> shortfall whatever the profile says, and
+<code>fail_on.min_graded_share</code> raises that bar per rule
+(<a href="profiles.html#full-schema">profiles</a>). When the key is set, every plan says on stderr that
+the floor is checked after the run:</p>
+<pre><code class="language-text">note: min_graded_share is set — only the run can tell how many cases each rule grades, so a rule below 80% is checked after it
+</code></pre>
+<p>A selected rule that grades with an evaluator nobody configured is refused by the plan in
+the words the run would record. The plan finds the evaluator through the rule's declared
+expectations, so a Python rule that reads an evaluator it does not declare is caught only
+when it runs.</p>
 <p>Tokens and wall time are not predicted. Nothing can know what a request will cost
 before it is answered, and a guessed figure is one a team would budget against.</p>
 <h2 id="see-also">See also</h2>
@@ -301,8 +603,10 @@ before it is answered, and a guessed figure is one a team would budget against.<
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-plan.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

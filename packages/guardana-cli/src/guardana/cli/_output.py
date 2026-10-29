@@ -14,7 +14,13 @@ the flag's own description cannot come to disagree.
 """
 
 
-def emit(rendered: str, output: Path | None, output_format: str = COMPARABLE_FORMAT) -> None:
+def emit(
+    rendered: str,
+    output: Path | None,
+    output_format: str = COMPARABLE_FORMAT,
+    *,
+    verbatim: bool = False,
+) -> None:
     """Print the report, or write it to `output` and say where it went.
 
     A file rather than a shell redirect, because a redirect is where a saved run
@@ -28,14 +34,17 @@ def emit(rendered: str, output: Path | None, output_format: str = COMPARABLE_FOR
     the user found out on the *next* run, which is the run they wanted compared.
     A command that spends a budget to produce the report refuses the combination
     before it spends anything, through `refuse_incomparable_output`.
+
+    `verbatim` text, an installed format's, is written with its line endings untouched
+    and printed without an added newline, so a CSV keeps its CRLF line endings.
     """
     if output is None:
-        typer.echo(rendered)
+        typer.echo(rendered, nl=not verbatim)
         return
     try:
-        output.write_text(rendered, encoding="utf-8")
+        output.write_text(rendered, encoding="utf-8", newline="" if verbatim else None)
     except OSError as exc:
-        # Loud, and exit 2: a run the user believes was saved but was not is a
+        # Loud, and exit 3: a run the user believes was saved but was not is a
         # comparison that silently never happens.
         typer.echo(f"error: could not write the report to {output}: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc

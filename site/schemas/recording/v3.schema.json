@@ -1,0 +1,283 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/recording/v3.schema.json",
+  "title": "Guardana Recording v3",
+  "description": "One record of a Guardana recording: what an application answered, graded later without calling it. The file is JSONL: the first non-blank line is the header, every later non-blank line is one exchange. Each line validates against this schema independently; that the header comes first, that an exchange names a rule when the header names no default, and that a file holds at least one exchange are checked by the reader.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/header"
+    },
+    {
+      "$ref": "#/$defs/exchange"
+    }
+  ],
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "header": {
+      "description": "The first record. `verbatim` has no default: the producer states whether every reply is exactly what the application said, and a reply that may not be is never graded.",
+      "type": "object",
+      "required": [
+        "guardana_recording",
+        "name",
+        "version",
+        "verbatim"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "guardana_recording": {
+          "const": 3
+        },
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/text"
+        },
+        "verbatim": {
+          "type": "boolean"
+        },
+        "subject": {
+          "description": "What answered, as the producer names it.",
+          "$ref": "#/$defs/text"
+        },
+        "subject_kind": {
+          "description": "What answered, as the producer declares it: the endpoint the team's users reach (`application`), or a model reached without the application's prompt, tools and data (`model_harness`). A recipe grading the recording takes it as the run's kind when the recipe declares none.",
+          "enum": [
+            "application",
+            "model_harness"
+          ]
+        },
+        "rule": {
+          "description": "The rule id of every exchange that names none.",
+          "$ref": "#/$defs/text"
+        },
+        "origin": {
+          "$ref": "#/$defs/origin"
+        }
+      }
+    },
+    "origin": {
+      "description": "The probe run the recording was kept from, as that run declared it. Written by `guardana probe --keep-exchanges`; declared, not verified.",
+      "type": "object",
+      "required": [
+        "run_id",
+        "target",
+        "trials",
+        "rules"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {
+          "$ref": "#/$defs/text"
+        },
+        "target": {
+          "$ref": "#/$defs/text"
+        },
+        "started_at": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "stopped_by": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "gate": {
+          "$ref": "#/$defs/optional_text"
+        },
+        "trials": {
+          "description": "The trials per case each rule ran with.",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "\\S"
+          },
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "rules": {
+          "description": "Every rule the run's plain pass planned, reached or not.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/text"
+          }
+        }
+      }
+    },
+    "optional_text": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/text"
+        }
+      ]
+    },
+    "exchange": {
+      "description": "One exchange: the messages a rule sent, and the reply the application gave or how it declined. Exactly one of `reply` and `declined`.",
+      "type": "object",
+      "required": [
+        "input"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "$ref": "#/$defs/text"
+        },
+        "input": {
+          "description": "One user message as a string, or the messages in order; the last must be from the user, which the reader checks.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/text"
+            },
+            {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/message"
+              }
+            }
+          ]
+        },
+        "reply": {
+          "description": "What the application answered; may be empty.",
+          "type": "string"
+        },
+        "declined": {
+          "$ref": "#/$defs/declined"
+        },
+        "meta": {
+          "$ref": "#/$defs/meta"
+        },
+        "key": {
+          "description": "The digest of the messages as the rule sent them, taken before any redaction.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "altered": {
+          "description": "True when the reply is not exactly what the application said. Never true on a declined line, which holds no reply.",
+          "type": "boolean"
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "reply"
+          ],
+          "not": {
+            "required": [
+              "declined"
+            ]
+          }
+        },
+        {
+          "required": [
+            "declined"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "reply"
+                ]
+              },
+              {
+                "required": [
+                  "altered"
+                ],
+                "properties": {
+                  "altered": {
+                    "const": true
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "required": [
+        "role",
+        "content"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant"
+          ]
+        },
+        "content": {
+          "type": "string"
+        }
+      }
+    },
+    "declined": {
+      "description": "A request the application declined, as the adapter's `declines:` entry it matched names it. No reply text is kept for it.",
+      "type": "object",
+      "required": [
+        "name",
+        "reading",
+        "status"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_.-]*$"
+        },
+        "reading": {
+          "description": "What the decline means for the check: the application refused on policy (`refusal`), or the request was not answered (`ungraded`).",
+          "enum": [
+            "refusal",
+            "ungraded"
+          ]
+        },
+        "status": {
+          "description": "The reply's HTTP status: 200-299 or 400-499, never 401, 403, 404, 407, 408, 425 or 429.",
+          "type": "integer",
+          "anyOf": [
+            {
+              "minimum": 200,
+              "maximum": 299
+            },
+            {
+              "minimum": 400,
+              "maximum": 499,
+              "not": {
+                "enum": [
+                  401,
+                  403,
+                  404,
+                  407,
+                  408,
+                  425,
+                  429
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "meta": {
+      "description": "What the reply carried beside its text, by the names an adapter's `metadata_paths:` give. A value redaction would change is left out.",
+      "type": "object",
+      "maxProperties": 16,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 1024
+      }
+    }
+  }
+}

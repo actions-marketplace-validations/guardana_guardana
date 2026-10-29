@@ -12,24 +12,47 @@
 - [ ] test
 - [ ] chore
 
+## Issue and release impact
+
+<!-- Link the issue this PR completes. Use Closes #N only if all acceptance
+     criteria are met; otherwise link it without a closing keyword. -->
+Issue:
+
+<!-- Propose one using docs/compatibility.md#versioning; the maintainer confirms
+     the version when grouping a release. A merge does not publish a package. -->
+- [ ] No package release needed (tests, docs, or maintainer tooling only)
+- [ ] Patch: compatible correction to documented behavior
+- [ ] Minor: compatible opt-in functionality or deprecation
+- [ ] Major: supported contract break or stricter default
+
+<!-- If a previously passing gate can fail after this change, explain which
+     check changes and whether this is a correction or a new default. -->
+Gate impact:
+
 ## Checklist
 
-- [ ] **This PR is a single commit.** (Multi-commit PRs are not accepted —
-      squash before pushing: see `CONTRIBUTING.md` § Commits and pull
-      requests.)
+- [ ] This PR contains one logical change. Multiple branch commits are fine;
+      a maintainer will squash-merge after all CI checks pass and review is
+      complete.
 - [ ] PR title is a specific, conventional-commit style message
       (`feat: …`, `fix: …`, `docs: …`, `refactor: …`, `test: …`,
-      `chore: …`) — not `wip` / `fixes`.
+      `chore: …`) — not `wip` / `fixes`. A maintainer confirms the squash
+      commit title.
 - [ ] All gates pass (or: `git push` and let the pre-push hooks run them):
       ```
       uv run ruff check . && uv run ruff format --check .
       uv run mypy --strict .
       uv run lint-imports
       uv run pytest --cov
-      uv run guardana scan packages
+      uv run guardana scan packages --profile scripts/dogfood.yaml
       ```
-- [ ] Docs updated alongside the code change (`CLAUDE.md`, `CONTRIBUTING.md`,
+- [ ] The change keeps the project principles (`CONTRIBUTING.md` § Principles).
+- [ ] Docs updated alongside the code change (`README.md`, `CONTRIBUTING.md`
       or `docs/`, as applicable) — not deferred to a follow-up.
+- [ ] New options, API parameters and payload fields state their minimum Guardana
+      version, applicable schema/API version and older-input behaviour using the
+      [availability convention](https://guardana.dev/docs/compatibility#feature-and-field-availability),
+      or this is explicitly not applicable.
 - [ ] If this PR adds/changes a **Rule**: it has a taxonomy mapping
       (OWASP/MITRE ATLAS/NIST tags) and a positive **and** negative test
       fixture (`guardana.core.testing` has the model doubles).

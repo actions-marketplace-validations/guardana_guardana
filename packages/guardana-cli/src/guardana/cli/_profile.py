@@ -3,12 +3,16 @@ from pathlib import Path
 import typer
 from guardana.cli.exit_codes import ExitCode
 from guardana.core.profile import (
+    PRESET_NAMES,
     Profile,
     ProfileError,
     default_profile,
     load_profile,
     preset,
 )
+
+PRESET_HELP = "Named policy preset: " + "|".join(PRESET_NAMES)
+"""The `--preset` help every command shows, built from the presets that exist."""
 
 
 def resolve_profile(profile_path: Path | None, preset_name: str | None) -> Profile:

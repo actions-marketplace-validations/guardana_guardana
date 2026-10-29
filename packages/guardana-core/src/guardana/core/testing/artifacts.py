@@ -1,9 +1,14 @@
 import json
+import shutil
 import struct
+import tempfile
+import weakref
 from collections.abc import Mapping, Sequence
+from pathlib import Path, PurePosixPath
 from typing import Final
 
 from guardana.core.formats.gguf import GgufValue
+from guardana.core.target.artifact import ArtifactTarget
 
 _MAGIC: Final = b"GGUF"
 _DEFAULT_VERSION: Final = 3
@@ -58,6 +63,42 @@ def build_gguf(
         + struct.pack("<Q", len(entries))
     )
     return header + body
+
+
+def files_target(
+    files: Mapping[str, bytes | str], *, source_read_limit: int | None = None
+) -> ArtifactTarget:
+    """Return an `ArtifactTarget` over a fresh directory holding `files`, keyed by relative path.
+
+    The directory is removed when the target is garbage-collected, so a rule's fixtures can
+    build their own tree each time they are materialised. A `str` is written as UTF-8.
+    `source_read_limit` replaces the target's default bound on a Python file it reads, so a
+    sample past it needs only a few bytes; None keeps the default a scan uses.
+    """
+    root = Path(tempfile.mkdtemp(prefix="guardana-fixture-"))
+    try:
+        for name, content in files.items():
+            path = root / _relative(name)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content.encode("utf-8") if isinstance(content, str) else content)
+    except Exception:
+        shutil.rmtree(root, ignore_errors=True)
+        raise
+    target = (
+        ArtifactTarget(root)
+        if source_read_limit is None
+        else ArtifactTarget(root, source_read_limit=source_read_limit)
+    )
+    weakref.finalize(target, shutil.rmtree, root, ignore_errors=True)
+    return target
+
+
+def _relative(name: str) -> PurePosixPath:
+    """Refuse a path that would leave the fixture's directory."""
+    path = PurePosixPath(name)
+    if not name or path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"a fixture file needs a relative path inside its tree, got {name!r}")
+    return path
 
 
 def build_safetensors(

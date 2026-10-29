@@ -1,20 +1,42 @@
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from dataclasses import MISSING, dataclass, field, fields, replace
+from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 
 from guardana.core.assessment import Assessment
 from guardana.core.evaluator.base import Evaluator, Expectation
 from guardana.core.report import Finding
+from guardana.core.report.shortfall import CoverageShortfall
 from guardana.core.rule._digest import digest_parts
-from guardana.core.safety import Impact, Maturity
+from guardana.core.safety import Detection, Impact, Maturity
 from guardana.core.severity import Severity
 from guardana.core.surface import Surface
 from guardana.core.target import Capability, Target, TargetKind
 from guardana.core.taxonomy import TaxonomyRef
 
 if TYPE_CHECKING:
+    from guardana.core.manifest.records import CalibrationRecord, SuiteSummary
     from guardana.core.rule.fixture import RuleFixture
+
+
+class NotOffered(Exception):  # noqa: N818 — named for what the target does
+    """Raised by a rule, before it reports anything, when the target lacks what it examines.
+
+    The run records the rule as skipped `not_offered`, a coverage gap, rather than as a
+    check that ran. It means "this target has none of what I examine"; an inconclusive
+    verdict means "I asked and could not tell". Raised after the rule reported a finding
+    or a measurement, it is an error of the rule.
+    """
+
+    def __init__(self, detail: str, *, missing: tuple[str, ...] = ()) -> None:
+        super().__init__(detail)
+        self.detail = detail
+        self.missing = missing
+
+
+NOT_OFFERED_AFTER_REPORTING = "raised NotOffered after reporting"
+"""The error a rule records when it raised `NotOffered` after reporting something."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +80,14 @@ class RuleMeta:
     everything.
     """
 
+    detection: Detection = Detection.UNDECLARED
+    """Whether a finding from this rule is a checked fact or a lead. See `Detection`.
+
+    Defaults to `UNDECLARED` rather than to either answer, because each would be a
+    claim about a rule nobody has read. Kept out of `Rule.digest()`: relabelling a
+    rule does not change what it sends or how it grades.
+    """
+
     @property
     def surface(self) -> Surface:
         """The security layer this rule belongs to (build vs runtime), from what it inspects."""
@@ -75,7 +105,26 @@ class RuleContext:
 
     config: Mapping[str, object] = field(default_factory=dict)
     evaluators: Mapping[str, Evaluator] = field(default_factory=dict)
+    calibrations: Mapping[str, "CalibrationRecord"] = field(default_factory=dict)
+    """The judge calibrations this run was pointed at, keyed by evaluator id.
+
+    Read by a rule that gates on a judge-graded rate while it runs; empty when the run
+    names none, which leaves every judge uncorrected.
+    """
+
     _assessments: list[Assessment] = field(default_factory=list, repr=False)
+    _conclusions: list["SuiteSummary"] = field(default_factory=list, repr=False)
+    _examined: set[str] = field(default_factory=set, repr=False)
+    _shortfalls: list[CoverageShortfall] = field(default_factory=list, repr=False)
+
+    def fresh(self) -> "RuleContext":
+        """Return the same configuration with every sink empty, so one run's records stand alone."""
+        empty = {
+            f.name: f.default_factory()
+            for f in fields(self)
+            if f.name.startswith("_") and f.default_factory is not MISSING
+        }
+        return replace(self, **empty)
 
     def get(self, key: str, default: object) -> object:
         """Read one config value, falling back to `default`."""
@@ -97,11 +146,61 @@ class RuleContext:
         """Everything `record` was given, in the order it arrived."""
         return tuple(self._assessments)
 
+    def conclude(self, summary: "SuiteSummary") -> None:
+        """Hand over what a suite concluded about its pass rate. The runner carries it.
+
+        A sink for the same reason as `record`: the conclusion is computed once, by the
+        rule that measured it, and every later reader stores or prints it as it was.
+        """
+        self._conclusions.append(summary)
+
+    def concluded(self) -> "SuiteSummary | None":
+        """Return the last conclusion `conclude` was given; None for a rule that is no suite."""
+        return self._conclusions[-1] if self._conclusions else None
+
+    def examined(self, path: Path | str) -> None:
+        """Record that this rule read `path` in its own format and reached a conclusion.
+
+        Called by a rule that understands a component — a pickle, an ONNX graph — once
+        it parsed the file or reported on it, never by a rule that merely reads every
+        file for something else. A model component the run observed and no completed
+        rule examined is a coverage shortfall; a file this rule reported on counts
+        without the call.
+        """
+        self._examined.add(str(path))
+
+    def examined_paths(self) -> frozenset[str]:
+        """Every path `examined` was given."""
+        return frozenset(self._examined)
+
+    def shortfall(self, gap: CoverageShortfall) -> None:
+        """Report coverage this rule was asked for and could not get. The runner carries it.
+
+        A shortfall joins the run's `coverage_shortfall`, the channel with no switch, so
+        the run is `indeterminate` unless a finding fails it. Use it where a check's own
+        precondition did not hold — a seeded control that never answered — and an
+        inconclusive verdict alone would sit behind `fail_on_inconclusive`, which
+        defaults off.
+        """
+        self._shortfalls.append(gap)
+
+    def shortfalls(self) -> tuple[CoverageShortfall, ...]:
+        """Everything `shortfall` was given, in the order it arrived."""
+        return tuple(self._shortfalls)
+
 
 class Rule(ABC):
     """A single security check. Authored as a plugin (this class) or as YAML."""
 
     meta: RuleMeta
+
+    deterministic: ClassVar[bool] = False
+    """Whether the verdicts this rule stamps with its own id are facts, not opinions.
+
+    Covers only a rule that grades in its own code; a verdict stamped by an
+    evaluator is judged by that evaluator's `deterministic`. False unless declared,
+    so a rule that says nothing is treated as a judge.
+    """
 
     def declared_expectations(self) -> Iterable[tuple[str, Expectation]]:
         """Return the (evaluator id, expectation) pairs this rule will grade with.
@@ -159,6 +258,37 @@ class Rule(ABC):
         rules` declares it once, in `guardana.rules._base.ArtifactRule`, for
         the built-ins it ships and measures — nothing upstream of that
         declares it for anyone else.
+        """
+        return None
+
+    def estimated_requests_for(self, target: Target) -> int | None:
+        """Upper bound on the requests this rule will send to `target`, or None if unknown.
+
+        Defaults to `estimated_requests`. A rule whose cost depends on what the target
+        holds — one request per seeded item and tenant — overrides it, and `guardana
+        plan` prices the run with this rather than with the target-free declaration.
+        """
+        return self.estimated_requests
+
+    def not_applicable_to(self, target: Target) -> str | None:
+        """Return why this rule has nothing to check on `target`, or None when it applies.
+
+        Consulted when rules are selected, after the capabilities, so the run and its
+        plan both record the rule as skipped `not_applicable` rather than as a check
+        that ran and found nothing. None by default.
+        """
+        return None
+
+    @property
+    def graded_verdicts(self) -> Mapping[str, int] | None:
+        """At most how many verdicts a run grades with each evaluator id, or None if unknown.
+
+        `guardana plan probe` multiplies each count by that evaluator's
+        `judge_calls_per_verdict` to price the judge calls a run adds to its target
+        requests. An empty mapping is a rule that grades in its own code and asks no
+        evaluator. None for the reason `estimated_requests` is: the engine makes no
+        claim about a rule it has never read, and a plan with a judge configured
+        does not claim to fit its budget while such a rule is selected.
         """
         return None
 
@@ -253,8 +383,9 @@ class Rule(ABC):
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Check `target` and yield a finding per problem found.
 
-        Yield nothing when the target is clean. Raise `RuleError` when the rule
-        cannot run at all — the runner records it as skipped instead of failing
-        the whole scan.
+        Yield nothing when the target is clean. Raise `NotOffered`, before yielding
+        anything, when the target does not offer what the rule examines. Raise
+        `RuleError` when the rule cannot run at all — the runner records it as an
+        error instead of failing the whole scan.
         """
         raise NotImplementedError

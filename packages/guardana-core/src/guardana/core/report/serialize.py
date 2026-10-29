@@ -12,6 +12,7 @@ from guardana.core.manifest.serialize import SCHEMA_URL, manifest_to_dict
 from guardana.core.report.check_error import CheckError
 from guardana.core.report.finding import Finding
 from guardana.core.report.result import ScanResult
+from guardana.core.target.scope import FileScope
 
 
 def finding_to_dict(finding: Finding) -> dict[str, object]:
@@ -62,12 +63,38 @@ def assessment_to_dict(assessment: Assessment) -> dict[str, object]:
         "rationale": assessment.rationale,
         "tags": list(assessment.tags),
         "trial": assessment.trial,
+        "reason": None if assessment.reason is None else str(assessment.reason),
     }
 
 
 def error_to_dict(error: CheckError) -> dict[str, object]:
     """Serialize one check that could not run."""
     return {"source": error.source, "stage": error.stage, "reason": error.reason}
+
+
+def scope_to_dict(scope: FileScope | None) -> dict[str, object] | None:
+    """Serialize what a file run listed and excluded; None for any other run."""
+    if scope is None:
+        return None
+    skipped = scope.skipped_models
+    return {
+        "files": list(scope.files),
+        "excludes": None
+        if scope.excludes is None
+        else [
+            {"pattern": e.pattern, "source": str(e.source), "file": e.file} for e in scope.excludes
+        ],
+        "ignored_directories": list(scope.ignored_directories),
+        "kept_models": [{"path": k.path, "pattern": k.pattern} for k in scope.kept_models],
+        "skipped_models": None
+        if skipped is None
+        else {
+            "directories": [
+                {"path": d.path, "model_files": d.model_files} for d in skipped.directories
+            ],
+            "searched_all": skipped.searched_all,
+        },
+    }
 
 
 def run_to_dict(result: ScanResult, manifest: RunManifest) -> dict[str, object]:
@@ -101,4 +128,5 @@ def run_to_dict(result: ScanResult, manifest: RunManifest) -> dict[str, object]:
         # Written even when empty, so "measured nothing" is a fact in the document
         # rather than something a reader infers from a missing key.
         "assessments": [assessment_to_dict(a) for a in result.assessments],
+        "scope": scope_to_dict(result.scope),
     }

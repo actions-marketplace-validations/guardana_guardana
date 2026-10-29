@@ -6,8 +6,6 @@ paths:
 ---
 # Tests
 
-Why: `docs/maintainers/lessons.md` § False green, § Gates.
-
 - **Tests are never a leak.** No fixture carries real customer data, a real secret or a real
   production prompt; evidence stays redacted. Crafted fixtures are built in code
   (`guardana.core.testing`) so they are readable in review.
@@ -15,6 +13,9 @@ Why: `docs/maintainers/lessons.md` § False green, § Gates.
   go red; delete `__pycache__` after a same-size edit. `getattr(x, "thing", ())` where nothing
   has `thing` is vacuous and looks thorough. A replay test needs input a replay would answer
   differently: a scripted double repeats its last reply, so grading the last turn agrees by luck.
+- **CI renders CLI output in colour** (Typer forces Rich colour under `GITHUB_ACTIONS`), so a
+  raw `in result.output` passes locally and fails there: assert on normalised text, and
+  reproduce CI with `FORCE_COLOR=1 uv run pytest <path>`.
 - **Assert at the seam where the value has to arrive**, not on a log line, a document or a
   mock's call count — those measure what the code said, not what it did.
 - **Cost gates count operations** (`test_scan_cost.py` tree walks and parses,

@@ -1,58 +1,42 @@
-"""Assemble the manifest a saved run carries.
+"""What only a command knows about a run: where it ran, and which deployment it verifies.
 
-Built here rather than in the runner because the circumstances of a run are the
-command's knowledge, not the engine's: which profile the user named, which
-version of the tool this is, what time it is, and whether this is a laptop or a
-pipeline. The engine stays a library that consults neither a clock nor an
-environment variable.
+The manifest itself is built by `guardana.core.manifest.build`; this module reads the
+environment for the circumstances the engine never consults, and turns an unreadable
+calibration file into the exit code for invalid usage.
 """
 
 import os
-import uuid
-from collections.abc import Mapping, Sequence, Set
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime
-from pathlib import Path
+from collections.abc import Mapping
+from datetime import datetime
 
 import typer
 from guardana.cli.exit_codes import ExitCode
-from guardana.core import __version__
-from guardana.core.assessment import Assessment
 from guardana.core.calibration.store import (
     CalibrationStoreError,
     RecordedCalibration,
-    load_calibrations,
 )
+from guardana.core.evaluator.config import calibrations_for_another_prompt_version
 from guardana.core.gate import GateOutcome
 from guardana.core.manifest import (
-    ConfigurationRef,
     DeploymentRef,
-    ExecutionSettings,
     RunManifest,
     RunSource,
-    RunUsage,
     SourceKind,
     TargetIdentity,
-    ToolInfo,
-    digest_of,
 )
-from guardana.core.manifest.coverage import (
-    CoverageRecord,
-    TaxonomyCatalogRecord,
-    coverage_digest,
+from guardana.core.manifest.build import (
+    _evaluator_records,
+    _Grading,
+    _trial_summary,
+    build_run_manifest,
+    load_profile_calibrations,
+    target_identity,
 )
-from guardana.core.manifest.records import EvaluatorRecord, RuleRecord, TrialSummary
-from guardana.core.manifest.settings import PrivacyRecord
-from guardana.core.manifest.summary import summarize
-from guardana.core.origin import Origin
+from guardana.core.manifest.usage import JudgeUsage
 from guardana.core.profile import Profile
 from guardana.core.registry import Registry
-from guardana.core.report import CoverageShortfall, ScanResult
-from guardana.core.rule import Rule
-from guardana.core.target import REQUEST_TIMEOUT_SECONDS, Target, TargetKind
-from guardana.core.taxonomy import catalogs
-from guardana.core.trials import reduce_rule
-from guardana.core.usage import TargetUsage
+from guardana.core.report import ScanResult
+from guardana.core.target import TargetKind
 
 _CI_PROVIDERS = (
     ("GITHUB_ACTIONS", "github"),
@@ -151,116 +135,6 @@ def detect_deployment(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class ProbeOutcome:
-    """What a probe produced, and what it was pointed at.
-
-    The identity travels back with the result because the command cannot rebuild
-    it: the targets are constructed and closed inside the run, and an MCP server
-    reached over stdio would have to be *started again* to be asked what it
-    supports. Without it the manifest recorded no fingerprint and no capabilities
-    for any endpoint run — so the coverage fingerprint, whose whole job is to
-    notice that one run could check less than the other, was blind to a target
-    that lost a capability.
-    """
-
-    result: ScanResult
-    identity: TargetIdentity
-
-
-def target_identity(target: Target, ref: str) -> TargetIdentity:
-    """Describe what was examined, and say what the fingerprint was computed from.
-
-    The fingerprint covers the *declared* identity of the target — its reference
-    and kind — which is what the engine can honestly attest to without asking the
-    target to identify itself. `fingerprint_inputs` records exactly that, so no
-    consumer reads the digest as covering model weights it never saw. What a real
-    endpoint supports, and how it identifies itself, is `guardana target inspect`.
-    """
-    inputs = ("kind", "ref")
-    return TargetIdentity(
-        kind=target.kind,
-        ref=ref,
-        fingerprint=digest_of(str(target.kind), ref),
-        fingerprint_inputs=inputs,
-        capabilities=tuple(sorted(str(c) for c in target.capabilities())),
-    )
-
-
-def _run_usage(spent: TargetUsage | None, started_at: datetime, completed_at: datetime) -> RunUsage:
-    """Turn what the targets metered into the run's usage block.
-
-    Wall time is measured here rather than in the engine, which does not consult a
-    clock. Everything else is passed through untouched: `spent is None` means no
-    target counted, and it stays an explicit unknown instead of becoming a zero
-    somewhere between the meter and the file.
-    """
-    elapsed = (completed_at - started_at).total_seconds()
-    if spent is None:
-        return RunUsage(wall_time_seconds=elapsed)
-    return RunUsage(
-        requests=spent.requests,
-        input_tokens=spent.input_tokens,
-        output_tokens=spent.output_tokens,
-        requests_missing_token_counts=spent.requests_missing_token_counts,
-        wall_time_seconds=elapsed,
-    )
-
-
-def _evaluator_records(
-    rules: Sequence[Rule], calibrations: Mapping[str, RecordedCalibration] | None = None
-) -> tuple[EvaluatorRecord, ...]:
-    """Record the evaluators the rules that ran declared they would grade with.
-
-    Declared, not "every evaluator installed": an evaluator nobody used graded
-    nothing, and listing it would pad the coverage fingerprint with checking that
-    never happened. A rule grading entirely in Python declares none, and that is
-    the honest answer for it.
-
-    No digest. An `Evaluator` has no declaration to hash — it is Python — and
-    inventing one from its class name would claim to detect a change it cannot see.
-    The tool version recorded beside it is what covers the code.
-
-    A calibration is attached when this run was pointed at one. An evaluator with no
-    recorded measurement carries `None`, which is what every run said for every
-    evaluator until `calibrate --record` existed — honest then and honest now, but
-    now distinguishable from "measured, and here is how honest it was".
-    """
-    declared = {
-        evaluator_id
-        for rule in rules
-        for evaluator_id, _expectation in rule.declared_expectations()
-        if evaluator_id
-    }
-    measured = calibrations or {}
-    return tuple(
-        EvaluatorRecord(
-            id=evaluator_id,
-            calibration=(measured[evaluator_id].as_record() if evaluator_id in measured else None),
-        )
-        for evaluator_id in sorted(declared)
-    )
-
-
-def _recorded_calibrations(profile: Profile) -> dict[str, RecordedCalibration]:
-    """Read every calibration file this profile points at, refusing one it cannot parse.
-
-    Refusing rather than skipping. A calibration file that silently failed to load
-    would leave every evaluator recorded as unmeasured, which reads as "nobody
-    checked this judge" — the opposite of what the operator configured and asked to
-    have in their evidence.
-    """
-    measured: dict[str, RecordedCalibration] = {}
-    for raw_path in profile.calibration_paths:
-        path = Path(raw_path)
-        if not path.exists():
-            raise CalibrationStoreError(
-                f"{path} does not exist, so the calibrations it names cannot be recorded"
-            )
-        measured.update(load_calibrations(path))
-    return measured
-
-
 def calibrations_or_exit(profile: Profile) -> dict[str, RecordedCalibration]:
     """Read the calibrations, or refuse in words with a code from the exit table.
 
@@ -269,40 +143,18 @@ def calibrations_or_exit(profile: Profile) -> dict[str, RecordedCalibration]:
     `1` with a stack trace — and `1` means *policy failed*, so a pipeline reading exit
     codes would report a security regression when the only thing wrong was a broken
     JSON file. A wrong verdict is worse than a crash.
+
+    A judge calibration measured under another prompt version than the one in force is
+    named on stderr, since it no longer applies and the run would not otherwise say why.
     """
     try:
-        return _recorded_calibrations(profile)
+        calibrations = load_profile_calibrations(profile)
     except CalibrationStoreError as exc:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
-
-
-def _coverage(
-    rules: Sequence[RuleRecord],
-    evaluators: Sequence[EvaluatorRecord],
-    capabilities: Sequence[str],
-    protocols: Mapping[str, str],
-    shortfall: Sequence[CoverageShortfall],
-) -> CoverageRecord:
-    """Describe what this run was able to check, and pin the catalogues it mapped against."""
-    taxonomies = tuple(
-        TaxonomyCatalogRecord(
-            framework=catalog.framework,
-            digest=catalog.digest,
-            entries=len(catalog.refs),
-            version=catalog.version,
-        )
-        for catalog in catalogs()
-    )
-    return CoverageRecord(
-        digest=coverage_digest(rules, evaluators, capabilities, taxonomies, protocols),
-        taxonomies=taxonomies,
-        protocols=dict(protocols),
-        # Carried into the document rather than left on the in-memory result: the
-        # verdict this run reached is `indeterminate` because of these, and evidence
-        # that states a conclusion without its cause is evidence nobody can act on.
-        shortfall=tuple(shortfall),
-    )
+    for stale in calibrations_for_another_prompt_version(profile, calibrations):
+        typer.echo(f"warning: {stale}", err=True)
+    return calibrations
 
 
 def _source(kind: SourceKind | None) -> RunSource:
@@ -333,116 +185,37 @@ def build_manifest(  # noqa: PLR0913 — a manifest is assembled from independen
     concurrency: int = 1,
     deployment: DeploymentRef | None = None,
     source_kind: SourceKind | None = None,
+    calibrations: Mapping[str, RecordedCalibration] | None = None,
+    judge_usage: Mapping[str, JudgeUsage] | None = None,
 ) -> RunManifest:
-    """Describe the run that produced `result`, digesting the rules that actually ran.
+    """Build the manifest with where this command ran, read from the environment.
 
-    Only the rules that ran are digested. A rule that was skipped or errored did
-    not test anything, and listing it as part of the plan would let a later
-    comparison treat a check that never happened as coverage it had.
+    The calibrations default to the profile's, refused in words when one cannot be read.
     """
-    now = datetime.now(UTC)
-    ran = tuple(rule for rule in registry.rules() if rule.meta.id in result.rules_run)
-    # `version` sat in the manifest from the first release with nothing writing it,
-    # which was the half of the plugin-override problem nobody could see: an id and
-    # a digest a replacement copies exactly, beside the one field that would have
-    # told them apart. See docs/design/capability-protocols.md.
-    recorded: dict[str, list[Assessment]] = {}
-    for assessment in result.assessments:
-        recorded.setdefault(assessment.rule_id, []).append(assessment)
-    reported = {f.rule_id for f in (*result.findings, *result.unverified, *result.waived)}
-    rules = tuple(
-        _rule_record(
-            rule,
-            registry.origin_of(rule.meta.id),
-            _trial_summary(rule, recorded.get(rule.meta.id, []), result, reported),
-        )
-        for rule in ran
-    )
-    evaluators = _evaluator_records(ran, calibrations_or_exit(profile))
-    target = (
-        identity
-        if identity is not None
-        else TargetIdentity(kind=target_kind, ref=target_ref, fingerprint_inputs=())
-    )
-    return RunManifest(
-        run_id=str(uuid.uuid4()),
-        created_at=now,
+    return build_run_manifest(
+        registry,
+        profile,
+        result,
+        target_kind=target_kind,
+        target_ref=target_ref,
+        gate=gate,
         started_at=started_at,
-        completed_at=now,
+        identity=identity,
+        concurrency=concurrency,
+        deployment=deployment,
         source=_source(source_kind),
-        deployment=deployment if deployment is not None else DeploymentRef(),
-        guardana=ToolInfo(version=__version__),
-        target=target,
-        configuration=ConfigurationRef(profile_name=profile.name),
-        # The ceilings are recorded whether or not the run hit them. Without them a
-        # run that exits `6` says it stopped and never says what it hit, which
-        # leaves the one number an operator needs — was the budget too small, or is
-        # the target now more expensive — unanswerable from the evidence.
-        execution=ExecutionSettings(
-            concurrency=concurrency,
-            timeout_seconds=REQUEST_TIMEOUT_SECONDS,
-            max_requests=profile.budgets.max_requests,
-            max_input_tokens=profile.budgets.max_input_tokens,
-            max_output_tokens=profile.budgets.max_output_tokens,
-            max_duration_seconds=profile.budgets.max_duration_seconds,
-            # Only an endpoint run makes attempts at a sampled reply; a file scan or a
-            # trace given a profile that says `trials: 5` asked for nothing it could do.
-            trials=profile.trials if target_kind is TargetKind.ENDPOINT else 1,
-        ),
-        usage=_run_usage(result.usage, started_at, now),
-        rules=rules,
-        evaluators=evaluators,
-        coverage=_coverage(
-            rules, evaluators, target.capabilities, result.protocols, result.coverage_shortfall
-        ),
-        result_summary=summarize(result, gate),
-        # Recorded, so a reader knows what was applied to the evidence they are
-        # looking at rather than assuming the default of whatever build they run.
-        privacy=PrivacyRecord(
-            evidence_mode=profile.privacy.mode,
-            redaction_policy_digest=profile.privacy.digest,
-        ),
+        calibrations=calibrations_or_exit(profile) if calibrations is None else calibrations,
+        judge_usage=judge_usage,
     )
 
 
-def _rule_record(rule: Rule, origin: Origin, trial_summary: TrialSummary | None) -> RuleRecord:
-    """Describe one rule that ran, including which distribution supplied it.
-
-    An unattributed origin stays `None` rather than becoming `"unknown"`: a
-    placeholder in an evidence field teaches readers to treat the field as
-    decoration.
-    """
-    return RuleRecord(
-        id=rule.meta.id,
-        digest=rule.digest(),
-        version=origin.version,
-        origin=origin.distribution or origin.source,
-        maturity=str(rule.meta.maturity),
-        declared_requests=rule.estimated_requests,
-        trial_summary=trial_summary,
-    )
-
-
-def _trial_summary(
-    rule: Rule, recorded: Sequence[Assessment], result: ScanResult, reported: Set[str]
-) -> TrialSummary | None:
-    """Reduce a repeating rule's recorded trials over its cases; None for a rule that cannot.
-
-    K comes from the rule object that ran, carried on the result, rather than from the
-    registry's copy: a planted copy is what sent the requests. A rule that reported a
-    finding never gets a bound, whatever its recorded trials say: a clean summary beside
-    a finding would be the report contradicting itself in the reassuring direction.
-    """
-    if not any(a.trial is not None for a in recorded):
-        return None
-    rule_id = rule.meta.id
-    trials = reduce_rule(
-        rule_id,
-        recorded,
-        result.trials_per_case.get(rule_id, 1),
-        one_case=rule.grades_one_case,
-    )
-    summary = TrialSummary.from_trials(trials)
-    if summary.bound is not None and rule_id in reported:
-        return replace(summary, bound=None)
-    return summary
+__all__ = [
+    "_Grading",
+    "_evaluator_records",
+    "_trial_summary",
+    "build_manifest",
+    "calibrations_or_exit",
+    "detect_deployment",
+    "detect_source",
+    "target_identity",
+]

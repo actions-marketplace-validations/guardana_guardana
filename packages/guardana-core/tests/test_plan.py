@@ -6,10 +6,12 @@ between a ceiling and a number that happens to be small.
 """
 
 from collections.abc import Iterable
+from dataclasses import replace
 from pathlib import Path
 
+import pytest
 from guardana.core.budget import Budgets
-from guardana.core.plan import RunPlan, build_plan
+from guardana.core.plan import JudgeMeterPlan, JudgePlan, RunPlan, build_plan
 from guardana.core.profile import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.report import Finding
@@ -128,15 +130,80 @@ def test_a_plan_without_a_request_budget_never_reports_a_breach() -> None:
 def test_a_rule_the_target_cannot_satisfy_is_listed_as_skipped() -> None:
     plan = _plan(_Priced(), _NeedsChat())
 
-    assert plan.skipped == ("guardana.test.chat",)
+    assert plan.skipped_rule_ids == ("guardana.test.chat",)
     assert plan.max_requests == 4, "a skipped rule contributes nothing to the ceiling"
 
 
 def test_a_rule_the_policy_excludes_is_absent_entirely() -> None:
     registry = Registry()
     registry.register_rule(_Priced())
-    profile = Profile("t", Policy(include=("acme.*",)))
+    profile = Profile("t", Policy(exclude=("guardana.test.*",)))
     plan = build_plan(registry, profile, ArtifactTarget(Path()))
 
     assert plan.rules == ()
     assert plan.skipped == (), "excluded by policy is not the same as skipped for capability"
+
+
+def _planned(budgets: Budgets, *, max_requests: int = 30, unknown: tuple[str, ...] = ()) -> RunPlan:
+    return RunPlan(
+        rules=("guardana.test.priced", *unknown),
+        skipped=(),
+        unknown_cost=unknown,
+        min_requests=1 + len(unknown),
+        max_requests=max_requests,
+        budgets=budgets,
+    )
+
+
+def test_a_request_rate_sets_a_floor_on_wall_time() -> None:
+    plan = _planned(Budgets(max_requests_per_minute=10))
+
+    assert plan.minimum_wall_time_seconds == 174.0, "30 requests, 29 intervals of 6s"
+
+
+def test_a_rule_of_unknown_cost_adds_at_least_one_paced_request() -> None:
+    plan = _planned(Budgets(max_requests_per_minute=60), unknown=("acme.test.unpriced",))
+
+    assert plan.minimum_wall_time_seconds == 30.0
+
+
+def test_the_busiest_judge_meter_can_set_the_floor() -> None:
+    plan = replace(
+        _planned(Budgets(max_requests_per_minute=60), max_requests=5),
+        judge=JudgePlan(
+            max_calls=40,
+            meters=(JudgeMeterPlan(evaluators=("llm_judge",), max_calls=40),),
+            unknown_cost=(),
+            unknown_on_meter=False,
+        ),
+    )
+
+    assert plan.minimum_wall_time_seconds == 39.0
+
+
+def test_without_a_rate_there_is_no_floor() -> None:
+    plan = _planned(Budgets(max_duration_seconds=1.0))
+
+    assert plan.minimum_wall_time_seconds is None
+    assert plan.exceeds_duration is False
+
+
+@pytest.mark.parametrize("ceiling", [173.0, 174.0])
+def test_a_duration_ceiling_that_ends_before_the_last_request_does_not_fit(
+    ceiling: float,
+) -> None:
+    plan = _planned(Budgets(max_requests_per_minute=10, max_duration_seconds=ceiling))
+
+    assert plan.exceeds_duration is True
+
+
+def test_a_duration_ceiling_past_the_last_request_fits() -> None:
+    plan = _planned(Budgets(max_requests_per_minute=10, max_duration_seconds=174.5))
+
+    assert plan.exceeds_duration is False
+
+
+def test_one_paced_request_needs_no_wall_time() -> None:
+    plan = _planned(Budgets(max_requests_per_minute=10), max_requests=1)
+
+    assert plan.minimum_wall_time_seconds == 0.0

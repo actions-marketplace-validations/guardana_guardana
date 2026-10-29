@@ -20,12 +20,25 @@ class SkipReason(StrEnum):
     NOT_APPLICABLE = "not_applicable"
     """The check was about a different system than the one under test.
 
-    Only a security contract produces this today: a contract naming `checkout-agent`
-    against a trace the operator declared came from `support-agent` is about
-    something else entirely. Nothing is missing, so it is not a coverage gap — but
-    it is also not a pass, which is why it is recorded and printed rather than
-    dropped. A contract layer where *nothing* applied is a `CoverageShortfall`, not
-    a pile of these.
+    A security contract naming `checkout-agent` against a trace the operator declared
+    came from `support-agent` is about something else entirely, and a rule whose
+    `not_applicable_to` names a reason has nothing to check on this target. Nothing is
+    missing, so it is not a coverage gap — but it is also not a pass, which is why it is
+    recorded and printed rather than dropped. A contract layer where *nothing* applied
+    is a `CoverageShortfall`, not a pile of these.
+    """
+
+    NOT_RECORDED = "not_recorded"
+    """The recording a run grades holds no answer to any of this rule's questions.
+
+    Only a recorded target produces it. The check did not happen, so it is a coverage gap.
+    """
+
+    NOT_OFFERED = "not_offered"
+    """The rule found, while it ran, that the target does not offer what it examines.
+
+    Raised by the rule as `NotOffered` before it reported anything. The check did not
+    happen, so it is a coverage gap.
     """
 
 

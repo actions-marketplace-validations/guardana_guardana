@@ -7,26 +7,21 @@ status: stable
 
 # `guardana rule test` — a rule's own samples, run as a command
 
-A rule that cannot fire is caught by a positive sample. A rule that fires on
-everything is caught by a negative one. **A rule that cannot say "I could not tell"
-is caught by nothing** — and it is the one that will eventually report clean about
-something it never examined.
-
-That third sample is what this command exists for.
+`guardana rule test` checks positive, negative, and inconclusive samples when you need to verify a rule's classifications.
 
 ```bash
-guardana rule test 'acme.*'
+guardana rule test 'acme.*' --plugins allowlist --allow-plugin acme-guardana-rules
 ```
 
 ```
 5 rule(s); 15 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 ```
 
-Sends nothing anywhere — every fixture is a scripted double — so it is safe to run
-on every save. The same fact bounds what a fixture proves: it checks how a rule
-classifies the reply or the run it is handed. A scripted model answers the same
-whatever it is sent, so a fixture says nothing about whether the rule's prompts or
-tool results carry an attack.
+That is the output for [`examples/custom_rule`](../examples/custom_rule/README.md), installed as
+the distribution `acme-guardana-rules`. Every command starts with only Guardana's own
+distributions, so an installed pack is admitted by name.
+
+Scripted fixtures send their replies to a judge configured by the profile for grading; nothing else is contacted. They test classification, but cannot show whether prompts or tool results carry an attack.
 
 ## Declaring fixtures in a YAML rule
 
@@ -61,6 +56,10 @@ fixtures:
 | `reply` | what the scripted model answers. `""` is legal, and is how a decline is sampled |
 | `outcome` | `finding` · `clean` · `inconclusive` |
 | `note` | optional: why this sample is the shape it is |
+
+Each sample runs on its own. A sample comes out `inconclusive` when the rule yields an
+inconclusive verdict or reports a coverage shortfall, when recorded cases are all ungraded, or when a suite declines to conclude, whatever else it yields; otherwise
+`finding` when it yields anything, and `clean` when it yields nothing.
 
 `reply` builds an endpoint over a scripted transport. That is enough because a YAML
 rule's `target_kind` is `endpoint` by construction — its double is always a model.
@@ -162,17 +161,56 @@ class MyRule(Rule):
         ]
 ```
 
+## Suites
+
+Suite fixtures use the single-turn shape. One `reply:` answers every case; a fixture can instead name its own `dataset:`. Each case in that fixture dataset may carry `reply`, falling back to the fixture's `reply:`.
+
+This fixture list shows a separate dataset and a single reply:
+
+```yaml
+fixtures:
+  - name: every answer names the setting
+    dataset: ./fixtures/answers-pass.jsonl
+    outcome: clean
+  - name: the model says nothing
+    reply: ""
+    outcome: inconclusive
+```
+
+A case-level `reply` is allowed only in a fixture dataset. Two different replies to the same messages are refused. A fixture dataset with fewer cases than `gate.min_sample` is refused at load. A suite without clean, finding and inconclusive samples is reported `indeterminate`, like any rule. See [quality suites](usage-suites.md).
+
+### Regression cases
+
+A suite whose dataset holds regression cases ([`guardana case add`](usage-case.md)) has each
+case's `observed` and `accepted` regraded with the rule as it is now, sending nothing. A pair
+holds while `observed` grades `fail` and `accepted` grades `pass`; the totals line says how
+many hold, and a case whose pair no longer holds is named by its dataset line:
+
+```
+✖ acme.quality.support — regression case at dataset line 3
+    the pair no longer holds: observed graded pass, accepted graded pass
+```
+
+Only an evaluator that declares itself deterministic and declares that a verdict asks no judge
+can regrade without sending; a suite holding pairs with any other evaluator is refused, never
+skipped. `rule test` tells the states of a pair apart in its exit code (`1`, `2` or `3`, in the
+table below); `recipe lock` refuses all of them with one code, `1`
+([recipes](usage-recipe.md)).
+
 ## Exit codes
 
 | Situation | Verdict | Exit |
 |---|---|---|
-| every fixture classified as declared | pass | `0` |
+| every fixture classified as declared, and every regression pair holds | pass | `0` |
 | a fixture classified wrongly | fail | `1` |
+| a regression pair's side graded the wrong way | fail | `1` |
 | a rule declares **no** fixtures | **indeterminate** | `2` |
 | a rule declares fixtures but **none** is `inconclusive` | **indeterminate** | `2` |
 | a fixture raised, or its target would not build | **indeterminate** | `2` |
+| a regression pair's side declined, or its evaluator raised | **indeterminate** | `2` |
 | a rule file or a plugin could not be loaded | **indeterminate** | `2` |
 | the selector matched no rule | refused | `3` |
+| a suite holds regression pairs its evaluator cannot regrade without sending | refused | `3` |
 
 **Rows three and four are the point.** A rule nobody sampled is a rule nobody
 checked, and a command built to disprove false greens cannot print "ok" over an
@@ -193,9 +231,14 @@ A fixture set, once run, *is* a labelled corpus — so an evaluator author gets 
 without hand-writing it:
 
 ```bash
-guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl
-guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl
+guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
+guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
 ```
+
+`examples/custom_rule` installs the evaluator `acme.strict_refusal`. A rule under
+`./my-rules/` that uses it for grading needs the same distribution admitted.
 
 `finding` becomes `attack_succeeded: true`, `clean` becomes `false`, and
 **`inconclusive` is left out and counted**: calibration measures a judge's
@@ -219,23 +262,15 @@ the rule sends one prompt or its evaluator does not read the prompt; an
 
 Everything else is left out and counted by reason. A scenario of several steps is
 graded on a part of the conversation only the rule knows, and an agent run is
-graded on its tool calls, which a corpus row has no place for. A fixture the rule
+graded on its tool calls, which a corpus row has no place for. Artifact and trace samples have no corpus row because the corpus holds model replies, and are counted under a reason that names them. A fixture the rule
 classified wrongly carries a label one of the two disagrees with.
 
 ## Built-in coverage, stated plainly
 
-51 rules ship and **11 are fully sampled** today. `guardana rule test 'guardana.*'`
-reports the rest as `indeterminate`, truthfully — that is the command working, not
-the command being unready. A gate pins the number so it can only rise.
-
-YAML rules in the default catalog that are not fully sampled:
-`guardana.agent.tool_argument_scope`. It ships a finding and an inconclusive sample
-and no clean one: the exact path its task names is graded as over-broad today, and
-a clean sample written around that would test nothing.
-
-Sampling the rest in an afternoon would mean writing fixtures to move a counter,
-and a fixture written for that reason is a test that cannot fail — which this
-project treats as worse than no test at all.
+Every built-in rule ships a finding, a clean and an inconclusive sample of its own, so
+`guardana rule test 'guardana.*'` proves each one; [the rule summary](generated/rule-summary.md)
+states the count generated by running the samples. A gate refuses a built-in rule without all three, unless the
+gate lists it as exempt with the reason it can never decline.
 
 ## Options
 
@@ -244,9 +279,6 @@ project treats as worse than no test at all.
 | `[selector]` | rule id or glob; defaults to every discovered rule |
 | `--rules PATH` | directory or file of custom YAML rules; repeatable |
 | `--profile PATH` | resolve `rules.paths` and evaluator config from a `guardana.yaml` |
-| `--write-corpus PATH` | write the fixtures out as a labelled corpus |
+| `--write-corpus PATH` | write the fixtures out as a labelled corpus, whole: through a temporary file and a rename, so a failed write leaves an earlier corpus as it was and exits `3` |
 | `--unsampled-ok` | do not go indeterminate over unsampled rules; says so in the output |
-| `--plugins`, `--allow-plugin` | the usual plugin-trust controls |
-
-Reasoning: [`design/extension-author-tooling.md`](design/extension-author-tooling.md),
-[`design/declarative-fixtures.md`](design/declarative-fixtures.md).
+| `--plugins`, `--allow-plugin` | the usual plugin-trust controls; `builtins` unless the flag or the profile's `plugins:` says otherwise. While an installed pack is refused, a selector that matches only its rules, such as `'acme.*'`, matches nothing and exits `3`; a selector that matches admitted rules exits `2` when a refused pack or a rule that failed to load leaves a gap. A pack author admits their own distribution: `--plugins allowlist --allow-plugin <distribution>` |

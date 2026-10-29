@@ -243,3 +243,55 @@ def test_the_json_form_counts_the_rules_actually_loaded(tmp_path: Path) -> None:
 
     assert full["trace_rules_loaded"] > 0
     assert refused["trace_rules_loaded"] == 0
+
+
+def _message_trace(tmp_path: Path, *parts: dict[str, object]) -> Path:
+    header = {"guardana_trace": 3, "trace_id": "t-1", "instrumented": ["messages"]}
+    span = {
+        "span_id": "s1",
+        "kind": "model_call",
+        "messages": [
+            {"role": "user", "parts": list(parts)},
+            {"role": "assistant", "parts": [{"type": "text", "content": "hi"}]},
+        ],
+    }
+    path = tmp_path / "messages.jsonl"
+    path.write_text(f"{json.dumps(header)}\n{json.dumps(span)}\n", encoding="utf-8")
+    return path
+
+
+def test_it_counts_the_messages_a_text_reading_rule_would_find_empty(tmp_path: Path) -> None:
+    """`messages: records 2` alone reads as covered while one of the two carries no text."""
+    path = _message_trace(tmp_path, {"type": "text"})
+
+    human = runner.invoke(app, ["trace", "inspect", str(path)])
+    document = json.loads(
+        runner.invoke(app, ["trace", "inspect", str(path), "--format", "json"]).stdout
+    )
+
+    assert human.exit_code == 0, human.output
+    assert "1 of 2 message(s) carry no readable text" in " ".join(human.output.split())
+    assert document["messages_without_text"] == 1
+
+
+def test_messages_that_all_carry_text_add_no_note(tmp_path: Path) -> None:
+    path = _message_trace(tmp_path, {"type": "text", "content": "hello"})
+
+    human = runner.invoke(app, ["trace", "inspect", str(path)])
+    document = json.loads(
+        runner.invoke(app, ["trace", "inspect", str(path), "--format", "json"]).stdout
+    )
+
+    assert "no readable text" not in human.output
+    assert document["messages_without_text"] == 0
+
+
+def test_a_part_spelling_its_text_outside_the_schema_is_refused_with_exit_three(
+    tmp_path: Path,
+) -> None:
+    path = _message_trace(tmp_path, {"type": "text", "text": "hello"})
+
+    result = runner.invoke(app, ["trace", "inspect", str(path)])
+
+    assert result.exit_code == 3
+    assert "unknown key(s) text" in " ".join(result.output.split())

@@ -1,0 +1,7 @@
+name: release-chat-endpoint
+rules:
+  include: ["guardana.prompt.*", "guardana.output.*"]
+fail_on:
+  severity: high
+  fail_on_skipped: true
+  fail_on_inconclusive: true

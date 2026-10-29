@@ -1,0 +1,6 @@
+schema_version: 2
+name: histpack-rules
+extension_api: '>=1,<2'
+provides:
+  rules:
+  - histpack.prompt.instruction_override

@@ -19,6 +19,10 @@ from guardana.server.db.migrations import apply_pending
 from guardana.server.lifecycle import record_sighting, set_status, waive
 from guardana.server.postgres_store import PostgresStore
 from guardana.server.tenancy import TenantScope, create_organization, create_project
+from test_migrations import _apply_through
+
+_AUDIT_LOG_MIGRATION = 7
+"""The migration that creates `audit_events`, the one whose rollback cannot be logged."""
 
 _IDENTITY = "sha256:" + "c" * 64
 _PROJECT = "acme/web"
@@ -34,13 +38,13 @@ def project(connection: DbConnection) -> int:
 
 
 def test_an_action_is_recorded_with_its_actor(connection: DbConnection, project: int) -> None:
-    record(connection, actor=CLI("konrad@ops-1"), action="key.create", subject="prod-ci")
+    record(connection, actor=CLI("alice@ops-1"), action="key.create", subject="prod-ci")
     connection.commit()
 
     events = recent(connection)
 
     assert [(event.action, event.subject) for event in events] == [("key.create", "prod-ci")]
-    assert events[0].actor == "konrad@ops-1"
+    assert events[0].actor == "alice@ops-1"
     assert events[0].actor_kind == "cli"
 
 
@@ -50,7 +54,7 @@ def test_the_kind_of_actor_is_recorded_not_implied(connection: DbConnection, pro
     Both are worth recording and only one is proof, so the row says which.
     """
     record(connection, actor=KEY("prod-ci (id 4)"), action="submission.store")
-    record(connection, actor=CLI("konrad@ops-1"), action="finding.waive")
+    record(connection, actor=CLI("alice@ops-1"), action="finding.waive")
     connection.commit()
 
     kinds = {event.action: event.actor_kind for event in recent(connection)}
@@ -60,13 +64,13 @@ def test_the_kind_of_actor_is_recorded_not_implied(connection: DbConnection, pro
 
 def test_the_cli_actor_comes_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Taken rather than typed: a prompt for your own name is a prompt people lie to."""
-    monkeypatch.setenv("LOGNAME", "konrad")
-    monkeypatch.setenv("USER", "konrad")
+    monkeypatch.setenv("LOGNAME", "alice")
+    monkeypatch.setenv("USER", "alice")
 
     actor = actor_from_environment(None)
 
     assert actor.kind == "cli"
-    assert actor.name.startswith("konrad@")
+    assert actor.name.startswith("alice@")
 
 
 def test_an_explicit_actor_wins(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,15 +85,15 @@ def test_triage_writes_an_audit_row(connection: DbConnection, project: int) -> N
     record_sighting(connection, project, _IDENTITY, datetime.datetime.now(tz=datetime.UTC))
     connection.commit()
 
-    set_status(connection, _PROJECT, _IDENTITY, status="acknowledged", actor=CLI("konrad@ops-1"))
+    set_status(connection, _PROJECT, _IDENTITY, status="acknowledged", actor=CLI("alice@ops-1"))
     waive(
         connection,
         _PROJECT,
         _IDENTITY,
-        approver="konrad",
+        approver="alice",
         reason="vendor fix due",
         expires=datetime.date(2026, 12, 31),
-        actor=CLI("konrad@ops-1"),
+        actor=CLI("alice@ops-1"),
     )
     connection.commit()
 
@@ -130,10 +134,10 @@ def test_revoking_a_key_is_recorded_under_the_project_it_reached(
         issued,
         secret_hash,
         scope=TenantScope.for_project(project),
-        created_by=CLI("konrad@ops-1"),
+        created_by=CLI("alice@ops-1"),
     )
 
-    assert revoke_key(connection, issued.prefix, actor=CLI("konrad@ops-1")) is True
+    assert revoke_key(connection, issued.prefix, actor=CLI("alice@ops-1")) is True
 
     assert [e.action for e in recent(connection, project=_PROJECT)] == ["key.revoke", "key.create"]
 
@@ -142,8 +146,9 @@ def test_revoking_a_key_that_is_not_there_records_nothing(
     connection: DbConnection, project: int
 ) -> None:
     """A log that records attempts as if they were changes is a log that overstates itself."""
-    assert revoke_key(connection, "not-a-prefix", actor=CLI("konrad@ops-1")) is False
+    revoked = revoke_key(connection, "not-a-prefix", actor=CLI("alice@ops-1"))
 
+    assert revoked is False
     assert recent(connection) == ()
 
 
@@ -238,7 +243,7 @@ def test_rolling_back_the_audit_log_says_it_could_not_record_itself(
     and then tried to write a row into it, so a command that had already done its
     work reported an error.
     """
-    apply_pending(connection)
+    _apply_through(connection, _AUDIT_LOG_MIGRATION)
     connection.commit()
     monkeypatch.setenv("GUARDANA_DATABASE_URL", database_url)
 

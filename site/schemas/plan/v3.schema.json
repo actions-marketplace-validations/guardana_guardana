@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/plan/v3.schema.json",
+  "title": "Guardana Run Plan v3",
+  "description": "What a run would cost, worked out without sending a request.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "rules",
+    "skipped",
+    "unknown_cost",
+    "requests",
+    "complete",
+    "budgets",
+    "fits_budget",
+    "trials",
+    "judge_calls"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skipped": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknown_cost": {
+      "description": "Rules that declare no request count. Named rather than counted as free: a plan containing one never claims to fit a budget, because its ceiling is not a ceiling.",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requests": {
+      "type": "object",
+      "required": [
+        "min",
+        "max"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "complete": {
+      "type": "boolean",
+      "description": "Whether every target request and, when `judge_calls` is present, every judge call was priced."
+    },
+    "budgets": {
+      "type": "object",
+      "required": [
+        "max_requests",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_duration_seconds"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_requests": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_input_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_output_tokens": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "max_duration_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "fits_budget": {
+      "type": "boolean",
+      "description": "False when the target requests, or the calls of any one budgeted judge on its own meter, could exceed `budgets.max_requests`, or when a rule of unknown cost could draw on either."
+    },
+    "trials": {
+      "description": "Attempts per case the run was asked for, already inside `requests`, and the selected rules that make one attempt whatever was asked because their verdict does not depend on a sampled reply.",
+      "type": "object",
+      "required": [
+        "per_case",
+        "single_attempt"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "per_case": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "single_attempt": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "judge_calls": {
+      "description": "Judge and grader calls the run would add to its target requests. Null when the plan does not price them: a scan wires no judge.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "required": [
+        "max",
+        "meters",
+        "unknown_cost",
+        "complete"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "description": "Every priced judge or grader call, metered or not.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "meters": {
+          "description": "One entry per budgeted judge: the evaluators that grade through it, and the most calls its own meter could count against `budgets.max_requests`.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "evaluators",
+              "max"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "evaluators": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "unknown_cost": {
+          "description": "Selected rules whose judge calls could not be priced: they do not say what they grade, or grade with an evaluator that is not registered or does not say what a verdict costs.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

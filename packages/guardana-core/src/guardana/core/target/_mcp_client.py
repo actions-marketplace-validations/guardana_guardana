@@ -14,32 +14,101 @@ gets settled once, by `negotiate`, before any question is asked; how a request i
 then written lives in `_mcp_wire`.
 """
 
+import json
+import os
+import selectors
 import subprocess
-from collections.abc import Mapping, Sequence
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from http import HTTPStatus
+from http.client import HTTPMessage
+from io import BytesIO
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
 
-from guardana.core.target._mcp_http import McpError, RawReply, Sender, send
+from guardana.core.target._mcp_http import (
+    MAX_RESPONSE_BYTES,
+    TIMEOUT_SECONDS,
+    AddressRefusedError,
+    McpError,
+    RawReply,
+    RedirectRefusedError,
+    Sender,
+    send,
+)
 from guardana.core.target._mcp_wire import (
     COMPLETE,
+    INITIALIZED,
+    LEGACY_VERSION,
     LEGACY_WIRE,
     PROBE_WIRE,
     SUPPORTED_VERSIONS,
+    UNSUPPORTED_PROTOCOL_VERSION,
     Era,
     McpProtocolError,
     Wire,
     choose_version,
+    completed,
     era_of,
     error_from,
-    newest_legacy,
-    result_of,
+    error_member,
+    handshake_refusal,
     server_info_in,
+)
+from guardana.core.target._url import display_url
+from guardana.core.target.endpoint import (
+    EndpointError,
+    EndpointUnreachable,
+    TargetChanged,
+    UnreadableReply,
+    close_http_error,
 )
 from guardana.core.usage import UsageMeter
 
-_HTTP_ERROR = 400
 _DISCOVER = "server/discover"
+_READ_CHUNK = 64 * 1024
+_QUOTED_BODY_BYTES = 4096
+_STALE_LINES = 16
+"""How many replies to no pending request an stdio server may send per request; more is unreadable.
+
+A line carrying `method` is the server's own request or notification, not a reply: a
+notification is skipped, uncounted, and the request's deadline bounds how long those go on.
+"""
+_SERVER_REQUESTS = 16
+"""How many of its own requests an stdio server may make per request; more is unreadable.
+
+Each answer is written within the request's deadline; this many short answers fit in any
+pipe buffer, so a server that asks and never reads stalls nothing.
+"""
+_MAX_REFLECTED_ID_CHARS = 256
+"""The longest id of a server's own request that is echoed back; a longer one is unreadable.
+
+The answer repeats the id, so an unbounded one would make every answer as large as the
+server chose.
+"""
+_METHOD_NOT_FOUND = -32601
+_HTTP_REQUEST_ID = 1
+"""The id of every HTTP request: each is its own exchange, and its reply is read by this id."""
+
+MAX_LISTING_PAGES = 16
+"""How many pages of one listing are read; a server that names more is refused, never cut short."""
+
+MAX_LISTING_BYTES = MAX_RESPONSE_BYTES
+"""How much one listing may hold across all its pages: paging never raises the one-reply ceiling."""
+
+REFUSAL_STATUSES = frozenset({401, 403})
+"""The statuses that mean a server decided this caller may not ask; no other status does."""
+
+_SHAREABLE_SCOPE = "public"
+
+_CREDENTIAL_STATUSES = frozenset({401, 403, 407})
+_TARGET_STATUSES = frozenset({404, 408, 425, 429})
+_NOT_FOUND = 404
+_CLIENT_ERROR = 400
+_SERVER_ERROR = 500
+_SUCCESS = range(200, 300)
 
 
 class McpTransport(Protocol):
@@ -53,9 +122,65 @@ class McpTransport(Protocol):
         """Send one JSON-RPC request and return its `result`."""
         raise NotImplementedError
 
+    def notify(self, method: str) -> None:
+        """Send one JSON-RPC notification, which nothing answers."""
+        raise NotImplementedError
+
     def close(self) -> None:
         """Release whatever this transport holds, stopping a process if it started one."""
         raise NotImplementedError
+
+
+class ConversationRefused(HTTPError):  # noqa: N818 — named for what the run meets
+    """A status the server gave this one request: not the target's failure, and not retried.
+
+    It keeps the reply, so a later reader is handed the same failure without a second request.
+    """
+
+    def __init__(self, reply: RawReply, ref: str) -> None:
+        super().__init__(ref, reply.status, _reason(reply.status), _message(reply), _quoted(reply))
+        self.reply = reply
+
+
+class IncompleteListing(McpError):  # noqa: N818 — named for what the run meets
+    """A listing that could not be read to its last page, or holds an entry that is no tool.
+
+    Never read as a shorter manifest: a later page or a malformed entry is exactly the
+    part of the server nobody examined.
+    """
+
+
+class SessionExpired(HTTPError):  # noqa: N818 — named for what the run meets
+    """A `404` to a request carrying a session id: the `2025-11-25` binding says open a new one.
+
+    Raised once per run; a second `404` is the target's failure. Left uncaught, it is
+    still the `404` it carries.
+    """
+
+
+@dataclass(frozen=True, slots=True)
+class Opening:
+    """What a server answered `initialize` with: its revision, its declarations, its identity.
+
+    The conversation's opening is made with the operator's credential when one is
+    configured. A modern conversation has none: `server/discover` carries the same facts.
+    """
+
+    version: str | None
+    capabilities: Mapping[str, object] | None = None
+    server_info: Mapping[str, object] | None = None
+
+
+def opening_in(result: Mapping[str, object]) -> Opening:
+    """Read an `initialize` result into an opening, keeping only what is well formed."""
+    version = result.get("protocolVersion")
+    capabilities = result.get("capabilities")
+    info = result.get("serverInfo")
+    return Opening(
+        version=version if isinstance(version, str) else None,
+        capabilities=capabilities if isinstance(capabilities, Mapping) else None,
+        server_info=info if isinstance(info, Mapping) else None,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,20 +257,32 @@ class Negotiation:
         return self.wire.era
 
     @property
+    def settled_version(self) -> str | None:
+        """The revision the run settled on, or None while the era is still open.
+
+        Settled once the server confirmed a revision, or once a modern wire was chosen
+        from what it listed. From then on a refusal of that revision is the server
+        changing under the run, never a reason to settle again.
+        """
+        if self.agreed is not None:
+            return self.agreed
+        if self.unsupported is None and self.wire.era is Era.MODERN and self.supported_versions:
+            return self.wire.version
+        return None
+
+    @property
     def legacy_wire(self) -> Wire | None:
-        """How to address the handshake era of this server, or None when it has none.
+        """How to address the handshake era of this server, or None when that is not yet known.
 
         A **dual-era** server is why this is not simply "the era we negotiated". It
         answers `server/discover`, so the conversation settles as modern and has no
         session — while the same server still hands one to every legacy client it
-        serves. An observation about sessions has to be bought where sessions
-        exist, or a counter for session ids goes unseen on exactly the servers
-        running through a migration.
+        serves. Only `2025-11-25` is spoken there; a server whose discovery listed no
+        such revision is asked by the legacy probe instead of being read as modern-only.
         """
         if self.wire.era is Era.LEGACY:
-            return self.wire
-        version = newest_legacy(self.supported_versions)
-        return Wire(era=Era.LEGACY, version=version) if version else None
+            return LEGACY_WIRE
+        return LEGACY_WIRE if LEGACY_VERSION in self.supported_versions else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,13 +306,29 @@ class McpConversation:
 
 
 class HttpMcpTransport:
-    """Talks JSON-RPC to a streamable-HTTP MCP server. Starts nothing."""
+    """Talks JSON-RPC to a streamable-HTTP MCP server. Starts nothing.
 
-    def __init__(self, url: str, *, credential: str | None = None, send: Sender = send) -> None:
+    Every reply is read here, once, into an answer or into the failure it stands for:
+    a server that did not answer, refused the operator's credential, failed, or sent
+    something that is not JSON-RPC stops the run; a status about this one request is
+    that request's failure; a JSON-RPC error is an answer.
+    """
+
+    def __init__(
+        self,
+        url: str,
+        *,
+        credential: str | None = None,
+        send: Sender = send,
+        on_session: Callable[[str], None] | None = None,
+    ) -> None:
         self._url = url
+        self._ref = display_url(url)
         self._credential = credential
         self._send = send
+        self._on_session = on_session
         self._session: str | None = None
+        self._reopened = False
         self._wire = PROBE_WIRE
         # Validate by sending nothing: a bad scheme has to fail when the target is
         # built, not on the first request, so `guardana plan` refuses it too.
@@ -201,27 +354,93 @@ class HttpMcpTransport:
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         """Send one JSON-RPC request and return its `result`."""
-        reply = self._send(
-            self._url, body=self._wire.body(method, params), headers=self.headers(method)
-        )
-        issued = reply.header("Mcp-Session-Id")
-        if issued and self._wire.era is Era.LEGACY:
-            self._session = issued
-        if reply.status >= _HTTP_ERROR:
-            raise _http_failure(reply, self._url)
-        return result_of(reply.body, self._url)
+        reply = self._post(self._wire.body(method, params, request_id=_HTTP_REQUEST_ID), method)
+        self._raise_for(reply)
+        return self._result_of(reply)
+
+    def notify(self, method: str) -> None:
+        """Send one notification; any success status is its whole answer."""
+        self._raise_for(self._post(self._wire.notification(method), method))
 
     def close(self) -> None:
         """Nothing to release: every call is its own request."""
 
+    def _post(self, body: bytes, method: str) -> RawReply:
+        try:
+            reply = self._send(self._url, body=body, headers=self.headers(method))
+        except (RedirectRefusedError, AddressRefusedError):
+            raise
+        except McpError as exc:
+            raise EndpointUnreachable(
+                f"the MCP server at {self._ref} did not answer: {exc}"
+            ) from exc
+        issued = reply.header("Mcp-Session-Id")
+        if issued:
+            if self._on_session is not None:
+                self._on_session(issued)
+            if self._wire.era is Era.LEGACY:
+                self._session = issued
+        return reply
+
+    def _raise_for(self, reply: RawReply) -> None:
+        """Raise what an error status stands for; return for a success status."""
+        status = reply.status
+        if status in _CREDENTIAL_STATUSES and self._credential is not None:
+            raise http_failure(reply, self._ref)
+        error = error_member(_payload(reply, _HTTP_REQUEST_ID))
+        if error is not None:
+            if status in _SUCCESS:
+                message = f"MCP server at {self._ref} returned an error: {dict(error)!r}"
+            else:
+                message = f"MCP server at {self._ref} answered HTTP {status}"
+            raise error_from(message, error)
+        if status in REFUSAL_STATUSES:
+            raise McpError(f"MCP server at {self._ref} answered HTTP {status}")
+        if status == _NOT_FOUND and self._session is not None and not self._reopened:
+            self._reopened = True
+            self._session = None
+            raise SessionExpired(
+                self._ref, status, _reason(status), _message(reply), _quoted(reply)
+            )
+        if status in _TARGET_STATUSES or status >= _SERVER_ERROR:
+            raise http_failure(reply, self._ref)
+        if status >= _CLIENT_ERROR:
+            raise ConversationRefused(reply, self._ref)
+        if status not in _SUCCESS:
+            raise unreadable(reply, self._ref)
+
+    def _result_of(self, reply: RawReply) -> Mapping[str, object]:
+        payload = _payload(reply, _HTTP_REQUEST_ID)
+        result = payload.get("result") if payload is not None else None
+        if not isinstance(result, dict):
+            raise unreadable(reply, self._ref)
+        return completed(result, self._ref)
+
 
 class StdioMcpTransport:
-    """Talks JSON-RPC to a server this process **starts**. Executes the thing under test."""
+    """Talks JSON-RPC to a server this process **starts**. Executes the thing under test.
 
-    def __init__(self, command: Sequence[str]) -> None:
+    A reply is read in bounded chunks against a deadline: the child is the code under
+    examination, so a line without end or a reply that never comes has to cost a
+    bounded amount of memory and time. Each request carries its own id, and a line
+    answering another one is discarded, so a reply that arrived late is never read as
+    the answer to the request after it. A line carrying `method` is the server asking
+    or notifying, whatever id it carries: a request is answered — `ping` with an empty
+    result, anything else as an unknown method, so a server waiting on its own request
+    is never left to stall — and a notification is skipped.
+    """
+
+    def __init__(
+        self, command: Sequence[str], *, timeout: float = TIMEOUT_SECONDS, ref: str = "stdio"
+    ) -> None:
         if not command:
             raise McpError("an stdio MCP server needs a command to run")
         self._wire = PROBE_WIRE
+        self._timeout = timeout
+        self._ref = ref
+        self._pending = bytearray()
+        self._broken: str | None = None
+        self._last_id = 0
         try:
             # S603: the command comes from the operator, who had to pass
             # --allow-exec to get here; there is no shell and no interpolation.
@@ -230,28 +449,188 @@ class StdioMcpTransport:
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
-                text=True,
             )
         except OSError as exc:
-            raise McpError(f"could not start MCP server {command[0]!r}: {exc}") from exc
+            raise EndpointUnreachable(f"could not start MCP server {command[0]!r}: {exc}") from exc
+        if self._process.stdin is not None:
+            os.set_blocking(self._process.stdin.fileno(), False)
 
     def speak(self, wire: Wire) -> None:
         """Adopt the negotiated revision for every later request."""
         self._wire = wire
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
-        """Write one JSON-RPC line and read the reply line."""
-        if self._process.stdin is None or self._process.stdout is None:
-            raise McpError("MCP server process has no usable pipes")
+        """Write one JSON-RPC line and read lines until the one answering it, in one deadline."""
+        self._last_id += 1
+        asked = self._last_id
+        deadline = time.monotonic() + self._timeout
+        self._write(self._wire.body(method, params, request_id=asked), deadline)
+        stale = 0
+        answered = 0
+        while stale <= _STALE_LINES:
+            payload = self._read_payload(deadline)
+            if "method" in payload:
+                if "id" in payload:
+                    answered += 1
+                    if answered > _SERVER_REQUESTS:
+                        raise self._fail(
+                            UnreadableReply(
+                                f"the MCP server at {self._ref} made more than "
+                                f"{_SERVER_REQUESTS} requests of its own while one was waiting "
+                                f"for its reply"
+                            )
+                        )
+                    self._answer(payload, deadline)
+                continue
+            if payload.get("id") != asked:
+                stale += 1
+                continue
+            error = error_member(payload)
+            if error is not None:
+                raise error_from(
+                    f"MCP server at {self._ref} returned an error: {dict(error)!r}", error
+                )
+            result = payload.get("result")
+            if not isinstance(result, dict):
+                raise UnreadableReply(
+                    f"the MCP server at {self._ref} sent a reply that is not JSON-RPC: it holds "
+                    f"neither a result object nor an error"
+                )
+            return completed(result, self._ref)
+        raise self._fail(
+            UnreadableReply(
+                f"the MCP server at {self._ref} sent more than {_STALE_LINES} lines answering "
+                f"no request it was asked"
+            )
+        )
+
+    def notify(self, method: str) -> None:
+        """Write one notification line; nothing is read for it."""
+        self._write(self._wire.notification(method), time.monotonic() + self._timeout)
+
+    def _answer(self, asked: Mapping[str, object], deadline: float) -> None:
+        """Answer one of the server's own requests: `ping` with `{}`, anything else as unknown."""
+        asked_id = asked.get("id")
+        reflectable = isinstance(asked_id, int) and not isinstance(asked_id, bool)
+        if isinstance(asked_id, str):
+            reflectable = len(asked_id) <= _MAX_REFLECTED_ID_CHARS
+        if not reflectable:
+            raise self._fail(
+                UnreadableReply(
+                    f"the MCP server at {self._ref} made a request whose id is neither an "
+                    f"integer nor a string of at most {_MAX_REFLECTED_ID_CHARS} characters"
+                )
+            )
+        answer: dict[str, object] = {"jsonrpc": "2.0", "id": asked_id}
+        if asked.get("method") == "ping":
+            answer["result"] = {}
+        else:
+            answer["error"] = {"code": _METHOD_NOT_FOUND, "message": "Method not found"}
+        self._write(json.dumps(answer).encode("utf-8"), deadline)
+
+    def _write(self, line: bytes, deadline: float) -> None:
+        """Write one line by `deadline` on the non-blocking pipe, or give up on the stream.
+
+        A server that stops reading its input fills the pipe, and a blocking write would
+        then wait for it past any deadline. A line cut short leaves the stream with no
+        known boundary, so a missed deadline ends the conversation.
+        """
+        stdin = self._process.stdin
+        if stdin is None or self._process.stdout is None:
+            raise EndpointUnreachable(f"the MCP server at {self._ref} has no usable pipes")
+        if self._broken is not None:
+            raise UnreadableReply(self._broken)
+        pending = memoryview(line + b"\n")
         try:
-            self._process.stdin.write(self._wire.body(method, params).decode("utf-8") + "\n")
-            self._process.stdin.flush()
-            reply = self._process.stdout.readline()
+            with selectors.DefaultSelector() as selector:
+                selector.register(stdin.fileno(), selectors.EVENT_WRITE)
+                while pending:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0 or not selector.select(remaining):
+                        message = (
+                            f"the MCP server at {self._ref} did not read its input within "
+                            f"{self._timeout} seconds"
+                        )
+                        self._broken = message
+                        raise EndpointUnreachable(message)
+                    try:
+                        pending = pending[os.write(stdin.fileno(), pending) :]
+                    except BlockingIOError:
+                        continue
         except OSError as exc:
-            raise McpError(f"MCP server stopped responding: {exc}") from exc
-        if not reply:
-            raise McpError("MCP server closed its output without answering")
-        return result_of(reply.encode("utf-8"), "stdio")
+            raise EndpointUnreachable(
+                f"the MCP server at {self._ref} did not answer: {exc}"
+            ) from exc
+
+    def _read_payload(self, deadline: float) -> Mapping[str, object]:
+        """Read the next line as a JSON object, or raise what its absence or shape stands for."""
+        if self._process.stdout is None:
+            raise EndpointUnreachable(f"the MCP server at {self._ref} has no usable pipes")
+        try:
+            line = self._read_line(self._process.stdout.fileno(), deadline)
+        except OSError as exc:
+            raise EndpointUnreachable(
+                f"the MCP server at {self._ref} did not answer: {exc}"
+            ) from exc
+        if line is None:
+            raise EndpointUnreachable(
+                f"the MCP server at {self._ref} did not answer: it closed its output"
+            )
+        try:
+            payload = json.loads(line)
+        except ValueError:
+            payload = None
+        if not isinstance(payload, dict):
+            raise self._fail(
+                UnreadableReply(
+                    f"the MCP server at {self._ref} sent a line that is not JSON-RPC "
+                    f"({len(line)} bytes)"
+                )
+            )
+        return payload
+
+    def _read_line(self, fd: int, deadline: float) -> bytes | None:
+        """Read one line from the child, or None when it closed its output first.
+
+        Raw reads on the descriptor, never the buffered pipe: a buffered read would
+        block past the deadline, and bytes it buffered would be invisible here.
+        Whatever follows the newline is kept for the next read, and so is a partial
+        line when the deadline passes: a late reply is read and discarded later
+        rather than the stream being given up.
+        """
+        buffered = self._pending
+        with selectors.DefaultSelector() as selector:
+            selector.register(fd, selectors.EVENT_READ)
+            while (end := buffered.find(b"\n")) < 0:
+                if len(buffered) > MAX_RESPONSE_BYTES:
+                    raise self._fail(UnreadableReply(self._too_long()))
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 or not selector.select(remaining):
+                    raise EndpointUnreachable(
+                        f"the MCP server at {self._ref} did not answer: no complete reply "
+                        f"within {self._timeout} seconds"
+                    )
+                chunk = os.read(fd, min(_READ_CHUNK, MAX_RESPONSE_BYTES + 1 - len(buffered)))
+                if not chunk:
+                    return None
+                buffered += chunk
+        if end > MAX_RESPONSE_BYTES:
+            raise self._fail(UnreadableReply(self._too_long()))
+        line = bytes(buffered[:end])
+        self._pending = buffered[end + 1 :]
+        return line
+
+    def _fail(self, error: UnreadableReply) -> UnreadableReply:
+        """Give up on the stream: after an unreadable line, nobody knows where a reply starts."""
+        self._broken = str(error)
+        self._pending = bytearray()
+        return error
+
+    def _too_long(self) -> str:
+        return (
+            f"the MCP server at {self._ref} sent a reply line that exceeds "
+            f"{MAX_RESPONSE_BYTES} bytes; refusing it"
+        )
 
     def close(self) -> None:
         """Stop the server we started; a scanner must not leave a process behind.
@@ -301,6 +680,14 @@ class MeteredTransport:
             # a bill that only counts successes understates what the target was sent.
             self._meter.record(None)
 
+    def notify(self, method: str) -> None:
+        """Claim room for a notification too: the server receives it as a request."""
+        self._meter.reserve()
+        try:
+            self._inner.notify(method)
+        finally:
+            self._meter.record(None)
+
     def close(self) -> None:
         """Close the transport underneath."""
         self._inner.close()
@@ -320,14 +707,18 @@ def negotiate(transport: McpTransport) -> Negotiation:
     era-ambiguous, so that route would take a tool list from a legacy server and
     record `2026-07-28` in the run manifest. One request is cheaper than a coverage
     claim no server agreed to.
+
+    Whatever else the probe meets falls back to the handshake, which asks again; a
+    spent budget is not caught, because it stops the run rather than answering.
     """
     transport.speak(PROBE_WIRE)
     try:
         discovered = transport.request(_DISCOVER, {})
     except McpProtocolError as exc:
         offered = exc.supported_versions()
-        return _modern(transport, offered, None) if offered else _fall_back(transport)
-    except McpError:
+        return modern(transport, offered, None) if offered else _fall_back(transport)
+    except (McpError, EndpointError, URLError, OSError) as exc:
+        close_http_error(exc)
         return _fall_back(transport)
     offered = _versions_in(discovered)
     if not offered:
@@ -335,10 +726,10 @@ def negotiate(transport: McpTransport) -> Negotiation:
         # framework answers unknown methods with an empty object rather than an
         # error. Fall back on the shape, not on a status code.
         return _fall_back(transport)
-    return _modern(transport, offered, discovered)
+    return modern(transport, offered, discovered)
 
 
-def _modern(
+def modern(
     transport: McpTransport, offered: tuple[str, ...], discovered: Mapping[str, object] | None
 ) -> Negotiation:
     """Choose a revision from what a modern server named, and adopt it."""
@@ -377,8 +768,14 @@ def _fall_back(transport: McpTransport) -> Negotiation:
     return Negotiation(wire=LEGACY_WIRE)
 
 
-def _open_the_handshake_era(transport: McpTransport, negotiation: Negotiation) -> Negotiation:
-    """Handshake, and re-settle the era when the answer says the server is modern after all.
+def open_era(
+    transport: McpTransport, negotiation: Negotiation
+) -> tuple[Negotiation, Opening | None]:
+    """Open the conversation when its era opens with `initialize`; return what it settled.
+
+    The opening is None when nothing was opened: a modern conversation, a revision
+    already agreed, or no revision in common. A handshake answered with a revision
+    other than `2025-11-25` settles the negotiation as unsupported, naming it.
 
     The discovery probe is not always conclusive: an authorization challenge says
     who may ask, not which protocol answers, so a protected server that refuses the
@@ -388,27 +785,136 @@ def _open_the_handshake_era(transport: McpTransport, negotiation: Negotiation) -
     modern server, and the client retries with a version it named rather than
     reporting a mismatch it has just been told how to fix.
     """
+    if (
+        negotiation.unsupported is not None
+        or negotiation.era is not Era.LEGACY
+        or negotiation.agreed is not None
+    ):
+        return negotiation, None
     try:
-        return replace(negotiation, agreed=initialize(transport))
+        opening = initialize(transport)
     except McpProtocolError as exc:
         offered = exc.supported_versions()
         if not offered:
             raise
-        return _modern(transport, offered, None)
+        return modern(transport, offered, None), None
+    refusal = handshake_refusal(opening.version)
+    if refusal is not None:
+        return replace(negotiation, unsupported=refusal), opening
+    return replace(negotiation, agreed=opening.version), opening
 
 
-def initialize(transport: McpTransport) -> str | None:
-    """Open a legacy conversation and return the revision the *server* answered with."""
-    result = transport.request(
-        "initialize",
-        {
-            "protocolVersion": LEGACY_WIRE.version,
-            "capabilities": {},
-            "clientInfo": {"name": "guardana", "version": "0"},
-        },
+def initialize(transport: McpTransport) -> Opening:
+    """Open a legacy conversation and return what the *server* answered it with."""
+    return opening_in(
+        transport.request(
+            "initialize",
+            {
+                "protocolVersion": LEGACY_WIRE.version,
+                "capabilities": {},
+                "clientInfo": {"name": "guardana", "version": "0"},
+            },
+        )
     )
-    agreed = result.get("protocolVersion")
-    return agreed if isinstance(agreed, str) else None
+
+
+def settled_request(  # noqa: PLR0913 — the conversation, the request, and its announcement
+    transport: McpTransport,
+    negotiation: Negotiation,
+    ref: str,
+    method: str,
+    params: Mapping[str, object],
+    *,
+    announce: bool = False,
+) -> Mapping[str, object]:
+    """Send one request of a settled conversation, opening a new session once if it expired.
+
+    `announce` sends `notifications/initialized` first, for a handshake just accepted.
+    A refusal of the settled revision is the server changing under the run, raised as
+    `TargetChanged`; so is a new session answered in another revision.
+    """
+    agreed = negotiation.settled_version
+    try:
+        try:
+            if announce:
+                transport.notify(INITIALIZED)
+            return transport.request(method, params)
+        except SessionExpired as expired:
+            close_http_error(expired)
+            _reopen(transport, agreed, ref)
+            return transport.request(method, params)
+    except McpProtocolError as exc:
+        _stop_if_changed(exc, agreed, ref)
+        raise
+
+
+def announce_opening(transport: McpTransport, negotiation: Negotiation, ref: str) -> None:
+    """Announce an accepted handshake, opening a new session once if it expired.
+
+    The same once-per-run re-open, and the same stop for a changed revision, as
+    `settled_request`.
+    """
+    agreed = negotiation.settled_version
+    try:
+        try:
+            transport.notify(INITIALIZED)
+        except SessionExpired as expired:
+            close_http_error(expired)
+            _reopen(transport, agreed, ref)
+    except McpProtocolError as exc:
+        _stop_if_changed(exc, agreed, ref)
+        raise
+
+
+def _reopen(transport: McpTransport, agreed: str | None, ref: str) -> None:
+    """Open and announce a new session for one that expired; a new revision stops the run."""
+    opening = initialize(transport)
+    if handshake_refusal(opening.version) is not None and agreed is not None:
+        answered = (opening.version,) if opening.version else ()
+        raise changed(ref, agreed, answered) from None
+    transport.notify(INITIALIZED)
+
+
+def _stop_if_changed(exc: McpProtocolError, agreed: str | None, ref: str) -> None:
+    """Raise `TargetChanged` when `exc` refuses the agreed revision; return otherwise."""
+    if exc.code == UNSUPPORTED_PROTOCOL_VERSION and agreed is not None:
+        raise changed(ref, agreed, exc.supported_versions()) from exc
+
+
+def list_manifest(
+    transport: McpTransport, negotiation: Negotiation, ref: str, *, announce: bool
+) -> McpConversation:
+    """List the tools over a settled conversation, announcing an accepted handshake first.
+
+    Refuses before sending when there is no shared revision. A `tools/list` written
+    for a version the server rejected would come back as an error whose message is
+    about the request rather than about the mismatch, and a rule reading that would
+    report a server it could not reach instead of one it could not speak to.
+    """
+    if negotiation.unsupported is not None:
+        raise McpError(negotiation.unsupported)
+    first = settled_request(transport, negotiation, ref, "tools/list", {}, announce=announce)
+    tools, cache = read_listing(
+        first,
+        lambda cursor: settled_request(
+            transport, negotiation, ref, "tools/list", {"cursor": cursor}
+        ),
+        ref,
+    )
+    return McpConversation(negotiation=negotiation, tools=tools, cache=cache)
+
+
+def changed(ref: str, agreed: str, offered: Sequence[str]) -> TargetChanged:
+    """Build the stop for a server that dropped the revision the run agreed with it."""
+    if offered:
+        return TargetChanged(
+            f"the MCP server at {ref} stopped accepting revision {agreed} during the run; "
+            f"it now offers {', '.join(offered)}"
+        )
+    return TargetChanged(
+        f"the MCP server at {ref} stopped accepting revision {agreed} during the run and "
+        f"named no revision it offers"
+    )
 
 
 def _no_common(offered: tuple[str, ...]) -> str:
@@ -431,18 +937,15 @@ def _capabilities_in(result: Mapping[str, object] | None) -> Mapping[str, object
     return declared if isinstance(declared, Mapping) else None
 
 
-def open_conversation(transport: McpTransport) -> McpConversation:
+def open_conversation(transport: McpTransport, ref: str = "mcp") -> McpConversation:
     """Settle the revision and read the manifest, which is everything a run needs from one."""
-    return read_manifest(transport, negotiate(transport))
+    return read_manifest(transport, negotiate(transport), ref)
 
 
-def read_manifest(transport: McpTransport, negotiation: Negotiation) -> McpConversation:
+def read_manifest(
+    transport: McpTransport, negotiation: Negotiation, ref: str = "mcp"
+) -> McpConversation:
     """Open the conversation if the era needs opening, and list the tools over it.
-
-    Refuses before sending when there is no shared revision. A `tools/list` written
-    for a version the server rejected would come back as an error whose message is
-    about the request rather than about the mismatch, and a rule reading that would
-    report a server it could not reach instead of one it could not speak to.
 
     The legacy handshake happens here rather than during negotiation because that is
     what it is for: a modern conversation needs no opening, and a run that never
@@ -450,35 +953,89 @@ def read_manifest(transport: McpTransport, negotiation: Negotiation) -> McpConve
     """
     if negotiation.unsupported is not None:
         raise McpError(negotiation.unsupported)
-    settled = negotiation
-    if settled.era is Era.LEGACY and settled.agreed is None:
-        settled = _open_the_handshake_era(transport, negotiation)
-    if settled.unsupported is not None:
-        raise McpError(settled.unsupported)
-    result = transport.request("tools/list", {})
-    return McpConversation(negotiation=settled, tools=tools_in(result), cache=cache_in(result))
+    settled, opening = open_era(transport, negotiation)
+    announce = opening is not None and settled.unsupported is None
+    return list_manifest(transport, settled, ref, announce=announce)
 
 
-def list_tools(transport: McpTransport) -> tuple[McpTool, ...]:
-    """Read every tool the server advertises, in the order it advertises them."""
-    return tools_in(transport.request("tools/list", {}))
+def list_tools(transport: McpTransport, ref: str = "mcp") -> tuple[McpTool, ...]:
+    """Read every tool the server advertises, on every page, in the order it advertises them."""
+    first = transport.request("tools/list", {})
+    tools, _ = read_listing(
+        first, lambda cursor: transport.request("tools/list", {"cursor": cursor}), ref
+    )
+    return tools
 
 
-def tools_in(result: Mapping[str, object]) -> tuple[McpTool, ...]:
-    """Read a `tools/list` result, skipping entries too malformed to name."""
+def read_listing(
+    first: Mapping[str, object], more: Callable[[str], Mapping[str, object]], ref: str
+) -> tuple[tuple[McpTool, ...], CacheHints]:
+    """Read a `tools/list` result and every page its `nextCursor` names, and the caching claims.
+
+    `more` asks for the page a cursor names. Bounded in pages and in bytes; a cursor that
+    repeats, a cursor that is not a string, a page that is no tool list and an entry that
+    is no tool declaration each raise `IncompleteListing` (or `McpError`), never a listing
+    cut short. A page any shared cache may serve makes the listing shareable.
+    """
+    tools: list[McpTool] = []
+    named: set[str] = set()
+    cache = cache_in(first)
+    page, number, size = first, 1, 0
+    asked: set[str] = set()
+    while True:
+        size += _size_of(page)
+        if size > MAX_LISTING_BYTES:
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed more than {MAX_LISTING_BYTES} bytes of tools "
+                f"by page {number}; the listing was not examined"
+            )
+        for tool in tools_in(page, ref, page_number=number):
+            if tool.name in named:
+                raise IncompleteListing(
+                    f"the MCP server at {ref} listed the tool {tool.name!r} more than once; "
+                    f"which declaration a client adopts is unknown, so none was examined"
+                )
+            named.add(tool.name)
+            tools.append(tool)
+        if number > 1:
+            cache = _widest(cache, cache_in(page))
+        cursor = _next_cursor(page, ref, number)
+        if cursor is None:
+            return tuple(tools), cache
+        if number >= MAX_LISTING_PAGES:
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed more than {MAX_LISTING_PAGES} pages of tools; "
+                f"the listing was not examined"
+            )
+        if cursor in asked:
+            raise IncompleteListing(
+                f"the MCP server at {ref} repeated a cursor on page {number} of its tool "
+                f"listing; the listing was not examined"
+            )
+        asked.add(cursor)
+        page = more(cursor)
+        number += 1
+
+
+def tools_in(
+    result: Mapping[str, object], ref: str = "mcp", *, page_number: int = 1
+) -> tuple[McpTool, ...]:
+    """Read one page of a `tools/list` result; an entry that is no tool declaration raises."""
     raw = result.get("tools")
     if not isinstance(raw, list):
-        raise McpError("MCP server did not return a tool list")
+        said = f"MCP server at {ref} did not return a tool list on page {page_number}"
+        raise IncompleteListing(said) if page_number > 1 else McpError(said)
     tools = []
-    for entry in raw:
-        if not isinstance(entry, dict):
-            continue
-        name = entry.get("name")
-        if not isinstance(name, str):
-            continue
+    for index, entry in enumerate(raw, start=1):
+        problem = _declaration_problem(entry)
+        if problem is not None or not isinstance(entry, dict):
+            raise IncompleteListing(
+                f"the MCP server at {ref} listed entry {index} on page {page_number} that is "
+                f"not a tool declaration ({problem}); the listing was not examined"
+            )
         tools.append(
             McpTool(
-                name=name,
+                name=entry["name"],
                 description=_text(entry, "description"),
                 title=_text(entry, "title"),
                 input_schema=_mapping(entry, "inputSchema"),
@@ -487,6 +1044,48 @@ def tools_in(result: Mapping[str, object]) -> tuple[McpTool, ...]:
             )
         )
     return tuple(tools)
+
+
+def _declaration_problem(entry: object) -> str | None:
+    """Say why `entry` is not a tool declaration, or None when it is one.
+
+    An optional field that is present must have its declared type: a description sent as
+    a list would otherwise be dropped from what is graded and from what a pin digests.
+    """
+    if not isinstance(entry, dict):
+        return "it is not an object"
+    if not isinstance(entry.get("name"), str):
+        return "its name is not text"
+    for key in ("description", "title"):
+        if entry.get(key) is not None and not isinstance(entry[key], str):
+            return f"its {key} is not text"
+    for key in ("inputSchema", "outputSchema", "annotations"):
+        if entry.get(key) is not None and not isinstance(entry[key], dict):
+            return f"its {key} is not an object"
+    return None
+
+
+def _next_cursor(page: Mapping[str, object], ref: str, number: int) -> str | None:
+    """Return the cursor naming the page after this one, or None when this is the last."""
+    cursor = page.get("nextCursor")
+    if cursor is None or isinstance(cursor, str):
+        return cursor
+    raise IncompleteListing(
+        f"the MCP server at {ref} sent a nextCursor on page {number} of its tool listing "
+        f"that is not a string; the listing was not examined"
+    )
+
+
+def _size_of(page: Mapping[str, object]) -> int:
+    """Count a page as the UTF-8 bytes of its JSON, the measure the one-reply ceiling uses."""
+    return len(json.dumps(page, ensure_ascii=False, default=str).encode("utf-8"))
+
+
+def _widest(kept: CacheHints, later: CacheHints) -> CacheHints:
+    """Keep the claims of the first page, unless a later one lets any shared cache serve it."""
+    if later.scope == _SHAREABLE_SCOPE:
+        return replace(kept, scope=later.scope)
+    return kept
 
 
 def cache_in(result: Mapping[str, object]) -> CacheHints:
@@ -503,44 +1102,74 @@ def carries_tools(reply: RawReply) -> bool | None:
     """Say whether this reply is a tool listing — or None when nobody could tell.
 
     Three answers, not two. `True` is a manifest the caller received. `False` is a
-    refusal: a non-`200`, or a `200` carrying a JSON-RPC error, both of which are
-    the server declining on purpose. `None` is a `200` nobody could read as either —
-    an unparseable body, a reply with no result at all, or an interim result asking
-    for input. Folding those into `False` reported a server nobody could read as a
-    server that refused, which is a pass on a question that was never answered.
+    refusal: a `401` or `403`, the server declining on purpose. `None` is everything
+    nobody could read as either — any other error status (`429`, `500`, `503` say the
+    server never got as far as deciding), a success status carrying a JSON-RPC error
+    (`-32603` is the server failing, and no code is reserved for a refusal), an
+    unparseable body, a reply with no result at all, a result holding no `tools` list,
+    or an interim result asking for input. Folding those into `False` would report a
+    server nobody could read as a server that refused, which is a pass on a question
+    that was never answered.
     """
-    if reply.status != 200:  # noqa: PLR2004 — the HTTP success boundary
+    if reply.status in REFUSAL_STATUSES:
         return False
+    if not 200 <= reply.status < 300:  # noqa: PLR2004 — the HTTP success range
+        return None
     payload = reply.json_object()
     if payload is None:
         return None
     if payload.get("error") is not None:
-        return False
+        return None
     result = payload.get("result")
     if not isinstance(result, dict) or result.get("resultType", COMPLETE) != COMPLETE:
         return None
-    return isinstance(result.get("tools"), list)
+    return True if isinstance(result.get("tools"), list) else None
 
 
-def _http_failure(reply: RawReply, ref: str) -> McpError:
-    """Build the exception for an error status, keeping a JSON-RPC error in the body.
+def http_failure(reply: RawReply, ref: str) -> HTTPError:
+    """Build the `HTTPError` an error status stands for, as an endpoint's would read.
 
-    A modern server answers `400` for an unsupported version, a missing client
-    capability and a header mismatch alike, and the body is the only thing that
-    tells them apart — which is also how a client decides whether the server is
-    modern at all. Discarding it on the status alone is what made every one of
-    those look like a server that could not be reached.
+    The body is kept, cut short, so a message can quote where the server said what
+    it refused; the headers travel as an `HTTPMessage`, as urllib's own would.
     """
-    message = f"MCP server at {ref} answered HTTP {reply.status}"
-    payload = reply.json_object()
-    error = payload.get("error") if payload is not None else None
-    return error_from(message, error) if error is not None else McpError(message)
+    return HTTPError(ref, reply.status, _reason(reply.status), _message(reply), _quoted(reply))
+
+
+def unreadable(reply: RawReply, ref: str) -> UnreadableReply:
+    """Build the stop for a reply that is not JSON-RPC, naming only its status and size."""
+    return UnreadableReply(
+        f"the MCP server at {ref} sent a reply that is not JSON-RPC "
+        f"(HTTP {reply.status}, {len(reply.body)} bytes)"
+    )
+
+
+def _payload(reply: RawReply, answering: int) -> Mapping[str, object] | None:
+    """Parse the reply to request `answering` as a JSON object, or None when there is none."""
+    return reply.json_object(answering)
+
+
+def _reason(status: int) -> str:
+    try:
+        return HTTPStatus(status).phrase
+    except ValueError:
+        return ""
+
+
+def _message(reply: RawReply) -> HTTPMessage:
+    headers = HTTPMessage()
+    for name, value in reply.headers.items():
+        headers[name] = value
+    return headers
+
+
+def _quoted(reply: RawReply) -> BytesIO:
+    return BytesIO(reply.body[:_QUOTED_BODY_BYTES])
 
 
 def _reject_unusable_scheme(url: str) -> None:
     scheme = urlsplit(url).scheme
     if scheme not in ("http", "https"):
-        raise McpError(f"unsupported MCP URL scheme {scheme!r} in {url!r}: expected http(s)")
+        raise McpError("the MCP server URL needs an http or https scheme")
 
 
 def _text(entry: Mapping[str, object], key: str) -> str:

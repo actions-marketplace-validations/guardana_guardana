@@ -1,0 +1,6 @@
+# The stand-in model answers only from documents and orders, so only the two checks over
+# seeded data say anything about it.
+rules:
+  include:
+    - guardana.tenancy.cross_tenant_answer
+    - guardana.retrieval.poisoned_document

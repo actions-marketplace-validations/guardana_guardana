@@ -22,6 +22,8 @@ from guardana.core.report import Evidence, Finding, StopReason
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, ChatMessage, EndpointTarget, Target, TargetKind
+from guardana.core.target.connection import Connection as Written
+from guardana.core.target.connection import resolve_connection
 
 _CEILING = 4
 
@@ -90,7 +92,7 @@ def test_the_request_ceiling_bounds_every_pass_of_one_probe_together() -> None:
         result = run_probe(
             _registry(),
             Profile(name="t", policy=Policy(), budgets=Budgets(max_requests=_CEILING)),
-            Connection(url="http://model.invalid", model="m"),
+            Connection(resolve_connection(Written("http://model.invalid", "m"), sending=False)),
         )
     finally:
         _endpoint.transport_factory = None
@@ -110,7 +112,7 @@ def test_the_manifest_reports_what_the_whole_probe_spent_exactly_once() -> None:
         result = run_probe(
             _registry(),
             Profile(name="t", policy=Policy(), budgets=Budgets(max_requests=_CEILING)),
-            Connection(url="http://model.invalid", model="m"),
+            Connection(resolve_connection(Written("http://model.invalid", "m"), sending=False)),
         )
     finally:
         _endpoint.transport_factory = None

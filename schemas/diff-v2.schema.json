@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://guardana.dev/schemas/diff/v2.schema.json",
-  "title": "Guardana Run Comparison v1",
+  "title": "Guardana Run Comparison v2",
   "description": "What changed between two saved runs. Versioned separately from a run: a comparison and a run are different documents, and tying them together would force one to move because the other did.",
   "type": "object",
   "required": [

@@ -1,28 +1,32 @@
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from urllib.parse import urlsplit
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
-from guardana.core.safety import Impact
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import (
     Capability,
     Document,
     McpAuthorizationView,
     TargetKind,
+    display_url,
     same_origin,
 )
 from guardana.core.taxonomy import OWASP_ASI03_2026, OWASP_MCP01_2025, OWASP_MCP07_2025
-from guardana.rules.mcp._base import McpAuthorizationRule
+from guardana.rules.mcp import _samples
+from guardana.rules.mcp._base import McpAuthorizationRule, further_issuers
 
 _PKCE_METHOD = "S256"
+_HTTP_ERROR = 400
 
 
 class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
     """A protected MCP server whose authorization surface no conforming client can use.
 
-    Four requirements, each a `MUST` in the MCP authorization specification and each
-    checkable without a credential:
+    Five requirements, each a `MUST` in the MCP authorization specification or the
+    RFCs it cites, and each checkable without a credential:
 
     - the server implements OAuth 2.0 Protected Resource Metadata (RFC 9728) and
       publishes it through the `WWW-Authenticate` challenge or a well-known URI;
@@ -32,11 +36,20 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
       tokens for the wrong audience;
     - the authorization server advertises `code_challenge_methods_supported`, which
       a client **must refuse to proceed** without, since that field is the only way
-      PKCE support can be discovered.
+      PKCE support can be discovered;
+    - the authorization server's metadata names, as its `issuer`, exactly the entry
+      its well-known address was built from (RFC 8414 §2 and §3.3): a client must not
+      use a document that names no issuer or another one. Compared as strings, with no
+      normalization, as the RFC compares them.
 
-    It says nothing about a server that answered an anonymous caller: there is no
-    protected resource there, and `guardana.mcp.unauthenticated_access` is the rule
-    with something to report.
+    Only a `404` or `410` reads as a document not published. A metadata address that
+    answered any other error status said nothing about the document, so the rule declines.
+    Only the first authorization server the document names is fetched, so the rule also
+    declines for every further one: what those advertise was never read.
+
+    It declines on a server that answered an anonymous caller: discovery is never
+    attempted there, so whatever surface it publishes went unread, and
+    `guardana.mcp.unauthenticated_access` is the rule that reports the open server.
     """
 
     meta = RuleMeta(
@@ -47,14 +60,62 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
         taxonomy=(OWASP_MCP07_2025, OWASP_MCP01_2025, OWASP_ASI03_2026),
         required_capabilities=frozenset({Capability.INSPECT_AUTHORIZATION}),
         impact=Impact.ACTIVE,
+        detection=Detection.INVARIANT,
     )
 
     claim = "whether its authorization surface is one a client can use was not established"
 
     @property
     def estimated_requests(self) -> int:
-        """The discovery probe, the anonymous pair, then the documented attempts per document."""
-        return 9
+        """The discovery probe, the anonymous three, then six documented metadata attempts."""
+        return 10
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample an unpublished surface, a conforming one, and three left unread."""
+        unsafe_issuer = {
+            **_samples.RESOURCE_METADATA,
+            "authorization_servers": [_samples.UNSAFE_ADDRESS],
+        }
+        return materialise(
+            (
+                _samples.sample(
+                    "a gated server publishing no protected resource metadata",
+                    FixtureOutcome.FINDING,
+                    lambda: _samples.target(
+                        _samples.protected_server(resource_metadata=None),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "a gated server publishing a conforming discovery chain",
+                    FixtureOutcome.CLEAN,
+                    lambda: _samples.target(
+                        _samples.protected_server(), credential=_samples.CREDENTIAL
+                    ),
+                ),
+                _samples.sample(
+                    "an authorization server named at an address a client must not fetch",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(
+                        _samples.protected_server(resource_metadata=unsafe_issuer),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "protected resource metadata answering 503",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(
+                        _samples.protected_server(resource_metadata_status=503),
+                        credential=_samples.CREDENTIAL,
+                    ),
+                ),
+                _samples.sample(
+                    "a server answering an anonymous caller",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(_samples.open_server()),
+                ),
+            )
+        )
 
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Walk the discovery chain and report the first requirement that is not met."""
@@ -63,6 +124,7 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
             yield blocked
             return
         if view.anonymous.open_to_anyone:
+            yield self.metadata_not_fetched(view)
             return
         resource = view.protected_resource
         if resource is None:
@@ -84,29 +146,44 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
             return
         yield from self._resource_document(view, resource)
         yield from self._authorization_server(view)
+        yield from self._further_issuers(view)
+
+    def _further_issuers(self, view: McpAuthorizationView) -> Iterator[Finding]:
+        """Decline for every authorization server named after the first: none is read."""
+        further = further_issuers(view)
+        if further:
+            named = ", ".join(display_url(issuer) for issuer in further)
+            yield self.unverified(
+                view,
+                f"the protected resource metadata names further authorization servers "
+                f"({named}) whose metadata this run did not fetch, so whether they "
+                f"advertise {_PKCE_METHOD} PKCE and identify their issuer was never seen",
+            )
 
     def _resource_document(
         self, view: McpAuthorizationView, resource: Document
     ) -> Iterator[Finding]:
         content = resource.content or {}
+        address = display_url(resource.url)
         issuers = content.get("authorization_servers")
         if not isinstance(issuers, list) or not [i for i in issuers if isinstance(i, str) and i]:
             yield self.finding(
                 view,
-                f"the protected resource metadata at {resource.url} names no authorization "
+                f"the protected resource metadata at {address} names no authorization "
                 f"server, which RFC 9728 requires and without which no client can obtain a token",
             )
         declared = content.get("resource")
         if not isinstance(declared, str) or not declared:
             yield self.finding(
                 view,
-                f"the protected resource metadata at {resource.url} declares no 'resource', "
+                f"the protected resource metadata at {address} declares no 'resource', "
                 f"so a client has no canonical identifier to bind a token to",
             )
         elif _different_origin(declared, view.server):
+            shown = display_url(declared)
             yield self.finding(
                 view,
-                f"the protected resource metadata declares resource {declared!r}, which is a "
+                f"the protected resource metadata declares resource {shown!r}, which is a "
                 f"different origin from the server under test; a token bound to it would not "
                 f"be bound to this server",
             )
@@ -124,11 +201,12 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
         if not document.readable:
             yield from self._unreadable(view, document, "authorization server metadata")
             return
+        yield from self._issuer(view, document)
         methods = _methods(document.content)
         if not methods:
             yield self.finding(
                 view,
-                f"the authorization server metadata at {document.url} advertises no "
+                f"the authorization server metadata at {display_url(document.url)} advertises no "
                 f"'code_challenge_methods_supported', which a conforming MCP client treats as "
                 f"no PKCE support and must refuse to proceed against",
             )
@@ -137,6 +215,33 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
                 view,
                 f"the authorization server advertises PKCE methods {sorted(methods)} without "
                 f"{_PKCE_METHOD!r}, which OAuth 2.1 requires of a client that can do it",
+            )
+
+    def _issuer(self, view: McpAuthorizationView, document: Document) -> Iterator[Finding]:
+        """Report a metadata document whose `issuer` is not the entry it was fetched for."""
+        address = display_url(document.url)
+        named = _named_issuer(view.protected_resource)
+        if named is None:
+            yield self.unverified(
+                view,
+                f"the authorization server metadata at {address} was read without an issuer "
+                f"named to fetch it for, so its issuer could not be compared",
+            )
+            return
+        issuer = (document.content or {}).get("issuer")
+        if not isinstance(issuer, str):
+            yield self.finding(
+                view,
+                f"the authorization server metadata at {address} names no issuer, which "
+                f"RFC 8414 requires; a client must not use it",
+            )
+            return
+        if issuer != named:
+            yield self.finding(
+                view,
+                f"the authorization server metadata at {address} names issuer "
+                f"{display_url(issuer)!r}, not {display_url(named)!r} it was fetched for; "
+                f"RFC 8414 says a client must not use it",
             )
 
     def _refused_issuer(self, view: McpAuthorizationView) -> Iterator[Finding]:
@@ -150,16 +255,22 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
         issuer = _named_issuer(view.protected_resource)
         if issuer is None:
             return
-        host = urlsplit(issuer).hostname
+        host = _hostname(issuer)
         refused = next(
-            (d for d in view.refused_addresses if urlsplit(d.url).hostname == host), None
+            (
+                d
+                for d in view.refused_addresses
+                if d.url == issuer or (host is not None and _hostname(d.url) == host)
+            ),
+            None,
         )
         if refused is None:
             return
+        named, address = display_url(issuer), display_url(refused.url)
         yield self.unverified(
             view,
-            f"the authorization server this document names ({issuer}) could not be fetched — "
-            f"{refused.url} was refused because {refused.refused} — so whether it advertises "
+            f"the authorization server this document names ({named}) could not be fetched — "
+            f"{address} was refused because {refused.refused} — so whether it advertises "
             f"PKCE was never established; guardana.mcp.discovery_target reports that address "
             f"as a finding",
         )
@@ -167,6 +278,11 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
     def _unreadable(
         self, view: McpAuthorizationView, document: Document, what: str
     ) -> Iterator[Finding]:
+        """Report a document served but unusable, or absent; decline on one never answered.
+
+        Only a `404` or `410` says the document does not exist. A server that answered
+        an error status of any other kind said nothing about it, so the rule declines.
+        """
         if document.refused is not None:
             yield self.unverified(
                 view,
@@ -174,16 +290,23 @@ class McpAuthorizationDiscoveryRule(McpAuthorizationRule):
                 f"guardana.mcp.discovery_target reports that address as a finding",
             )
             return
-        if document.status is not None:
+        address = display_url(document.url)
+        served = document.status is not None and document.status < _HTTP_ERROR
+        if served and document.error is not None:
             yield self.finding(
                 view,
-                f"the {what} is not published: {document.url} answered HTTP {document.status}, "
+                f"the {what} at {address} answered HTTP {document.status} but "
+                f"{document.error}, so a client cannot read how to authenticate here",
+            )
+            return
+        if document.status is not None and document.error is None:
+            yield self.finding(
+                view,
+                f"the {what} is not published: {address} answered HTTP {document.status}, "
                 f"so a client has no documented way to discover how to authenticate here",
             )
             return
-        yield self.unverified(
-            view, f"the {what} at {document.url} could not be read: {document.error}"
-        )
+        yield self.unverified(view, f"the {what} at {address} could not be read: {document.error}")
 
 
 def _named_issuer(resource: Document | None) -> str | None:
@@ -219,3 +342,11 @@ def _different_origin(declared: str, server: str) -> bool:
     deployment as a finding — or worse, the other way round.
     """
     return not same_origin(declared, server)
+
+
+def _hostname(url: str) -> str | None:
+    """Return the host `url` names, or None when it does not parse as a URL."""
+    try:
+        return urlsplit(url).hostname
+    except ValueError:
+        return None

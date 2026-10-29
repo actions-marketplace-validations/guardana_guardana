@@ -5,6 +5,8 @@ place where the code reached a confident answer it had not earned, and each is n
 pinned by a test that fails if the answer goes back.
 """
 
+import pytest
+from _offline import refuse_name_lookups
 from guardana.core.rule import RuleContext
 from guardana.core.target import McpServerTarget
 from guardana.core.target._mcp_http import RawReply
@@ -16,6 +18,8 @@ from guardana.rules.mcp import (
     McpUnauthenticatedAccessRule,
 )
 from mcp_fixtures import CONFORMING_RESOURCE, CREDENTIAL, ROUTABLE, findings, guarded, outcomes
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 _TOOLS = [{"name": "read_file", "description": "Read a file."}]
 
@@ -54,7 +58,7 @@ def test_a_tool_listing_delivered_over_sse_is_still_a_tool_listing() -> None:
 def test_an_sse_server_does_not_get_a_metadata_finding_it_never_earned() -> None:
     server = _SseServer(ROUTABLE, tools=_TOOLS)
 
-    assert findings(McpAuthorizationDiscoveryRule(), server) == []
+    assert outcomes(findings(McpAuthorizationDiscoveryRule(), server)) == ["inconclusive"]
 
 
 def test_a_reply_nobody_can_parse_is_not_a_refusal() -> None:
@@ -81,7 +85,9 @@ def test_the_session_sample_does_not_depend_on_which_rules_ran() -> None:
     # true about the target.
     def verdict(*, read_the_token_probe: bool) -> list[str]:
         server = guarded(session_ids=["one-and-only-session"] * 6, accepts_any_token=True)
-        target = McpServerTarget(ROUTABLE, credential=CREDENTIAL, sender=server)
+        target = McpServerTarget(
+            ROUTABLE, credential=CREDENTIAL, sender=server, discovery_sender=server
+        )
         if read_the_token_probe:
             list(McpTokenAudienceRule().run(target, RuleContext()))
         return [f.evidence.summary for f in McpSessionBindingRule().run(target, RuleContext())]
@@ -102,7 +108,10 @@ def test_a_default_port_written_out_is_the_same_origin() -> None:
             '"https://93.184.215.14/.well-known/oauth-protected-resource", scope="s"'
         ),
         resource_metadata=CONFORMING_RESOURCE,
-        authorization_metadata={"code_challenge_methods_supported": ["S256"]},
+        authorization_metadata={
+            "issuer": "https://93.184.215.14",
+            "code_challenge_methods_supported": ["S256"],
+        },
     )
 
     reported = findings(McpAuthorizationDiscoveryRule(), server, credential=CREDENTIAL)
@@ -119,7 +128,10 @@ def test_an_injected_transport_alone_does_not_claim_an_authorization_surface() -
             pass
 
         def request(self, method: str, params: object) -> dict[str, object]:
-            return {"protocolVersion": "x"} if method == "initialize" else {"tools": []}
+            return {"protocolVersion": "2025-11-25"} if method == "initialize" else {"tools": []}
+
+        def notify(self, method: str) -> None:
+            pass
 
         def close(self) -> None:
             return None

@@ -14,11 +14,20 @@ edition it names, and the correspondence is computed in memory when asked for.
 import json
 from collections import defaultdict
 from enum import StrEnum
+from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._plugins import resolve_trust, warn_about_load_errors
+from guardana.cli._plugins import (
+    AllowPluginOption,
+    PluginsOption,
+    hint_refused_plugins,
+    resolve_trust,
+    warn_about_load_errors,
+)
+from guardana.cli._profile import resolve_profile
 from guardana.cli.exit_codes import ExitCode
+from guardana.core.entrypoints import TAXONOMY_GROUP
 from guardana.core.registry import Registry
 from guardana.core.taxonomy import (
     Correspondent,
@@ -46,14 +55,9 @@ def taxonomy(
         typer.Argument(help="One reference to explain, e.g. LLM07:2025 or AML.T0051"),
     ] = None,
     format: Annotated[TaxonomyFormat, typer.Option(help="human|json")] = TaxonomyFormat.human,
-    plugins: Annotated[
-        str,
-        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
-    ] = "all",
-    allow_plugin: Annotated[
-        list[str],
-        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
-    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    plugins: PluginsOption = None,
+    allow_plugin: AllowPluginOption = None,
+    profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
 ) -> None:
     """Show the installed framework catalogues, or explain one reference.
 
@@ -62,20 +66,23 @@ def taxonomy(
     years later. With a reference it prints that entry and what it corresponds to
     in the other editions.
     """
-    trust = resolve_trust(plugins, allow_plugin, no_plugins=False)
+    resolved = resolve_trust(plugins, allow_plugin, resolve_profile(profile, None))
     # Discovery first: a company's own catalogue arrives through the
     # `guardana.taxonomies` entry point, and a listing that showed only the
     # built-ins would tell them their pack is not installed when it is.
-    registry = Registry.discover(trust)
+    registry = Registry.discover(resolved.trust)
     # And a pack that failed to load is worse than one that is absent: its
     # references are mappings the user believes they have. Warned about here for
     # the same reason `guardana rules` warns — this command exists to confirm what
     # is installed, so a silent gap defeats it.
-    warn_about_load_errors(registry, what="a taxonomy provider")
+    warn_about_load_errors(registry, resolved, what="a taxonomy provider")
+    hint_refused_plugins(registry, resolved)
     if reference is None:
         _list_catalogs(format)
         return
-    _explain(reference, format, len(registry.load_errors))
+    refused = sum(1 for ep in registry.refused if ep.group == TAXONOMY_GROUP)
+    failed = sum(1 for ep, _ in registry.failed if ep.group == TAXONOMY_GROUP)
+    _explain(reference, format, refused=refused, failed=failed)
 
 
 def _registered_outside_a_catalog() -> list[tuple[str, tuple[TaxonomyRef, ...]]]:
@@ -167,7 +174,7 @@ def _list_catalogs(format: TaxonomyFormat) -> None:
             typer.echo(f"    {ref.reference:16} {ref.title}")
 
 
-def _explain(reference: str, format: TaxonomyFormat, refused: int) -> None:
+def _explain(reference: str, format: TaxonomyFormat, *, refused: int, failed: int) -> None:
     try:
         found = resolve(reference)
     except TaxonomyError as exc:
@@ -176,16 +183,20 @@ def _explain(reference: str, format: TaxonomyFormat, refused: int) -> None:
         typer.echo(f"error: {exc}", err=True)
         raise typer.Exit(code=_INVALID_USAGE) from exc
     if found is None:
-        if refused:
+        if refused or failed:
             # `resolve` searches built-ins (always loaded) plus whatever
-            # `guardana.taxonomies` registered — and plugin trust just refused
-            # `refused` of those providers. A reference they would have defined
-            # is unproven, not absent, so "no installed catalogue" would say more
-            # than this build actually knows.
+            # `guardana.taxonomies` registered, and some of those providers were
+            # refused or failed to import: a reference one of them would define is
+            # unproven, not absent.
+            unloaded: list[str] = []
+            if refused:
+                unloaded.append(f"{refused} provider(s) were refused by plugin trust")
+            if failed:
+                unloaded.append(f"{failed} provider(s) failed to load")
             typer.echo(
-                f"error: no loaded catalogue defines {reference!r} — {refused} "
-                f"provider(s) were refused by plugin trust, so this may be theirs "
-                f"rather than missing; see the warning(s) above",
+                f"error: no loaded catalogue defines {reference!r} — "
+                f"{' and '.join(unloaded)}, so this may be theirs rather than missing; "
+                f"see the warning(s) above",
                 err=True,
             )
             raise typer.Exit(code=ExitCode.INDETERMINATE)

@@ -7,8 +7,7 @@ engine that outlives a renamed standard is possible at all.
 **Identity is scheme + edition + local id.** `OWASP-LLM/2025/LLM07` (System Prompt
 Leakage) and `OWASP-LLM/2026/LLM07` (Misinformation) are two different controls that
 happen to share a string, so a rule names an edition: `LLM07:2025`. Titles and ranks
-hang off that identity as display data and are never part of it. See
-`docs/design/taxonomy-editions.md`.
+hang off that identity as display data and are never part of it.
 
 Mapping is mandatory for a rule (`CONTRIBUTING.md`), which is why registration is
 open: a company mapping rules to its own control catalogue, or to a framework we
@@ -136,10 +135,24 @@ def catalogs() -> tuple[TaxonomyCatalog, ...]:
     """Every built-in catalogue, with its digest — what a run manifest pins.
 
     Third-party references registered through the entry point are in `known_refs()`
-    and not here: a package registers references, not a catalogue file, so there is
-    no digest to pin for them and inventing one would claim provenance nobody has.
+    and not here: a package registers references, not a catalogue file. A run manifest
+    pins them per framework by a digest over the references themselves.
     """
     return _CATALOGS
+
+
+def extensions() -> dict[str, tuple[TaxonomyRef, ...]]:
+    """Every reference registered beyond the built-in catalogues, grouped by framework.
+
+    Includes a control a package adds to a built-in framework: it changes what a mapping
+    to that framework says, so it is pinned like a framework of the package's own.
+    """
+    builtin = {ref.reference for catalog in _CATALOGS for ref in catalog.refs}
+    grouped: dict[str, list[TaxonomyRef]] = {}
+    for ref in known_refs():
+        if ref.reference not in builtin:
+            grouped.setdefault(ref.framework, []).append(ref)
+    return {framework: tuple(refs) for framework, refs in grouped.items()}
 
 
 def register(ref: TaxonomyRef) -> None:
@@ -152,10 +165,26 @@ def register(ref: TaxonomyRef) -> None:
     _registry.add(ref)
 
 
+def unregister(reference: str) -> None:
+    """Drop one registered reference; used to undo a provider that failed part-way."""
+    _registry.forget(reference)
+
+
 def register_all(refs: Iterable[TaxonomyRef]) -> None:
-    """Register several references, failing on the first that redefines a known one."""
-    for ref in refs:
-        register(ref)
+    """Register several references, all or none.
+
+    The first that redefines a known reference raises, and every reference this call
+    added before it is dropped again, as discovery drops a provider that failed part-way.
+    """
+    known = {ref.reference for ref in _registry.all()}
+    try:
+        for ref in refs:
+            register(ref)
+    except Exception:
+        for ref in _registry.all():
+            if ref.reference not in known:
+                unregister(ref.reference)
+        raise
 
 
 __all__ = [
@@ -234,9 +263,11 @@ __all__ = [
     "TaxonomyRef",
     "catalogs",
     "correspondents",
+    "extensions",
     "known_refs",
     "register",
     "register_all",
     "resolve",
     "resolve_recorded",
+    "unregister",
 ]

@@ -87,7 +87,7 @@ def read_garak(text: str, path: Path) -> ObservationRead:
                     f"know how to read as a verdict or as metadata"
                 )
             continue
-        claims, clean = _garak_eval(record, number)
+        claims, clean = _garak_eval(record, number, unreadable)
         observations.extend(claims)
         passed += clean
     return ObservationRead(
@@ -113,18 +113,26 @@ def _garak_version(record: Mapping[str, Any]) -> str | None:
     return None
 
 
+_GARAK_COUNTS = ("fails", "nones", "passed", "total", "total_evaluated", "total_processed")
+
+
 def _garak_eval(
-    record: Mapping[str, Any], number: int
+    record: Mapping[str, Any], number: int, unreadable: list[str]
 ) -> tuple[tuple[ImportedObservation, ...], int]:
-    """Turn one `eval` record into the claims it makes, and count the clean result."""
+    """Turn one `eval` record into the claims it makes, and count the clean result.
+
+    garak scores each output as passed, failed or none; `total_evaluated` (`total` before
+    garak 0.14) is passed plus failed, and `total_processed` adds the nones. A record counts
+    as clean only when it states, or lets be derived, no failed and no undecided output over
+    at least one scored output; a count that is missing, mistyped or inconsistent makes the
+    record unreadable, because such a record is not a pass.
+    """
     probe = optional_text(record, "probe") or f"record {number}"
     detector = optional_text(record, "detector") or "unknown detector"
-    fails = optional_int(record, "fails")
-    nones = optional_int(record, "nones") or 0
-    evaluated = optional_int(record, "total_evaluated")
-    passes = optional_int(record, "passed")
-    if fails is None and passes is not None and evaluated is not None:
-        fails = evaluated - passes - nones
+    counts = _garak_counts(record, f"record {number} ({probe}/{detector})", unreadable)
+    if counts is None:
+        return (), 0
+    fails, nones, evaluated = counts
     claims: list[ImportedObservation] = []
     if fails:
         claims.append(
@@ -134,7 +142,7 @@ def _garak_eval(
                 outcome=ObservedOutcome.FAILED,
                 category=probe,
                 detail=f"{fails} of {evaluated if evaluated is not None else '?'} "
-                f"output(s) failed detector {detector}",
+                f"scored output(s) failed detector {detector}",
             )
         )
     if nones:
@@ -148,7 +156,105 @@ def _garak_eval(
                 f"not decide, which is not a pass",
             )
         )
-    return tuple(claims), 0 if (fails or nones) else 1
+    return tuple(claims), 1 if (fails == 0 and nones == 0) else 0
+
+
+def _garak_counts(
+    record: Mapping[str, Any], where: str, unreadable: list[str]
+) -> tuple[int | None, int | None, int | None] | None:
+    """Return a record's failed, undecided and evaluated counts, or None when it says nothing.
+
+    A failed or undecided count it neither states nor lets be derived is None, after the
+    record is reported unreadable: what it does state is still a claim, and it is not clean.
+    """
+    passes = fails = nones = evaluated = processed = None
+    problem = _garak_untrustworthy(record)
+    if problem is None:
+        evaluated = optional_int(record, "total_evaluated")
+        if evaluated is None:
+            evaluated = optional_int(record, "total")
+        processed = optional_int(record, "total_processed")
+        passes, fails, nones = _garak_derived(
+            optional_int(record, "passed"),
+            optional_int(record, "fails"),
+            optional_int(record, "nones"),
+            evaluated,
+            processed,
+        )
+        if any(count is not None and count < 0 for count in (passes, fails, nones)):
+            problem = (
+                f"states counts its totals cannot hold ({fails} failed, {passes} passed, "
+                f"{nones} undecided; {evaluated} evaluated, {processed} processed)"
+            )
+    if problem is not None:
+        unreadable.append(f"{where} {problem}")
+        return None
+    if fails is None or nones is None:
+        missing = "failure" if fails is None else "undecided"
+        unreadable.append(f"{where} states no {missing} count, and no totals to derive one from")
+        return fails, nones, evaluated
+    if passes is None:
+        if fails == 0 and nones == 0:
+            unreadable.append(
+                f"{where} states no failure, and nothing that shows it scored an output"
+            )
+            return None
+        return fails, nones, evaluated
+    problem = _garak_inconsistency(fails, passes, nones, evaluated, processed)
+    if problem is not None:
+        unreadable.append(f"{where} {problem}")
+        return None
+    return fails, nones, evaluated
+
+
+def _garak_derived(
+    passes: int | None,
+    fails: int | None,
+    nones: int | None,
+    evaluated: int | None,
+    processed: int | None,
+) -> tuple[int | None, int | None, int | None]:
+    """Fill in a passed, failed or undecided count garak left out, from the totals it wrote."""
+    if fails is None and passes is not None and evaluated is not None:
+        fails = evaluated - passes
+    if passes is None and fails is not None and evaluated is not None:
+        passes = evaluated - fails
+    if processed is not None and fails is not None:
+        if nones is None and passes is not None:
+            nones = processed - fails - passes
+        elif passes is None and nones is not None:
+            passes = processed - fails - nones
+    return passes, fails, nones
+
+
+def _garak_untrustworthy(record: Mapping[str, Any]) -> str | None:
+    """Say why a record's counts cannot be read at all: mistyped, negative or two totals apart."""
+    mistyped = [k for k in _GARAK_COUNTS if k in record and optional_int(record, k) is None]
+    if mistyped:
+        return f"states {', '.join(mistyped)} as something other than an integer"
+    negative = [k for k in _GARAK_COUNTS if (optional_int(record, k) or 0) < 0]
+    if negative:
+        return f"states a negative {', '.join(negative)}"
+    total, evaluated = optional_int(record, "total"), optional_int(record, "total_evaluated")
+    if total is not None and evaluated is not None and total != evaluated:
+        return f"states two totals of evaluated outputs that differ ({total} and {evaluated})"
+    return None
+
+
+def _garak_inconsistency(
+    fails: int, passes: int, nones: int, evaluated: int | None, processed: int | None
+) -> str | None:
+    """Say why a record's counts cannot all be true, or None when they can."""
+    if (evaluated is not None and fails + passes != evaluated) or (
+        processed is not None and fails + passes + nones != processed
+    ):
+        return (
+            f"states {fails} failed, {passes} passed and {nones} undecided output(s), which "
+            f"its totals ({evaluated} evaluated, {processed} processed) do not add up to"
+        )
+    if fails + passes + nones == 0:
+        return "scored no output"
+    return None
 
 
 def read_promptfoo(text: str, path: Path) -> ObservationRead:

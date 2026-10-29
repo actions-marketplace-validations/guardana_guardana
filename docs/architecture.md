@@ -15,15 +15,29 @@ guardana-core     Target / Rule / Evaluator / Finding / Profile,
                    plus threat-agnostic plumbing rules build on:
                    `formats` (bounded model-file readers) and `testing`
                    (doubles and artifact builders).
-                   No network I/O beyond what a Target itself performs.
+                   No network I/O beyond what a Target, a judge configured
+                   under `evaluators:` or the collector reporter performs.
 guardana-rules     Built-in rules (YAML + Python plugin), each mapped to
                    OWASP / MITRE ATLAS / NIST.
-guardana-cli       The `guardana` command — scan, probe, monitor, diff,
-                   and sixteen more; `guardana --help` lists all twenty.
+guardana-cli       The `guardana` command — scan, probe, monitor, diff
+                   and the rest; `guardana --help` lists them all.
 guardana-report    Renderers: human, SARIF, JSON, JUnit.
 guardana-server    OPTIONAL collector. Ingests normalized Findings from many
                    agents; list/trend view. A separate, separately-deployed
                    service.
+```
+
+```mermaid
+flowchart LR
+  accTitle: Guardana's five packages
+  accDescr: guardana-cli runs guardana-core, which discovers the built-in rules in guardana-rules and the rules in your own extension packages. guardana-report renders the results. guardana-server, the optional collector, receives a versioned envelope over HTTP and is never imported by the engine.
+  classDef accent fill:#F0ECFF,stroke:#5B3DF5,color:#4A2FE0
+  classDef cmd font-family:monospace
+  CLI([guardana-cli]):::cmd ==> CORE[guardana-core<br>Target · Rule · Evaluator<br>Finding · Profile · Runner]:::accent
+  RULES([guardana-rules]):::cmd --> CORE
+  EXT[Your extension<br>packages] -.-> CORE
+  CORE ==> REP([guardana-report]):::cmd
+  CORE -.->|versioned envelope| SRV([guardana-server<br>optional collector]):::cmd
 ```
 
 Each is `src/guardana/<name>` — a PEP 420 namespace package. No package
@@ -43,6 +57,7 @@ model:
 class TargetKind(StrEnum):
     ARTIFACT = "artifact"
     ENDPOINT = "endpoint"
+    TRACE = "trace"
 
 class Capability(StrEnum):
     READ_FILES = "read_files"
@@ -65,13 +80,18 @@ per-rule declaration; `guardana rules` groups by it and takes `--surface`.
 Built-ins: `ArtifactTarget` (walks a directory, exposing `iter_files(suffixes)`
 over model files, dependency manifests, and source, skipping `.git`,
 `.venv`, `node_modules`, etc., plus `python_source(path)` — a Python file read,
-parsed and indexed **once per scan** rather than once per rule, so scan cost
-grows with the target instead of with the rule count) and `EndpointTarget` (a live chat endpoint,
+parsed and indexed **once per scan**, not once per rule, while parsed sources
+fit an 8 MiB cache. Within that budget, scan cost grows with the target, not the
+rule count. Beyond it, each further read reparses the file) and `EndpointTarget` (a live chat endpoint,
 exposing `chat(messages) -> str`, with a pluggable `ChatTransport` so tests
 never hit the network). The transport is selected by a provider name —
 `openai` (the default, any OpenAI-compatible server), `ollama` (native
-`/api/chat`), or `tgi` (HF TGI `/generate`) — surfaced as `--provider` on
-`probe`/`monitor`; a genuinely custom backend ships a `Target` through the
+`/api/chat`), or `tgi` (HF TGI `/generate`) — or by an adapter file mapping a
+guarded endpoint's own request and response. Both are read through one `Connection`
+(`guardana.core.target.connection`): `--provider` and `--adapter` on `probe`,
+`plan probe`, `target inspect` and `monitor`, and `provider` and `adapter` in a judge's
+`evaluators:` block, refused alike before anything is sent when they cannot be used as
+written. A genuinely custom backend ships a `Target` through the
 `guardana.targets` entry point instead. An OpenAI-compatible transport also
 implements the optional `ToolCallingTransport` protocol, so `EndpointTarget`
 advertises `CALL_TOOLS` and exposes `offer_tools(messages, tools)` — the seam
@@ -89,7 +109,7 @@ core ships plumbing so a third-party pack ships judgement. Full contract in
 **Skipped is not errored.** The `Runner` keeps two outcomes apart that used to
 share a bucket: a rule the target cannot satisfy is *skipped* (normal), and a
 rule that raised is an *error* (a defect) recorded in `ScanResult.errors`, which
-fails the gate by default. `Registry.discover()` isolates each entry point for
+fails the gate by default. `Registry.discover(trust)` isolates each entry point for
 the same reason — one broken third-party pack must not leave you with no rules.
 
 A rule declares which capabilities it needs (`required_capabilities` in
@@ -146,23 +166,30 @@ An `Exchange` (`guardana.core.exchange`) is the graded conversation — the
 message sequence plus `reply_text` (the last assistant reply, `None` when
 there is nothing to grade) and `transcript` (the whole conversation, so a
 multi-turn scenario's "across the conversation" goal is gradable). Every
-built-in evaluator fails closed on `reply_text is None`: the verdict is
-`inconclusive`, never a silent pass.
+built-in evaluator that grades reply text fails closed on `reply_text is None`:
+the verdict is `inconclusive`, never a silent pass. `tool_call` grades actions,
+even when a run has tool calls but no text. Its verdict is
+`inconclusive` when required action evidence is missing.
 
-Shipped evaluators: `keyword` (cheap refusal-marker matching — honestly
-low-confidence, ~0.5–0.6), `canary` (near-perfect detection of a planted
-marker verbatim, ~0.9–0.99), `length` (grades a reply by length — a runaway
-answer to a divergence prompt is a lead, for the unbounded-consumption check),
-`llm_judge` (a versioned judging prompt sent to
-a judge model wired from the profile's `evaluators:` block; confidence is
-measured as agreement across `min_agreement` samples, and the prompt version
-is stamped into `evaluator_id` — `llm_judge@2025.1` — so grading stays
+Shipped evaluators include `keyword` (cheap refusal-marker matching — honestly
+low-confidence, ~0.5–0.6), `canary` (near-perfect detection of a planted marker
+verbatim, ~0.9–0.99), `length` (grades a reply by length — a runaway answer to a
+divergence prompt is a lead, for the unbounded-consumption check), `amplification`
+(grades the ratio of what came back to what was asked), `tool_call` (grades an
+agent run by what it did, not what it said), `llm_judge` (a versioned judging
+prompt sent to a judge model wired from the profile's `evaluators:` block;
+confidence is measured as agreement across `min_agreement` samples, and the prompt
+version is stamped into `evaluator_id` — `llm_judge@2026.1` — so grading stays
 reproducible as the rubric evolves), and `guard` (an opt-in external
 safety-classifier — see
-[`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)). A
-rule references an evaluator by its string `id`, resolved from the registry
-at run time; swapping which evaluator grades a rule never requires touching
-the rule itself.
+[`profiles.md`](profiles.md#config-wired-evaluators-llm_judge-and-guard)); the
+[evaluator catalog](generated/evaluator-catalog.md) lists every one.
+`guardana calibrate` measures and corrects errors in `keyword`, `answered`,
+`guard`, `llm_judge` and `reference_judge`, each under its own evaluator id. Other
+evaluators are deterministic and need no such correction. A
+rule references an evaluator by its string `id`, resolved from the registry at run
+time; swapping which evaluator grades a rule requires no change to the rule
+itself.
 
 ### 4. Report / Finding — normalized result
 
@@ -209,7 +236,7 @@ class Profile:
 ```
 
 Loaded from a `guardana.yaml` file by `load_profile`, or from a named preset
-(`ci`/`pre-training`/`monitor`) via `--preset`. See
+(`ci`/`pre-training`/`monitor`/`release`) via `--preset`. See
 [`profiles.md`](profiles.md) for the full field-by-field schema and the presets.
 
 ## The Registry — uniform discovery
@@ -219,33 +246,27 @@ evaluators, built-in or third-party, so nothing else in the engine
 hard-codes a list of them:
 
 ```python
-_TAXONOMY_GROUP = "guardana.taxonomies"
-_RULE_GROUP = "guardana.rules"
-_EVALUATOR_GROUP = "guardana.evaluators"
-_TARGET_GROUP = "guardana.targets"
-
 class Registry:
     @classmethod
-    def discover(cls, trust: PluginTrust | None = None) -> Self:
-        policy = trust if trust is not None else PluginTrust()
+    def discover(cls, trust: PluginTrust) -> Self:
         reg = cls()
-        for group, register in (
+        handlers = {
             # Taxonomies first: a YAML rule's `taxonomy:` resolves while its
             # own entry point is still loading.
-            (_TAXONOMY_GROUP, register_taxonomy),
-            (_RULE_GROUP, reg.register_rule),
-            (_EVALUATOR_GROUP, reg.register_evaluator),
-            (_TARGET_GROUP, reg.register_target),
-        ):
-            for ep in entry_points(group=group):
-                if not policy.allows(ep):
-                    reg.record_load_error(...)   # refused, never imported
-                    continue
-                _absorb(ep.load()(), register)
+            TAXONOMY_GROUP: (TaxonomyRef, reg._record_taxonomy),
+            RULE_GROUP: (Rule, reg.register_rule),
+            EVALUATOR_GROUP: (Evaluator, reg.register_evaluator),
+            TARGET_GROUP: (Target, reg.register_target),
+        }
+        for entry_point in installed_entry_points():  # the four groups, in that order
+            if not trust.allows(entry_point.distribution):
+                ...  # recorded as a refusal; never imported
+                continue
+            ...  # imported; its provider registers everything or nothing
         return reg
 ```
 
-`Registry.discover(trust)` walks every installed package's four entry-point
+`Registry.discover(trust)` walks every installed package's four run
 groups — `guardana.taxonomies`, `guardana.rules`, `guardana.evaluators`, and
 `guardana.targets` [entry points](https://packaging.python.org/en/latest/specifications/entry-points/)
 — and calls each one `trust` allows (a zero-arg callable returning either a
@@ -259,7 +280,9 @@ That same call runs in every CLI mode, `--plugins disabled` (`--no-plugins`'s
 deprecated spelling) included: it still walks every installed entry point,
 but `PluginTrust.allows()` refuses each one *before*
 its code is imported and records the refusal in `load_errors` — the registry
-ends up empty, but zero third-party code ever runs. `Registry()`, the bare
+ends up empty, and no entry point's module is imported. The CLI starts with
+`builtins` unless a flag or the profile's `plugins:` says otherwise, and records each
+refusal the same way. `Registry()`, the bare
 constructor with no entry-point walk at all, is for embedding code that wants
 to skip discovery entirely — `guardana.core.testing.assert_secure` accepts one
 this way when a caller wants no plugins and no CLI involved. See
@@ -281,10 +304,12 @@ via `guardana.yaml`'s `rules.paths`) on `scan`, `probe`, and `monitor`.
 
 | Group | Provides | Wired into `Registry`? |
 |---|---|---|
-| `guardana.taxonomies` | one `TaxonomyRef`, or an iterable | **Yes** — `Registry.discover()`, loaded **first**, so a rule pack's own `taxonomy:` references resolve while its own entry point is still loading. |
-| `guardana.rules` | one `Rule`, or an iterable of `Rule`s | **Yes** — `Registry.discover()` |
-| `guardana.evaluators` | one `Evaluator`, or an iterable | **Yes** — `Registry.discover()` |
-| `guardana.targets` | one `Target` subclass, or an iterable | **Yes** — `Registry.discover()`. `Registry.targets()` exposes the discovered classes; a class declaring a unique `scheme` and `from_locator` is also selectable as `--target scheme://…` by commands accepting its kind. See [`extending.md`](extending.md#adding-a-target). |
+| `guardana.taxonomies` | one `TaxonomyRef`, or an iterable | **Yes** — `Registry.discover(trust)`, loaded **first**, so a rule pack's own `taxonomy:` references resolve while its own entry point is still loading. |
+| `guardana.rules` | one `Rule`, or an iterable of `Rule`s | **Yes** — `Registry.discover(trust)` |
+| `guardana.evaluators` | one `Evaluator`, or an iterable | **Yes** — `Registry.discover(trust)` |
+| `guardana.targets` | one `Target` subclass, or an iterable | **Yes** — `Registry.discover(trust)`. `Registry.targets()` exposes the discovered classes; a class declaring a unique `scheme` and `from_locator` is also selectable as `--target scheme://…` by commands accepting its kind. See [`extending.md`](extending.md#adding-a-target). |
+| `guardana.renderers` | one `RendererSpec` | **No** — imported only when `--format` names it; see [`outputs.md`](outputs.md) |
+| `guardana.reporters` | one `ReporterSpec` | **No** — imported only when `--reporter <name>://` names it |
 
 ## The Runner
 
@@ -297,16 +322,22 @@ class Runner:
     def run(self, target: Target) -> ScanResult: ...
 ```
 
+Before it selects anything, the runner refuses with `ProfileError` an include pattern
+that matches no registered rule, naming each one
+([profiles](profiles.md#an-include-pattern-must-match-a-rule)).
 For each registered rule: skip it if `target.kind` doesn't match
 `meta.target_kind`, or the profile's `Policy.matches(rule_id)` excludes it;
 skip it (recording it under `rules_skipped`) if the target can't satisfy
-`meta.required_capabilities`; otherwise run it, catching `RuleError` per
-rule so one bad rule can't abort the whole scan. Findings whose verdict is
+`meta.required_capabilities`; otherwise run it, catching any `Exception` or
+`SystemExit` per rule (not `KeyboardInterrupt`) and recording it on the result's
+`errors` channel, so one bad rule can't abort the whole scan and the gate fails on
+it by default ([when a rule raises](writing-rules.md#what-happens-when-your-rule-raises)). Findings whose verdict is
 `inconclusive` are partitioned onto the result's `unverified` channel rather
-than counted as confirmed findings — or dropped. `gate(result, policy)` is
-the free function that turns a `ScanResult` into the pass/fail boolean CLI
-commands use for their exit code (see [`profiles.md`](profiles.md#the-gate));
-`fail_on_inconclusive: true` makes the unverified channel gate too.
+than counted as confirmed findings — or dropped. `gate_outcome(result, policy)`
+turns a `ScanResult` into `pass`, `fail` or `indeterminate`, which CLI commands
+exit with as `0`, `1` or `2` (see [`profiles.md`](profiles.md#the-gate)), and
+`gate(result, policy)` is its boolean form, true for anything that is not a pass.
+`fail_on_inconclusive: true` makes an unverified result leave the run `indeterminate`.
 
 ## The core↔server boundary
 
@@ -318,7 +349,7 @@ class Reporter(Protocol):
     def submit(self, result: ScanResult, *, source: str) -> None: ...
 ```
 
-`guardana.core.reporter.HttpReporter` (used by all three CLI commands via
+`guardana.core.reporter.HttpReporter` (used by `scan`, `probe`, `monitor` and `analyze-trace` via
 `--reporter server://<url>`) POSTs a **versioned JSON envelope** to whatever
 URL you give it — it doesn't know or care whether the receiving end is
 `guardana-server` or something else entirely:
@@ -340,39 +371,62 @@ silently misreading a renamed field. The `unverified` channel is carried over
 the wire for the same reason it is surfaced locally — a check that could not be
 graded must never reach the collector as a false all-clear.
 
-`guardana-server` itself is a small, independently-deployed FastAPI app
-(`guardana.server.app.create_app`) exposing `POST /findings`,
-`GET /findings`, and `GET /trend` over an in-memory (or pluggable) `Store`.
-It validates every submission with Pydantic models
-(`guardana.server.envelope.Submission`), so a malformed POST — or one with an
-unsupported `schema_version` — is rejected with `422` instead of poisoning
-`/findings` and `/trend`. An **opt-in dashboard**
-(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default) mounts a
-read-only page at `GET /` plus an aggregated `GET /stats` — a self-contained HTML
-page (no build step, offline; server-side aggregation in `guardana.server.stats`)
-that visualizes the store. It adds no write surface and no auth; the
-`Store` grows a `records()` seam (timestamped submissions) for the time-series.
+The version window:
+
+- every change to the envelope raises its version;
+- a collector accepts every version from 2 up to its own, so an agent left on an
+  older release keeps reporting and sends only what it could observe;
+- an agent newer than its collector is refused with `422`, and the refusal names
+  the versions the collector speaks — upgrade collectors before agents;
+- dropping a version is a major release.
+
+Version 8 is published as
+[`collector-envelope/v8.schema.json`](https://guardana.dev/schemas/collector-envelope/v8.schema.json).
+The collector's tests send it every envelope a published release wrote, from
+version 2 on, and read each one back through the tenant-scoped store. No envelope
+version names a tenant: the project comes from the API key.
+
+`guardana-server` is a small, independently deployed FastAPI app
+(`guardana.server.app.create_app`) with a PostgreSQL-backed store
+(`guardana.server.postgres_store.PostgresStore`). It exposes `POST /findings`,
+`GET /findings`, `GET /trend`, `GET /healthz`, `GET /readyz`, and `GET /catalog`.
+The health endpoints distinguish a running process from readiness; the catalog
+returns the build's rule catalog. `/`, `/healthz` and `/readyz` also answer `HEAD`.
+An unhandled error returns `500` with `X-Content-Type-Options: nosniff` and a JSON body without exception text; its traceback goes to the collector's log. It validates submissions with Pydantic models
+(`guardana.server.envelope.Submission`), so a malformed POST or an unsupported
+`schema_version` is rejected with `422`. Scoped API keys are hashed at rest and
+pinned to one project and optionally one environment. An **opt-in dashboard**
+(`create_app(dashboard=True)` or `GUARDANA_DASHBOARD=1`, off by default) exposes
+`GET /` and aggregated `GET /stats`. Its `POST /session` and `DELETE /session`
+endpoints use a read-scoped API key to authenticate a browser session held in an
+`HttpOnly`, `SameSite=Strict` cookie.
 
 This boundary is intentional and load-bearing: all OSS value (every rule, every
 evaluator, every report format, every CLI mode) works fully offline with zero
-dependency on the collector. The collector is a strictly separable layer —
-self-hosted (`guardana-server`) or, later, a managed cloud — that can grow
-(dashboard, auth, persistence, fleet management, retention) without ever forking
-or depending-back-into the engine.
+dependency on the collector. The collector is a separable, self-hosted layer
+(`guardana-server`) with a dashboard, authentication, and persistence. Retention and
+deletion ship with it ([`usage-collector.md`](usage-collector.md)); a managed cloud and
+fleet management are not built.
 
 ## Repository layout
 
 ```
 guardana/
 ├─ packages/
-│  ├─ guardana-core/   src/guardana/core/{target,rule,evaluator,report,profile,
-│  │                                      registry,runner,reporter,monitor,testing}
-│  ├─ guardana-rules/  src/guardana/rules/{supply_chain,prompt,output,training,agent,catalog}
-│  ├─ guardana-cli/    src/guardana/cli/{scan,probe,monitor,init,rules,new_rule}
-│  ├─ guardana-report/ src/guardana/report/{human,sarif,json_report,junit}
+│  ├─ guardana-core/   src/guardana/core/{assessment,calibration,contract,diff,evaluator,
+│  │                                      judge_error,manifest,monitor,pack,plan,profile,
+│  │                                      registry,report,reporter,rule,runner,target,
+│  │                                      taxonomy,testing,trace,trajectory,trials,…}
+│  ├─ guardana-rules/  src/guardana/rules/{agent,catalog,contract,mcp,output,prompt,
+│  │                                       supply_chain,trace,training}
+│  ├─ guardana-cli/    src/guardana/cli/{analyze_trace,baseline,calibrate,config,diff,
+│  │                                     doctor,init,monitor,new_pack,new_rule,pack,plan,
+│  │                                     probe,rule,rules,run,scan,target,taxonomy,trace,…}
+│  ├─ guardana-report/ src/guardana/report/{human,diff_human,diff_json,json_report,junit,
+│  │                                        sarif}
 │  └─ guardana-server/ (optional collector; separate deploy)
 ├─ docs/               (this directory)
-├─ examples/           (sample profile + custom-rule package)
+├─ examples/           (sample profile, custom-rule package, contracts, integrators)
 ├─ CLAUDE.md  CONTRIBUTING.md  CODE_OF_CONDUCT.md  SECURITY.md
 └─ pyproject.toml      (uv workspace, ruff, mypy, pytest)
 ```

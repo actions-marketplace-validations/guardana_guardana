@@ -3,7 +3,7 @@
 Every `TaskOutput` carries a non-optional `agent`, naming which agent produced it.
 Guardana's model had nowhere to put that until `Span.agent` (trace schema v2), and a
 multi-agent execution without it is a list of steps nobody performed. This adapter is
-why the field exists; see `docs/design/framework-adapters.md`.
+why the field exists.
 
 Two traps, and both are refused here. **CrewAI's "delegation" is not `Delegation`** —
 the framework calls agent-to-agent task passing delegation, while Guardana's

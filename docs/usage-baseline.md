@@ -7,9 +7,7 @@ status: stable
 
 # `guardana baseline` — accepted risk with an owner and an end date
 
-A waiver is the one place Guardana deliberately does not fail on a finding. The
-only thing that makes that defensible is that it stays **temporary and visible**:
-an accepted risk that never lapses is a finding somebody deleted.
+`guardana baseline` manages waivers when you need to accept a finding temporarily and visibly.
 
 ```bash
 guardana baseline create .                  # writes guardana-baseline.yaml
@@ -30,9 +28,9 @@ waivers:
     expires: 2026-12-31
 ```
 
-**A generated baseline is deliberately not usable as-is.** Every waiver carries
-placeholder text for the reason and the approver, and `verify` fails while it is
-still there. A baseline nobody edited is a list of findings somebody silenced in a
+**A generated baseline waives its findings as soon as a scan reads it and states
+that it is unreviewed.** Every waiver has placeholder text for its reason and
+approver. `scan` warns about each such waiver; `verify` fails for generated placeholders or a blank or whitespace-only reason or approver (v1: reason only). Gate on `guardana baseline verify` to require review. An unedited baseline lists findings somebody silenced in a
 hurry, and it should look like one.
 
 ## Flags
@@ -43,9 +41,12 @@ hurry, and it should look like one.
 | Flag | Default | Meaning |
 |---|---|---|
 | `PATH` (positional) | — | Directory to scan; required unless `--target` is used |
+| `--file PATH` | `guardana-baseline.yaml` | The baseline to refresh (`update` only; `create` writes with `--output`) |
+| `--profile PATH` | none (built-in default profile) | Path to a `guardana.yaml` policy file |
+| `--preset [ci\|pre-training\|monitor\|release]` | none | Named policy preset (mutually exclusive with `--profile`) — see [`profiles.md`](profiles.md#named-presets---preset) |
 | `--target SCHEME://LOCATOR` | none | Build a trusted installed artifact target for `create` or `update` |
 | `--target-option KEY=VALUE` | none | Repeatable, non-secret configuration passed to that target |
-| `--plugins [all\|builtins\|allowlist\|disabled]` | `all` | Which installed plugins to load — same meaning as on `probe` |
+| `--plugins [all\|builtins\|allowlist\|disabled]` | `builtins`, or the profile's `plugins:` | Which installed plugins to load — same meaning as on `probe` |
 | `--allow-plugin TEXT` | none | Distribution to trust; repeatable, needs `--plugins allowlist` |
 
 `PATH` and `--target` are mutually exclusive. `verify` only reads the baseline,
@@ -71,18 +72,34 @@ pipeline, so the two facts a red build most needs — *this lapsed* and *nobody 
 wrote a reason for this* — were only ever available to somebody who already
 suspected them.
 
+## Written only from a complete scan
+
+`create` and `update` write nothing when the scan behind them is not entitled to a
+snapshot, and exit `2` (`6` or `7` when the run was stopped, as `scan` would). The
+gate's own open questions decide — nothing verified, a run cut short, a coverage
+shortfall, anything the profile's `fail_on` refuses — and a rule that did not run
+counts whatever `fail_on_error` says. A profile that selects no rule produces a
+scan with nothing in it, and a baseline taken over it would waive nothing while
+looking complete; for `update`, it would delete every waiver as "fixed".
+
 ## `update` only removes, and only on a complete scan
 
-It drops waivers for findings that no longer occur and **never adds new ones**.
+It drops waivers for findings confirmed absent and **never adds new ones**; on a path run, a waiver whose rule did not run, whose file exists but the run does not list, or whose directory is missing is retained and listed as `kept: … unknown`. On a `--target` run, a waiver is removed as fixed when its rule runs, its finding is absent, and either the target lists its file, the target lists no files, or the waiver has no location. It is kept as `kept: … unknown` only when it names no rule, its rule did not run, or the run did not list its file. The removal condition for a file no longer in the scanned tree applies only to path runs.
+On a path run where the rule ran, a waiver whose file no longer exists under the scanned path and whose directory still does is removed and listed as `removed: <fingerprint> (<rule>) — <location> is no longer in the scanned tree`.
 Accepting a risk is a decision somebody makes; `create` is where that happens.
 An update that quietly widened a baseline would be the same failure as a gate that
 weakens itself.
 
 It also **refuses to touch the file** when the scan behind it was incomplete — a
-rule that errored, or a run cut short — and exits `2`. The command decides a
+rule that errored, a run cut short, a run that verified nothing. The command decides a
 finding is fixed by not seeing it, and a check that did not run produces exactly
 that absence. Until 0.7.1 one broken rule deleted the waiver, the reason and the
 approver, printed "is fixed", and exited `0`.
+
+`create` and `update` write the file whole, through a temporary file and a rename, so a
+write that fails part-way leaves the approved baseline as it was and exits `3`. `create`
+refuses an `--output` that is a file the scan reads: `.guardanaignore`, the profile or
+anything it names, a rule file, or a scanned file that is not an earlier baseline.
 
 ## A typo is refused, never read around
 
@@ -104,9 +121,12 @@ that reason.
 ## Versions
 
 Version 1 baselines still load — their waivers have no expiry and are reported as
-such. A file from a *newer* version is refused rather than read optimistically:
-honouring waivers whose conditions this build cannot evaluate is the fail-open the
-strictness exists to prevent.
+such, and a file without `version` is read as version 1. A file from a *newer* version
+is refused rather than read optimistically: honouring waivers whose conditions this
+build cannot evaluate is the fail-open the strictness exists to prevent. A `version`
+that is not a whole number (`true`, `"2"`, `2.0`) is refused as `version must be an
+integer`, and one below 1 as `version 0 does not exist`, with exit `3` like any other
+unreadable baseline.
 
 ## See also
 

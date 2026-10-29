@@ -1,6 +1,6 @@
 ---
 name: coder
-description: Implements ONE lane of a work file in docs/work/ — production code plus its tests — from a brief that names the files, the behaviour and the verification command. Use for engine, rule, CLI, report, collector or script code. One lane per invocation; lanes that touch the same files must not run in parallel.
+description: Implements ONE lane of a work file in .work/ — production code plus its tests — from a brief that names the files, the behaviour and the verification command. Use for engine, rule, CLI, report, collector or script code. One lane per invocation; lanes that touch the same files must not run in parallel.
 model: opus
 effort: high
 disallowedTools: Agent

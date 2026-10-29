@@ -47,7 +47,7 @@ def test_pricing_sends_nothing_at_all() -> None:
         sent.append(url)
         raise AssertionError("plan contacted the target")
 
-    target = McpServerTarget(_SERVER, sender=refuse)  # type: ignore[arg-type]
+    target = McpServerTarget(_SERVER, sender=refuse, discovery_sender=refuse)  # type: ignore[arg-type]
 
     assert target.capabilities()
     assert sent == []

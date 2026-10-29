@@ -21,7 +21,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import ClassVar
 
 import pytest
+from _offline import refuse_name_lookups
 from guardana.core.target._mcp_http import McpError, RedirectRefusedError, send
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 _METADATA_ENDPOINT = "http://169.254.169.254/latest/meta-data/"
 

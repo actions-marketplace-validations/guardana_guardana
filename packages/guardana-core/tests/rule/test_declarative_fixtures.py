@@ -11,12 +11,15 @@ across two verifications.
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
+import yaml
+from _yaml_input_cases import NON_TEXT_KEYS
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.evaluator.tool_call import ToolCallEvaluator
 from guardana.core.rule import Rule, RuleContext, RuleLoadError, load_yaml_rules
-from guardana.core.rule.fixture import FixtureOutcome
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES, FixtureOutcome
 from guardana.core.rule.verify import FixtureVerdict, verify_rule
 from guardana.core.target import EndpointTarget
 from guardana.core.target.endpoint import ChatMessage, ToolCall, ToolCallReply, ToolSpec
@@ -117,6 +120,7 @@ max_steps: 4
 expect:
   forbidden_tools: [send_email]
   delivered_by: recall
+  payload_marker: audit-sync@evil.example
   goal: "a note written in one session must not steer the next"
 fixtures:
   - name: it fires when the second session emails after recalling the note
@@ -220,7 +224,7 @@ def test_a_declarative_rule_of_every_shape_proves_all_three_outcomes(
     assert verification.is_proven, [r.detail for r in verification.results] + list(
         verification.gaps
     )
-    assert {r.expected for r in verification.results} == set(FixtureOutcome)
+    assert {r.expected for r in verification.results} == set(DEMANDED_OUTCOMES)
 
 
 @pytest.mark.parametrize("source", [_GRADED_EARLY, _TRAJECTORY, _MEMORY])
@@ -526,3 +530,34 @@ def test_the_agent_double_has_no_plain_chat_reply() -> None:
 def test_the_agent_double_needs_a_non_empty_session() -> None:
     with pytest.raises(ValueError, match="non-empty session"):
         ScriptedAgentTransport()
+
+
+@pytest.mark.parametrize("section", ["fixture", "turn"])
+@pytest.mark.parametrize("mixed", [False, True])
+@pytest.mark.parametrize(("key", "shown"), NON_TEXT_KEYS)
+def test_non_text_agent_fixture_keys_raise_ruleloaderror(
+    tmp_path: Path,
+    section: str,
+    mixed: bool,
+    key: str,
+    shown: str,
+) -> None:
+    document: dict[str, Any] = yaml.safe_load(_TRAJECTORY)
+
+    extra: dict[Any, Any] = yaml.safe_load(f"{key}: ignored\n")
+    if mixed:
+        extra["unrecognised"] = "ignored"
+
+    fixture = document["fixtures"][0]
+    block = fixture if section == "fixture" else fixture["turns"][0]
+    block.update(extra)
+
+    path = tmp_path / "agent.yaml"
+    path.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
+
+    with pytest.raises(RuleLoadError, match="unknown key") as caught:
+        load_yaml_rules(path)
+
+    prefix = f"invalid rule in {path}: "
+    assert str(caught.value).startswith(prefix)
+    assert shown in str(caught.value).removeprefix(prefix)

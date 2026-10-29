@@ -1,10 +1,10 @@
 import tempfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable
 from pathlib import Path
 
 from guardana.core.evaluator import Verdict
 from guardana.core.formats import FormatError, read_gguf_metadata
-from guardana.core.report import Evidence, Finding
+from guardana.core.report import CoverageShortfall, Evidence, Finding, ShortfallKind
 from guardana.core.rule import FixtureOutcome, Rule, RuleContext, RuleError, RuleFixture, RuleMeta
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, Capability, Target, TargetKind
@@ -46,32 +46,37 @@ class ApprovedModelRule(Rule):
         if not isinstance(target, FileReader):
             raise RuleError(f"{self.meta.id} needs a file target, got {type(target).__name__}")
         for path in target.iter_files((".gguf",)):
-            yield from self._scan(path)
+            ctx.examined(path)
+            try:
+                metadata = read_gguf_metadata(path)
+            except FormatError as exc:
+                yield self._unscanned(path, f"provenance unreadable: {exc}", ctx)
+                continue
+            organization = metadata.text(_ORGANIZATION_KEY)
+            if organization is None or organization.lower() not in _APPROVED_ORGANIZATIONS:
+                name = metadata.text(_NAME_KEY) or path.name
+                yield self._finding(path, f"'{name}' declares organization {organization!r}")
 
-    def _scan(self, path: Path) -> Iterator[Finding]:
-        try:
-            metadata = read_gguf_metadata(path)
-        except FormatError as exc:
-            # Unreadable provenance is a decline, not an accusation: we never
-            # established which organization this model came from, so reporting
-            # it as unapproved would invent evidence — the fail-open this project
-            # exists to avoid runs the other way too.
-            yield Finding(
-                rule_id=self.meta.id,
-                severity=self.meta.severity,
-                title=self.meta.title,
-                taxonomy=self.meta.taxonomy,
-                target_ref=str(path),
-                evidence=Evidence(
-                    summary=f"provenance unreadable: {exc}", detail=f"file={path.name}"
-                ),
-                verdict=Verdict("inconclusive", 0.0, f"provenance unreadable: {exc}", self.meta.id),
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        # Unreadable provenance is a decline, not an accusation: reporting the model
+        # as unapproved would invent evidence. The shortfall keeps the run from
+        # passing under every policy, not only under `fail_on_inconclusive`.
+        ctx.shortfall(
+            CoverageShortfall(
+                ShortfallKind.UNEXAMINED_COMPONENT,
+                name=str(path),
+                detail=f"{self.meta.id} could not read it: {reason}",
             )
-            return
-        organization = metadata.text(_ORGANIZATION_KEY)
-        if organization is None or organization.lower() not in _APPROVED_ORGANIZATIONS:
-            name = metadata.text(_NAME_KEY) or path.name
-            yield self._finding(path, f"'{name}' declares organization {organization!r}")
+        )
+        return Finding(
+            rule_id=self.meta.id,
+            severity=self.meta.severity,
+            title=self.meta.title,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(summary=reason, detail=f"file={path.name}"),
+            verdict=Verdict("inconclusive", 0.0, reason, self.meta.id),
+        )
 
     def _finding(self, path: Path, summary: str) -> Finding:
         return Finding(

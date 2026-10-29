@@ -8,7 +8,7 @@ run has to say so rather than fall into that silence.
 """
 
 from abc import abstractmethod
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
@@ -16,6 +16,11 @@ from guardana.core.rule import Rule, RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import McpAuthorizationView, Target
 from guardana.core.target.protocols import AuthorizationInspector
+
+METADATA_NOT_FETCHED = (
+    "the server answers an anonymous caller, so its authorization metadata was never fetched"
+)
+"""Why a rule grading the metadata documents declines on a server open to anyone."""
 
 
 class McpReporting(Rule):
@@ -29,6 +34,11 @@ class McpReporting(Rule):
 
     claim = "this check could not be made"
     """What this rule would have established, phrased to follow "so …" in a sentence."""
+
+    @property
+    def graded_verdicts(self) -> Mapping[str, int]:
+        """Empty: an MCP rule grades what the server revealed in its own code."""
+        return {}
 
     def finding(
         self, view: McpAuthorizationView, summary: str, *, severity: Severity | None = None
@@ -56,18 +66,19 @@ class McpReporting(Rule):
         )
 
     def unreachable(self, view: McpAuthorizationView) -> Finding | None:
-        """Return the verdict to report when the server never answered, or None.
+        """Return the verdict to report when the server could not be examined, or None.
 
-        Every rule here calls this first. Silence from a rule means *the invariant
-        holds*, so a rule that examined a server it could not reach and said nothing
-        would be claiming the invariant holds on a server it never saw — and a
-        report where three rules said "not established" while three said nothing at
-        all would invite reading the second three as clean.
+        Every rule here calls this first. A server that sent no reply stops the run
+        before any rule grades it; this is the server that answered with something no
+        observation can be made from — a revision guardana does not speak, a status
+        that is neither a session nor a refusal — and the reason is quoted. Silence
+        from a rule means *the invariant holds*, so a rule that said nothing here would
+        be claiming the invariant holds on a server it never examined.
         """
         error = view.anonymous.error
         if error is None:
             return None
-        return self.unverified(view, f"the server could not be reached, so {self.claim}: {error}")
+        return self.unverified(view, f"the server could not be examined, so {self.claim}: {error}")
 
 
 class McpAuthorizationRule(McpReporting):
@@ -90,6 +101,33 @@ class McpAuthorizationRule(McpReporting):
             return
         yield from self.examine(target.authorization())
 
+    def metadata_not_fetched(self, view: McpAuthorizationView) -> Finding:
+        """Decline on a server open to anyone, where discovery is never attempted.
+
+        Whatever such a server publishes went unread, so silence here would grade a
+        document nobody fetched. The rule that reports the open server is a different
+        id, and a profile may have excluded it.
+        """
+        return self.unverified(
+            view,
+            f"{METADATA_NOT_FETCHED} and {self.claim}; "
+            f"guardana.mcp.unauthenticated_access reports the open server",
+        )
+
     @abstractmethod
     def examine(self, view: McpAuthorizationView) -> Iterator[Finding]:
         """Grade the observation, yielding a finding or an unverified verdict per claim."""
+
+
+def further_issuers(view: McpAuthorizationView) -> tuple[str, ...]:
+    """Return the authorization servers the resource names after the first, in its order.
+
+    Only the first one's metadata is ever fetched, so whatever these advertise was not seen.
+    """
+    resource = view.protected_resource
+    content = None if resource is None else resource.content
+    issuers = None if content is None else content.get("authorization_servers")
+    if not isinstance(issuers, list):
+        return ()
+    named = list(dict.fromkeys(entry for entry in issuers if isinstance(entry, str) and entry))
+    return tuple(named[1:])

@@ -8,6 +8,8 @@ verification for self-hosted and self-built AI (model files, live endpoints,
 and agents) from one rule engine that runs on your laptop, in CI, and next to
 a served model.
 
+The collector is beta: [Product status](https://guardana.dev/docs/product-status).
+
 ## Run it
 
 ```bash
@@ -25,7 +27,7 @@ hypercorn can point it at the app instead:
 `gunicorn -k uvicorn.workers.UvicornWorker 'guardana.server:create_app()'`.
 
 There is an official image too:
-`docker run -p 8000:8000 -e GUARDANA_DATABASE_URL=… ghcr.io/guardana/guardana-collector:0.27`.
+`docker run -p 8000:8000 -e GUARDANA_DATABASE_URL=… ghcr.io/guardana/guardana-collector:1.0`.
 
 The dashboard is a single self-contained page (no build step, works offline)
 showing severity, per-source/per-rule breakdowns, an activity-over-time trend,

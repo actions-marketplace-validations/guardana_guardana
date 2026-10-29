@@ -1,0 +1,22 @@
+[project]
+name = "guardana-retrieval-pilot"
+version = "0.1.0"
+description = "Example: a small retrieval application the tenancy and poisoning checks run against."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+classifiers = ["Typing :: Typed"]
+# The standard library serves it and Guardana's doubles stand in for its tools. No vector
+# store and no model library: the index and the "model" are a few deterministic lines, so
+# a verdict here is about the checks, never about somebody else's release.
+dependencies = ["guardana-core"]
+
+[project.scripts]
+retrieval-pilot = "retrieval_pilot.__main__:main"
+
+[build-system]
+requires = ["hatchling==1.32.4"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/retrieval_pilot"]

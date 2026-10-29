@@ -1,0 +1,3 @@
+# guardana.yaml — the operator demands it directly
+trace:
+  require: [identity, approval, effects]

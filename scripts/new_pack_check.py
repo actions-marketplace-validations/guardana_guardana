@@ -76,9 +76,14 @@ def _install(pack: Path, venv: Path) -> Path:
     return venv / "bin"
 
 
+def _trusting(name: str) -> list[str]:
+    """Return the flags that admit this pack: every command starts with built-in trust only."""
+    return ["--plugins", "allowlist", "--allow-plugin", name]
+
+
 def _validate(bin_dir: Path, pack: Path, name: str, module: str) -> None:
     manifest = pack / "src" / module / "guardana-pack.yaml"
-    named = _run([str(bin_dir / "guardana"), "pack", "validate", str(manifest)])
+    named = _run([str(bin_dir / "guardana"), "pack", "validate", str(manifest), *_trusting(name)])
     if named.returncode != 0:
         raise CheckError(f"pack validate exited {named.returncode}:\n{named.stdout}{named.stderr}")
     if name not in named.stdout:
@@ -90,7 +95,7 @@ def _validate(bin_dir: Path, pack: Path, name: str, module: str) -> None:
     # manifest is dropped before validation, so a pack whose manifest missed the
     # wheel is reported as nothing to check rather than as broken. Exit 0 alone
     # would not tell them apart; the pack's own name in the output does.
-    discovered = _run([str(bin_dir / "guardana"), "pack", "validate"])
+    discovered = _run([str(bin_dir / "guardana"), "pack", "validate", *_trusting(name)])
     if discovered.returncode != 0 or name not in discovered.stdout:
         raise CheckError(
             f"discovery over the installed packs did not come back clean about {name} "
@@ -102,7 +107,7 @@ def _validate(bin_dir: Path, pack: Path, name: str, module: str) -> None:
 _LIE = "nobody.registers.this"
 
 
-def _detector_works(bin_dir: Path, pack: Path, module: str, tmp: Path) -> None:
+def _detector_works(bin_dir: Path, pack: Path, name: str, module: str, tmp: Path) -> None:
     """Prove the validator would notice, by handing it a manifest that lies.
 
     The lie goes under `rules:` and the refusal has to name it. A non-zero exit
@@ -115,7 +120,7 @@ def _detector_works(bin_dir: Path, pack: Path, module: str, tmp: Path) -> None:
     lying = tmp / "lying-pack.yaml"
     lying.write_text(manifest.replace("  rules:\n", f"  rules:\n    - {_LIE}\n", 1))
 
-    done = _run([str(bin_dir / "guardana"), "pack", "validate", str(lying)])
+    done = _run([str(bin_dir / "guardana"), "pack", "validate", str(lying), *_trusting(name)])
     if done.returncode == 0:
         raise CheckError(
             f"a manifest promising {_LIE}, which nothing registers, was accepted; "
@@ -129,8 +134,8 @@ def _detector_works(bin_dir: Path, pack: Path, module: str, tmp: Path) -> None:
         )
 
 
-def _graded(bin_dir: Path, prefix: str, rules: int) -> None:
-    done = _run([str(bin_dir / "guardana"), "rule", "test", f"{prefix}.*"])
+def _graded(bin_dir: Path, name: str, prefix: str, rules: int) -> None:
+    done = _run([str(bin_dir / "guardana"), "rule", "test", f"{prefix}.*", *_trusting(name)])
     if done.returncode != 0:
         raise CheckError(f"rule test exited {done.returncode}:\n{done.stdout}{done.stderr}")
     summary = done.stdout.strip().splitlines()[-1] if done.stdout.strip() else ""
@@ -170,8 +175,8 @@ def _check(pack: Path, name: str, tmp: Path) -> int:
     rules = _rules_in(pack, module)
     bin_dir = _install(pack, tmp / f"venv-{name}")
     _validate(bin_dir, pack, name, module)
-    _detector_works(bin_dir, pack, module, tmp)
-    _graded(bin_dir, name.split("-", maxsplit=1)[0], rules)
+    _detector_works(bin_dir, pack, name, module, tmp)
+    _graded(bin_dir, name, name.split("-", maxsplit=1)[0], rules)
     _suite(bin_dir, pack)
     return rules
 

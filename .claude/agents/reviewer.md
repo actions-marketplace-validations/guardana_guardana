@@ -29,9 +29,9 @@ Hunt, in this order:
    is the envelope still versioned; do the PostgreSQL tests exist and refuse to skip in CI.
 8. **Repo rules.** Missing negative fixture; a bare taxonomy id (`LLM07`) instead of the edition
    form; comments carrying dates, names, incident history or decisions; secrets or real prompts
-   in fixtures; a Fable/Mythos model id; attribution; the five documentation places not
-   answered; `docs/generated/` edited by hand; a new script with no row in
-   `docs/maintainers/ops-catalogue.md`.
+   in fixtures; a hard-coded preview model id; attribution; the five documentation places
+   not answered; `docs/generated/` edited by hand; internal material (a plan, an audit, a
+   design note) added anywhere git tracks instead of `.work/`.
 
 Verify before you claim: open the code, run a read-only command, or mark the finding
 `UNVERIFIED`. No style nitpicks a formatter would settle.

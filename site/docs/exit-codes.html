@@ -6,58 +6,78 @@
 <title>Exit codes — Guardana documentation</title>
 <meta name="description" content="the exit-status contract every command honours">
 <link rel="canonical" href="https://guardana.dev/docs/exit-codes">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html" aria-current="page">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,61 +98,112 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>Exit codes</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html" aria-current="page">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>Exit codes</h1><p class="lede">the exit-status contract every command honours</p><p>Machine consumers should never have to parse human output to find out what
 happened, so the exit status is a contract. It is an importable enum
 (<code>guardana.cli.exit_codes.ExitCode</code>) and a test asserts that this table matches
@@ -163,11 +235,11 @@ behaviour.</p>
 </tr>
 <tr>
 <td>4</td>
-<td>target unavailable or authentication failed</td>
+<td>target or judge unavailable, or authentication failed; a run its target stopped part-way is saved</td>
 </tr>
 <tr>
 <td>5</td>
-<td>internal Guardana error</td>
+<td>internal Guardana error, or a third-party evaluator's own code failing in <code>calibrate</code></td>
 </tr>
 <tr>
 <td>6</td>
@@ -175,11 +247,20 @@ behaviour.</p>
 </tr>
 <tr>
 <td>7</td>
-<td>run interrupted, partial evidence written</td>
+<td>run interrupted before it finished</td>
+</tr>
+<tr>
+<td>8</td>
+<td>an installed output failed: a format raised or returned no text, or a reporter failed, or a delivery <code>delivery.required</code> asks for was not acknowledged; the verdict is printed</td>
 </tr>
 </tbody>
 </table></div>
 <h2 id="the-reasoning">The reasoning</h2>
+<p><code>plan scan</code>, <code>plan probe</code>, <code>plan grade</code>, <code>config explain</code>, <code>target inspect</code> and
+<code>run inspect</code> accept <code>--format human</code> or
+<code>--format json</code>. Any other format, including <code>sarif</code> and <code>junit</code>, exits <code>3</code>
+before the command reads configuration or a saved run, discovers plugins or
+builds a target.</p>
 <p><strong>Every non-zero code is a non-pass.</strong> Nothing in the table means &quot;probably
 fine&quot;. A CI job that treats any non-zero as a failure is <em>correct</em> by default and
 gets finer control only if it asks for it — the safe reading is the default
@@ -188,8 +269,14 @@ reading.</p>
 no rule ran, <strong>no rule that ran reached a verdict</strong>, a check could not run under
 <code>fail_on_error</code>, one side of a comparison never finished, or <strong>coverage the operator
 demanded was not there</strong> — a dimension named in <code>trace.require</code>, or one an assertion
-in a security contract needs. If indeterminate and clean shared a code, a broken
-setup would read as a green build.</p>
+in a security contract needs — or <strong>a suite declined</strong>: too few of its cases were
+measured, its judge's error could not be corrected, ungraded trials leave its pass
+rate on both sides of its bar, a corrected rate clears the bar while the raw rate and
+the corrected lower limit do not, or the suite raised before it concluded — or <strong>coverage
+no run can do without was not there</strong>: a scanned path held no file other than
+<code>.guardanaignore</code> files (<code>empty_target</code>), or a rule attempted cases and graded none of
+them, or fewer than <code>fail_on.min_graded_share</code> (<code>ungraded_cases</code>). If indeterminate and
+clean shared a code, a broken setup would read as a green build.</p>
 <p>The second of those is worth stating on its own, because it is the one that looks
 like a completed run. An endpoint answering every request with an empty message — a
 rate-limited gateway, a content filter, a wrong model name — makes every rule
@@ -198,10 +285,13 @@ zero, and nothing was established. That is <code>2</code>, and no <code>fail_on_
 <code>fail_on_inconclusive</code> decides what to do when <em>some</em> checks go dark, which is a
 preference, and a run with nothing at all to show is not one. One check reaching a
 verdict is enough to make <code>0</code> honest again.</p>
-<p>That last case is the only one no <code>fail_on_*</code> setting can switch off, and
-deliberately: every other branch covers checks nobody specifically asked for, while
-this one was asked for by name. <code>fail_on_skipped</code> defaults to off, so without it the
+<p>That last case has no <code>fail_on_*</code> setting in front of it, deliberately: the
+switches cover checks nobody specifically asked for, while this one was asked for by
+name. <code>fail_on_skipped</code> defaults to off, so without it the
 default path for &quot;the contract I wrote could not be checked&quot; would have been <code>0</code>.</p>
+<p>A declined suite has no switch in front of it either, for the same reason: its bar
+is a demand its author wrote into the rule, and a pass rate the suite could not
+establish is not a preference to switch off.</p>
 <p><strong><code>6</code> is separate from <code>1</code>, in both directions.</strong> A budget stopping a run is not
 a security verdict, so an under-budgeted pipeline must not report a failure that
 never happened. More importantly the other way round: a team must not be able to
@@ -209,25 +299,153 @@ fix a red gate by lowering the budget until the run stops early. A stopped run i
 reported as stopped whatever its partial findings say, and <code>guardana diff</code> refuses
 to read the missing findings as an improvement.</p>
 <p><strong><code>4</code> is separate from <code>5</code>.</strong> An unreachable endpoint is the user's environment;
-an internal error is our defect. Conflating them sends bug reports to the wrong
+an internal error is our defect. A crash prints one line naming the exception type
+and exits <code>5</code>; the traceback is printed only with <code>GUARDANA_DEBUG=1</code>, because it can
+carry a URL or a payload from the run. In <code>calibrate</code>, a third-party evaluator whose own code raises also causes exit <code>5</code>; the message names the evaluator and does not call it a Guardana defect. A judge configured under <code>evaluators:</code> that cannot be
+reached or rejects the request is <code>4</code> too, and the message names the judge's block
+(<code>evaluators.llm_judge</code>), not the target. Conflating them sends bug reports to the wrong
 place and hides real bugs in a category people learn to ignore.</p>
+<p><strong><code>4</code> describes a result too.</strong> A target that fails part-way — it refuses the
+credentials, answers <code>404</code>, <code>408</code>, <code>425</code>, <code>429</code> or <code>5xx</code> once retried, stops answering, or
+sends a reply Guardana cannot read — stops the run (<code>stopped_by: target_unavailable</code>). A
+chat endpoint, an MCP server and an A2A agent stop alike, an MCP server that cannot be
+reached at all included (<a href="usage-probe.html#when-the-server-fails-part-way">MCP</a>,
+<a href="usage-probe.html#probing-an-a2a-agent">A2A</a>). An MCP server that stops accepting the
+protocol revision the run agreed with it stops the run too, as <code>stopped_by: target_changed</code>: it still answers, so <code>target_unavailable</code> would name the wrong cause.
+Like a budget stop either outranks the verdict, and the run is saved with what it graded
+before the failure (<a href="usage-probe.html#when-the-target-fails-part-way">probe</a>). A <code>4xx</code> about
+one request is not the target's failure: it is an error of the rule that sent it, and the
+run exits <code>2</code> under <code>fail_on_error</code>. When pooled rules stop for several reasons,
+<code>target_unavailable</code> outranks <code>target_changed</code>, and both outrank the budget's stop,
+because a larger budget would not have let the run finish. A target that fails before
+the run has a result — an stdio MCP command that cannot be started, say — and a judge
+that fails at any point, still exit <code>4</code> with nothing saved.</p>
 <p><strong><code>3</code> is usage, not policy.</strong> A malformed <code>guardana.yaml</code> must not look like a
-policy failure, or a typo in a config file reads as a security finding.</p>
-<p><strong><code>7</code> is honest partiality.</strong> Ctrl-C, or a timeout with evidence already written,
-is neither a pass nor a completed failure. The partial run is kept and the code
-says it is partial.</p>
+policy failure, or a typo in a config file reads as a security finding. A
+<code>rules.include</code> pattern that matches no registered rule is such a typo, even beside a
+pattern that matches: the command refuses before any rule runs, whatever <code>fail_on</code>
+says, and names every such pattern
+(<a href="profiles.html#an-include-pattern-must-match-a-rule">profiles</a>):</p>
+<pre><code class="language-text">error: rules.include contains unmatched patterns: &quot;guardana.supply_chain.code_executon&quot; — check the spelling and registered rules.
+</code></pre>
+<p>A selection the policy narrows to nothing with every pattern matched — each rule
+excluded, or for another kind of target — still runs no rule and exits <code>2</code>.</p>
+<p><strong><code>7</code> is honest partiality.</strong> Ctrl-C is neither a pass nor a completed failure.
+Nothing the command had not yet written is written afterwards, and the code says
+the run did not finish. Stopping <code>guardana monitor</code> with Ctrl-C exits <code>7</code> too, even
+after an alert: the alerts it printed are the record of the cycles that raised them.</p>
+<p><strong><code>8</code> is separate from <code>5</code>.</strong> An <a href="outputs.html">installed output</a> is code another
+distribution shipped: a format that raised or returned no text, so nothing was written,
+or a reporter whose delivery is <code>unknown</code> because it raised, returned no valid status or
+ran past its deadline. The bug report belongs to that distribution, so the code is not
+<code>5</code>. The verdict is printed whenever <code>8</code> replaces its code; <code>8</code> replaces <code>0</code>, <code>1</code> and <code>2</code>,
+and a run that stopped keeps <code>4</code>, <code>6</code> or <code>7</code>. A receiver that refused or did not answer is not
+<code>8</code> by default: the delivery line says so and the verdict keeps its code, as for the collector.
+When Guardana's own redaction fails before an output is called, nothing is written or sent and the
+code is <code>5</code>, under the same precedence; <code>GUARDANA_DEBUG=1</code> prints the traceback. A profile's
+<code>custom_patterns</code> entry that misses its time or size bound while the run's results are
+redacted (<a href="privacy.html">privacy</a>) is the same failure: nothing is written or sent, and the code
+is <code>5</code> under the same precedence.</p>
+<p><strong><code>8</code> is also a delivery a profile required.</strong> A profile that sets <code>delivery.required: true</code>
+(<a href="profiles.html#delivery">profiles</a>) asks that every delivery the run makes be acknowledged: the
+collector's, which answers with its own acknowledgement and not merely a <code>2xx</code>, and an installed
+reporter's, whose status must be <code>delivered</code> — <code>not_sent</code> included, since a job that delivered
+nothing must not pass. Anything else is <code>8</code> under the same precedence, with the verdict printed:
+it replaces <code>0</code>, <code>1</code> and <code>2</code>, a stopped run keeps <code>4</code>, <code>6</code> or <code>7</code>, and a redaction failure stays
+<code>5</code>. <code>import-observations</code>, which otherwise exits <code>2</code>, exits <code>8</code> the same way. <code>monitor</code> never
+stops a watch for it: it counts the alert deliveries that were not acknowledged and ends a
+watch that would have exited <code>0</code>, <code>1</code> or <code>2</code> with <code>8</code>. Without the key nothing changes. The
+setting is not part of the verdict, so it moves no profile digest. <code>scan --write-baseline</code> and
+<code>probe --write-mcp-pin</code> forward nothing, so they refuse any <code>--reporter</code> with <code>3</code> before
+anything is sent, whatever the profile says.</p>
 <h2 id="which-commands-produce-which">Which commands produce which</h2>
-<p><code>scan</code>, <code>probe</code> and <code>monitor</code> can produce any of them. <code>diff</code> has no target to be
+<p><code>scan</code>, <code>probe</code> and <code>monitor</code> can produce any of them. <code>8</code> needs an installed format or
+reporter, which <code>monitor</code> refuses, or a delivery <code>delivery.required</code> asks for: <code>monitor</code> exits
+<code>8</code> when an alert's delivery to the collector was not acknowledged. A <code>monitor</code> bounded by
+<code>--max-cycles</code> exits with the worst outcome any cycle earned, judged as <code>probe</code> judges
+the cycle and as <code>diff</code> judges it against the first one; a policy failure outranks a
+stop, and a cycle the endpoint dropped or its target stopped is <code>4</code> when nothing worse was seen. <code>diff</code> has no target to be
 unavailable, so <code>4</code> never occurs there; it uses <code>2</code> both for &quot;these runs cannot be
 compared&quot; — including a rule whose trials per case changed between the two runs — and
 for &quot;one of them never finished&quot;. <code>run inspect</code>, <code>run migrate</code>,
-<code>trace inspect</code> and <code>plan</code> produce <code>0</code> or <code>3</code> — <code>trace inspect</code> grades nothing, so
+<code>trace inspect</code> and <code>plan</code> produce <code>0</code> or <code>3</code> — <code>plan</code> exits <code>3</code> when the target or a
+judge meter could exceed the request budget — <code>trace inspect</code> grades nothing, so
 it has no verdict to report and says what is missing in its output instead.
-<code>analyze-trace</code> adds one route to <code>2</code> the others do not have: demanded coverage that
+<code>grade</code> uses the codes <code>probe</code> uses, with no target to be unavailable: <code>3</code> also covers a
+recording that cannot be read, one a probe kept at other trials per case than the run
+grades, and an <code>--output</code> that would replace or remove the recording, <code>4</code> a judge that
+cannot be reached, and <code>2</code> a run that graded nothing
+(<a href="usage-grade.html"><code>usage-grade.md</code></a>). Before reading anything, <code>scan</code>, <code>probe</code>, <code>grade</code>,
+<code>analyze-trace</code> and <code>import-observations</code> exit <code>3</code> when <code>--output</code> or its sidecar path
+(<code>&lt;stem&gt;.exchanges.jsonl</code>) is a file they read: one named on the command line (the scanned
+file, recording, trace or results file, <code>--profile</code>, a <code>--rules</code> file or a rule file in a
+<code>--rules</code> directory, <code>--baseline</code>, a <code>--contract</code>, and for <code>probe</code> <code>--system-prompt-file</code>,
+<code>--fixtures</code> and its tenants' adapters, <code>--adapter</code>, <code>--mcp-pin</code> and <code>--mcp-registry-entry</code>)
+or one the profile names under <code>rules.paths</code>, <code>contracts:</code>, <code>calibrations:</code> or a judge's or
+guard's <code>adapter</code>; <code>recipe run</code> refuses the same profile files inside its
+<code>output.directory</code>; <code>analyze-trace</code> also exits <code>3</code> when <code>--write-trace</code> is <code>--output</code>, its
+sidecar path or such a file, a file in a <code>--rules</code> or <code>--contract</code> directory included.
+For <code>probe</code>, <code>--output</code> also refuses an existing file named by an argument of the stdio <code>--mcp</code> command, with exit <code>3</code> before anything is written or the server started.
+After scanning and before writing, <code>scan</code> exits <code>3</code> when <code>--output</code> or its sidecar path is
+a file it scanned, other than an earlier saved run and the exchanges a saved run beside it
+records by digest. <code>run migrate</code> exits <code>3</code> when the sidecar path of <code>--output</code>
+is its input; writing over the input itself is migrating in place. It also exits <code>3</code>
+when <code>--output</code> is the input's own sidecar or the destination cannot be written; the
+destination is then left as it was. <code>scan --write-baseline</code> and
+<code>probe --mcp … --write-mcp-pin</code> exit <code>3</code> beside <code>--output</code> or when their file cannot be
+written; the pin command also refuses a destination it reads (a profile, rule file, dataset a suite reads, pin, registry entry or file the profile names) before sending or reading anything. It also refuses an existing file named by an argument of the stdio <code>--mcp</code> command, with exit <code>3</code> before anything is written or the server started. An argument joining an option and a path, such as <code>--config=conf.json</code>, is not recognised as a file. <code>probe</code> exits <code>3</code> for an MCP-only flag without <code>--mcp</code>; <code>recipe run</code> exits <code>3</code>
+for a recipe that names a file inside its own <code>output.directory</code>.
+<code>probe --keep-exchanges</code> exits <code>3</code> before sending anything when its sidecar path holds
+exchanges the other saved run of the pair (<code>&lt;stem&gt;</code> or <code>&lt;stem&gt;.json</code>) records, or a file
+the run saved at <code>--output</code> does not record by digest.
+<code>analyze-trace</code> exits <code>2</code> for demanded coverage that
 was not available, and a security contract that turned out to be about a different
-AI system than the one under test. <code>baseline create</code>, <code>baseline update</code> and
-<code>scan --write-baseline</code> produce <code>2</code> when a check did not run, because a snapshot
-taken over a rule that never ran is missing whatever it would have found.</p>
+AI system than the one under test. <code>probe --mcp</code> with a pin also exits <code>2</code> for demanded coverage that was not available. <code>baseline create</code>, <code>baseline update</code> and
+<code>scan --write-baseline</code> write nothing and produce <code>2</code> when the run is not entitled
+to a snapshot — any open question the gate refuses, with a check that did not run
+counted whatever <code>fail_on_error</code> says — because a snapshot taken over a rule that
+never ran is missing whatever it would have found. A run that stopped exits <code>6</code> or
+<code>7</code> there, as it does on <code>scan</code>. <code>calibrate</code> exits <code>3</code> when <code>--max-ece</code> is not finite or is outside [0, 1], <code>1</code> when the measured error is over
+<code>--max-ece</code>, <code>2</code> when the measurement is not reliable, <code>4</code> when its judge cannot be
+reached, <code>5</code> when a third-party evaluator's own code raises, and <code>6</code> when the profile's <code>budgets:</code> stop its judge — then nothing is
+measured or recorded.</p>
+<p>A connection that cannot be used as written is <code>3</code> on <code>probe</code>, <code>plan probe</code>,
+<code>target inspect</code>, <code>monitor</code> and every judge, refused before anything is sent: an
+unknown <code>--provider</code>, a <code>--system-prompt-file</code> or <code>--adapter</code> that cannot be read, an
+<code>--api-key-env</code> naming an unset or empty variable, <code>--adapter</code> with <code>--provider</code> or
+<code>--api-key-env</code>, and an adapter whose <code>url:</code> differs from <code>--url</code> or whose <code>method:</code> is
+not <code>POST</code>. The two <code>--api-key-env</code> cases do not apply to <code>plan probe</code>, which has no
+<code>--api-key-env</code> option; passing it is an unknown-option error, also exit <code>3</code>. On <code>probe --mcp</code> the same holds for an stdio command given without
+<code>--allow-exec</code>, which starts nothing, an stdio <code>--mcp</code> command that cannot be split into a program and its arguments, an <code>--mcp-token-env</code> naming an unset or empty
+variable, and an <code>--mcp-registry-entry</code> that cannot be read or is not an entry; on
+<code>probe --a2a</code> and <code>plan probe --a2a</code>, for an agent URL whose path is neither an agent card
+(ending in <code>.json</code>) nor the origin; and on <code>probe --a2a</code>, for an unset token variable, a
+second caller's variable without the first, or two variables holding the same value. None
+of them is <code>5</code>, which covers Guardana's own defects and a third-party evaluator's own failure in <code>calibrate</code>.</p>
+<p><code>recipe lock</code> and <code>recipe run</code> exit <code>4</code>, writing no lock and sending nothing, when the
+installed target the recipe names fails to connect while it is being built.
+<code>recipe lock</code> exits <code>0</code> once it wrote the lock, <code>1</code>, writing nothing, when a regression
+case of a selected suite no longer holds with the rule as it is now — a side graded the
+wrong way, a side declined, the evaluator raised, or the suite's evaluator cannot regrade
+without sending — where <code>rule test</code> tells those apart as <code>1</code>, <code>2</code>, <code>2</code> and <code>3</code>; <code>2</code> when
+what it would pin cannot be
+pinned — nothing selected, plugin trust refused an installed extension, a selected check
+that would not grade — and also <code>2</code>, having written the lock, when a selected check is
+unpinned; <code>3</code> for a recipe it cannot read, and, writing nothing, for a configuration whose
+run could never pass, as <code>plan</code> refuses it. <code>recipe lock --check</code> uses the same codes and
+<code>1</code> when a pin moved: the lock is the policy it checks, as <code>pack lock --check</code> does. A
+pin that moved, or a regression case that no longer holds, is <code>3</code> on <code>recipe run</code>, which
+sends nothing, because the run was refused
+rather than judged, and so is anything <code>recipe lock</code> refuses with <code>2</code>; otherwise <code>recipe run</code> exits as the run's gate decides, and every rule
+its lock pins is demanded coverage: one the run did not complete makes it <code>2</code> whatever the
+<code>fail_on_*</code> switches say, as a demanded <code>analyze-trace</code> dimension does
+(<a href="usage-recipe.html"><code>usage-recipe.md</code></a>).</p>
+<p><code>case add</code> exits <code>0</code> when it wrote the case, or showed it without <code>--write</code>; <code>1</code> when a side
+of the proof graded the wrong way; <code>2</code> when a side declined; and <code>3</code> for a refused input,
+recording, rule, evaluator or flag, and for an evaluator that raised. <code>case list</code> exits <code>0</code>,
+or <code>3</code> for a recording it cannot read (<a href="usage-case.html"><code>usage-case.md</code></a>). <code>rule test</code> exits
+<code>1</code> when a regression pair's side graded the wrong way, <code>2</code> when one declined or raised, and
+<code>3</code> when a suite holds pairs its evaluator cannot regrade without sending.</p>
 <p>An unused code is better than a second table.</p>
 <h3 id="changed-in-0210">Changed in 0.21.0</h3>
 <p><strong>A run where every check declined now exits <code>2</code> instead of <code>0</code>.</strong> The guard for
@@ -244,7 +462,8 @@ with a single concluded check is unaffected.</p>
 <li><strong>An unreadable saved run exited <code>1</code>.</strong> <code>run inspect</code>, <code>run migrate</code> and <code>diff</code>
 let the manifest reader's own exception escape, so the user got a traceback and
 a code that says &quot;a finding failed the policy&quot; — the one thing a broken input
-file is not. All three now report <code>3</code>.</li>
+file is not. <code>run inspect</code> and <code>run migrate</code> now report <code>3</code>; <code>diff</code> reports <code>2</code>,
+because a comparison with an unreadable side is one that could not be made.</li>
 <li><strong><code>scan --write-baseline</code> exited <code>1</code> where <code>baseline create</code> exited <code>2</code></strong> for
 the identical situation. Codes are read by pipelines that never see the message
 beside them, so a code meaning two things means nothing.</li>
@@ -261,8 +480,10 @@ between non-zero codes, so no pipeline turns green by accident.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/exit-codes.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

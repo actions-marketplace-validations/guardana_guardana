@@ -57,8 +57,13 @@ def _sitemap() -> str:
 
 
 def _robots() -> str:
-    """Everything is public documentation, so the only thing worth saying is where the map is."""
-    return f"User-agent: *\nAllow: /\n\nSitemap: {_ORIGIN}/sitemap.xml\n"
+    """Everything is public documentation, open to search engines and to AI use alike."""
+    return (
+        "User-agent: *\n"
+        "Content-Signal: search=yes, ai-input=yes, ai-train=yes\n"
+        "Allow: /\n"
+        f"\nSitemap: {_ORIGIN}/sitemap.xml\n"
+    )
 
 
 def main() -> int:

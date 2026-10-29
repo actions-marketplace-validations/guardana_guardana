@@ -8,17 +8,18 @@ if it changes nothing else, which is what these tests pin:
 * the same report, in the same order, whichever rule finishes first;
 * the concurrency limit is a limit, not a suggestion (a probe must not become a
   load test against someone's production model);
-* a rule that raises is still recorded, and an unreachable endpoint still aborts
-  the whole run rather than being reported per-rule.
+* a rule that raises is still recorded, and an unreachable endpoint still stops
+  the whole run rather than being reported as one rule's error.
 """
 
 import threading
 from collections.abc import Iterable
 from urllib.error import URLError
 
+import pytest
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
-from guardana.core.report import Evidence, Finding
+from guardana.core.report import Evidence, Finding, StopReason
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.runner import Runner
 from guardana.core.severity import Severity
@@ -105,6 +106,32 @@ class _Unreachable(Rule):
         yield  # pragma: no cover — unreachable, keeps this a generator
 
 
+class _Exiting(Rule):
+    meta = RuleMeta(
+        id="test.concurrency.exiting",
+        title="exits",
+        severity=Severity.HIGH,
+        target_kind=TargetKind.ENDPOINT,
+        taxonomy=(),
+        required_capabilities=frozenset({Capability.CHAT}),
+    )
+
+    def __init__(self, raised: BaseException) -> None:
+        self._raised = raised
+
+    def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
+        """Report a finding, then end the way a rule calling `sys.exit` does."""
+        yield Finding(
+            rule_id=self.meta.id,
+            severity=Severity.HIGH,
+            title=self.meta.title,
+            taxonomy=(),
+            target_ref=target.ref,
+            evidence=Evidence(summary="found before exiting"),
+        )
+        raise self._raised
+
+
 def _target() -> EndpointTarget:
     return EndpointTarget("http://x", "m", transport=ScriptedTransport("ok"))
 
@@ -167,20 +194,22 @@ def test_a_raising_rule_is_recorded_and_the_rest_still_run() -> None:
     assert [e.source for e in result.errors] == ["test.concurrency.raising"]
 
 
-def test_an_unreachable_endpoint_still_aborts_the_whole_run() -> None:
-    # Every rule would fail identically, so this stays a single top-level failure
-    # with its own exit code rather than N per-rule errors.
+def test_an_unreachable_endpoint_still_stops_the_whole_run() -> None:
+    # Every rule would fail identically, so the run stops with its own exit code
+    # rather than reading as one rule's error among finished ones.
     _reset()
     rules: list[Rule] = [_Tracked(i, sync=False) for i in range(2)]
     rules.append(_Unreachable())
     runner = Runner(
         registry=_registry(*rules), profile=Profile(name="t", policy=Policy()), concurrency=_LIMIT
     )
-    try:
-        runner.run(_target())
-    except URLError:
-        return
-    raise AssertionError("an unreachable endpoint must propagate, not be swallowed")
+
+    result = runner.run(_target())
+
+    assert result.stopped_by is StopReason.TARGET_UNAVAILABLE
+    assert [(e.source, e.stage) for e in result.errors] == [
+        ("test.concurrency.unreachable", "target")
+    ]
 
 
 def test_artifact_scans_stay_sequential() -> None:
@@ -193,3 +222,46 @@ def test_artifact_scans_stay_sequential() -> None:
     )
     assert runner.concurrency_for(TargetKind.ARTIFACT) == 1
     assert runner.concurrency_for(TargetKind.ENDPOINT) == _LIMIT
+
+
+@pytest.mark.parametrize("concurrency", [1, _LIMIT])
+def test_an_interrupt_in_a_rule_ends_the_run_whatever_the_concurrency(concurrency: int) -> None:
+    # A worker thread swallows what it does not catch, so a pool that lets Ctrl-C
+    # fly would drop the rule and its finding and report the run as clean.
+    _reset()
+    raised = KeyboardInterrupt()
+    rules: list[Rule] = [_Tracked(i, sync=False) for i in range(2)]
+    rules.append(_Exiting(raised))
+    runner = Runner(
+        registry=_registry(*rules),
+        profile=Profile(name="t", policy=Policy()),
+        concurrency=concurrency,
+    )
+
+    with pytest.raises(KeyboardInterrupt) as caught:
+        runner.run(_target())
+
+    assert caught.value is raised
+
+
+@pytest.mark.parametrize("code", [0, 7])
+def test_a_rule_calling_sys_exit_is_the_same_error_whatever_the_concurrency(code: int) -> None:
+    def run(concurrency: int) -> tuple[list[str], list[tuple[str, str]], tuple[str, ...]]:
+        _reset()
+        rules: list[Rule] = [_Tracked(i, sync=False) for i in range(2)]
+        rules.append(_Exiting(SystemExit(code)))
+        result = Runner(
+            registry=_registry(*rules),
+            profile=Profile(name="t", policy=Policy()),
+            concurrency=concurrency,
+        ).run(_target())
+        return (
+            [f.rule_id for f in result.findings],
+            [(e.source, e.stage) for e in result.errors],
+            result.rules_run,
+        )
+
+    sequential = run(1)
+    assert sequential[1] == [("test.concurrency.exiting", "run")]
+    assert "test.concurrency.exiting" in sequential[0]
+    assert run(_LIMIT) == sequential

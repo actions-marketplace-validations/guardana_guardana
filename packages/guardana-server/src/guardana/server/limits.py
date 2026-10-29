@@ -70,19 +70,49 @@ def _number(environ: Mapping[str, str], name: str, default: int) -> int:
 
 @dataclass
 class RateLimiter:
-    """A per-caller allowance over a rolling minute, kept in this process."""
+    """A per-caller allowance over a rolling minute, kept in this process.
+
+    A credential is its own caller only after the collector has accepted it once;
+    until then its requests are charged to the peer address. The limiter runs
+    before authentication, so keying on whatever token a request presents would
+    let one peer buy a fresh allowance per invented token.
+
+    Whether a credential is accepted and what it has spent are kept apart:
+    withdrawing acceptance leaves the history in place, so a key accepted again
+    resumes the window it was in instead of starting an empty one.
+    """
 
     limits: Limits
     clock: Callable[[], float] = time.monotonic
     _seen: dict[str, deque[float]] = field(default_factory=dict)
+    _accepted: set[str] = field(default_factory=set)
+
+    def caller_for(self, peer: str, credential: str | None) -> str:
+        """Who to charge: the credential if it was accepted before, else the peer."""
+        if credential is not None and credential in self._accepted:
+            return credential
+        return peer
+
+    def vouch(self, credential: str) -> None:
+        """Record that the collector accepted this credential, so it earns its own allowance."""
+        if self.limits.requests_per_minute == _UNLIMITED or credential in self._accepted:
+            return
+        if credential not in self._seen:
+            self._make_room(self.clock())
+            self._seen[credential] = deque()
+        self._accepted.add(credential)
+
+    def forget(self, credential: str) -> None:
+        """Stop treating this credential as accepted, keeping what it has already spent."""
+        self._accepted.discard(credential)
 
     def allows(self, caller: str, *, path: str) -> bool:
         """Whether this caller may make one more request now."""
         if self.limits.requests_per_minute == _UNLIMITED or path in _NEVER_LIMITED:
             return True
         now = self.clock()
-        if len(self._seen) > _MAX_TRACKED_CALLERS:
-            self._forget_the_quiet(now)
+        if caller not in self._seen:
+            self._make_room(now)
         window = self._seen.setdefault(caller, deque())
         while window and now - window[0] >= _MINUTE:
             window.popleft()
@@ -91,13 +121,28 @@ class RateLimiter:
         window.append(now)
         return True
 
+    def _make_room(self, now: float) -> None:
+        """Keep the caller map under its bound before a new caller is added.
+
+        Quiet callers go first. If every tracked caller is still inside its
+        minute, the earliest-added are dropped, a tenth of the bound at a time so
+        the sweep is not repeated for every new caller.
+        """
+        if len(self._seen) < _MAX_TRACKED_CALLERS:
+            return
+        self._forget_the_quiet(now)
+        overflow = len(self._seen) - (_MAX_TRACKED_CALLERS - _MAX_TRACKED_CALLERS // 10)
+        for caller in list(self._seen)[: max(0, overflow)]:
+            del self._seen[caller]
+        self._accepted &= self._seen.keys()
+
     def _forget_the_quiet(self, now: float) -> None:
         """Drop callers whose window has emptied.
 
-        One entry per distinct caller, and an unauthenticated collector keys on the
-        peer address — so a long-running process facing the internet would grow a
-        dictionary forever. Sweeping only when the map is already large keeps the
-        common path free of it.
+        One entry per distinct caller, and an unauthenticated caller is keyed on
+        its peer address — so a long-running process facing the internet would
+        grow a dictionary forever. Sweeping only when the map is already large
+        keeps the common path free of it.
         """
         self._seen = {
             caller: window

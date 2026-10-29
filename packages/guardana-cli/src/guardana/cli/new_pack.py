@@ -10,8 +10,13 @@ from typing import Annotated
 import typer
 import yaml
 from guardana.cli.exit_codes import ExitCode
-from guardana.core.pack import EXTENSION_API_VERSION, MANIFEST_NAME, PACK_SCHEMA_VERSION
+from guardana.core import __version__ as core_version
+from guardana.core.pack import EXTENSION_API_VERSION, MANIFEST_NAME
 from guardana.core.registry import RESERVED_NAMESPACE, RESERVED_TARGET_SCHEMES
+
+_SCAFFOLD_SCHEMA = 2
+"""The manifest schema a scaffold writes: it declares no output, which is all schema 3
+adds, and a schema 2 manifest also loads on builds that predate outputs."""
 
 _SHAPES = {
     "prompt": ("prompt_secret_disclosure.yaml", "prompt_rule.yaml.tmpl"),
@@ -52,6 +57,7 @@ class _Names:
     def render(self, template: str) -> str:
         """Substitute the template tokens, longest first so prefixes do not collide."""
         api_range = f">={EXTENSION_API_VERSION},<{EXTENSION_API_VERSION + 1}"
+        floor, ceiling = _core_range(core_version)
         for token, value in (
             ("__MARKER__", self.marker),
             ("__MODULE__", self.module),
@@ -60,10 +66,24 @@ class _Names:
             ("__CLASS__", self.klass),
             ("__DIST__", self.distribution),
             ("__API_RANGE__", api_range),
-            ("__SCHEMA__", str(PACK_SCHEMA_VERSION)),
+            ("__SCHEMA__", str(_SCAFFOLD_SCHEMA)),
+            ("__CORE_FLOOR__", floor),
+            ("__CORE_CEILING__", ceiling),
         ):
             template = template.replace(token, value)
         return template
+
+
+def _core_range(version: str) -> tuple[str, str]:
+    """Return the `guardana-core` this pack is made with and the next minor it stops before.
+
+    The local label is dropped: a requirement may not name one.
+    """
+    public = version.partition("+")[0]
+    release = re.match(r"(\d+)\.(\d+)", public)
+    if release is None:
+        raise ValueError(f"guardana-core reports a version that is not PEP 440: {version!r}")
+    return public, f"{release[1]}.{int(release[2]) + 1}"
 
 
 def _refuse(message: str) -> typer.Exit:
@@ -191,8 +211,11 @@ def new_pack(
     typer.echo(f"Wrote {len(written)} files to {target}{'/' if str(target) != '.' else ''}")
     typer.echo("Install and verify it:")
     typer.echo(f"  pip install -e {target}")
-    typer.echo(f"  guardana pack validate {package / MANIFEST_NAME}")
-    typer.echo(f"  guardana rule test '{names.prefix}.*'")
+    # Guardana loads only its built-ins unless trust is stated, so each command
+    # admits this pack by its distribution name.
+    admit = f"--plugins allowlist --allow-plugin {names.distribution}"
+    typer.echo(f"  guardana pack validate {package / MANIFEST_NAME} {admit}")
+    typer.echo(f"  guardana rule test '{names.prefix}.*' {admit}")
     typer.echo(f"  pytest {target / 'tests'}")
 
 

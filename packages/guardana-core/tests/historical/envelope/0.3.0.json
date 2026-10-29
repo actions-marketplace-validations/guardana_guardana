@@ -1,0 +1,44 @@
+{
+  "schema_version": 3,
+  "source": "subject",
+  "findings": [
+    {
+      "rule_id": "guardana.supply_chain.pickle_opcode",
+      "severity": "CRITICAL",
+      "title": "Dangerous pickle opcode (arbitrary code on load)",
+      "taxonomy": [
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM03"
+        },
+        {
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM05"
+        },
+        {
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0018"
+        },
+        {
+          "framework": "NIST-AI-100-2",
+          "id": "supply-chain"
+        }
+      ],
+      "target_ref": "subject/model.pkl",
+      "evidence": {
+        "summary": "unpickling imports non-allowlisted callable: os.system",
+        "detail": "file=model.pkl"
+      },
+      "verdict": null
+    }
+  ],
+  "unverified": [],
+  "errors": [],
+  "summary": {
+    "rules_run": 19,
+    "rules_skipped": [],
+    "max_severity": "CRITICAL",
+    "unverified": 0,
+    "errors": 0
+  }
+}

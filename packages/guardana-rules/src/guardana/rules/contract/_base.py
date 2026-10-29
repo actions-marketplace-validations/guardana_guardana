@@ -16,6 +16,7 @@ from guardana.core.contract import Assertion, SecurityContract
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
 from guardana.core.rule._digest import digest_parts
+from guardana.core.safety import Detection
 from guardana.core.target import Capability, TargetKind
 from guardana.core.target.trace import capability_for
 from guardana.core.taxonomy import TaxonomyRef
@@ -66,6 +67,7 @@ class ContractRule(TraceRule, Generic[A]):
             required_capabilities=frozenset(
                 {Capability.READ_TRACE, *self._dimension_capabilities()}
             ),
+            detection=Detection.INVARIANT,
         )
 
     def _dimension_capabilities(self) -> frozenset[Capability]:

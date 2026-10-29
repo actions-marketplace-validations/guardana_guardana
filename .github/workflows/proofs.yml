@@ -1,0 +1,465 @@
+# Runs the maintainer proofs against the packages PyPI serves, on clean runners
+# (`scripts/proofs/`). No Guardana package is built from this checkout: it supplies the proof
+# scripts, the reference retrieval application under test and the collector's deployment
+# files, the last two compared with the version's tag. Every Guardana package comes from
+# pypi.org and the collector image from ghcr.io, at the version dispatched. Where a proof
+# claims to run offline, the network is cut after the install and a canary inside the
+# isolation shows it. Every record is uploaded, passed or not, and the summary passes only
+# when every expected record passed.
+
+name: Proofs
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The guardana-cli version on PyPI, e.g. 1.0.0rc4"
+        required: true
+        type: string
+      pack:
+        description: "The guardana-reference-pack version on PyPI; the newest when empty"
+        required: false
+        type: string
+
+# Read-only: it checks out the scripts, installs from PyPI and uploads its own artifacts.
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.9"
+  PYTEST_VERSION: "8.4.2"
+  # The release before the 1.0 candidates: #143 upgrades a collector database it created.
+  RECOVERY_FROM: "0.41.0"
+  PROOF_COMMIT: ${{ github.sha }}
+  PROOF_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+jobs:
+  inputs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      pack: ${{ steps.check.outputs.pack }}
+    steps:
+      - name: The versions to prove
+        id: check
+        env:
+          VERSION: ${{ inputs.version }}
+          PACK: ${{ inputs.pack }}
+        run: |
+          # A whole-string match: a line-based one would accept a value with a newline in it.
+          pattern='^[0-9]+\.[0-9]+\.[0-9]+((a|b|rc)[0-9]+)?(\.post[0-9]+)?(\.dev[0-9]+)?$'
+          if [[ ! $VERSION =~ $pattern ]]; then
+            echo "::error::'$VERSION' is not a version."
+            exit 1
+          fi
+          if [[ -n $PACK && ! $PACK =~ $pattern ]]; then
+            echo "::error::'$PACK' is not a version."
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "pack=$PACK" >> "$GITHUB_OUTPUT"
+
+  # #138 on Linux: one container installs with the network, a second runs the first run
+  # with `--network none`. The image is Debian's python:<version>-slim on the runner's kernel.
+  first-run-linux:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:${{ matrix.python }}-slim container"
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install from PyPI, then walk the starter offline
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PY: ${{ matrix.python }}
+          INSTALLER: ${{ matrix.installer }}
+        run: >-
+          python3 -m proofs container --proof first-run --python "$PY" --installer "$INSTALLER"
+          --version "$VERSION" --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-first-run-linux-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #138 on macOS: the runner's own interpreter, every network operation of the proof's
+  # process tree denied by sandbox-exec.
+  first-run-macos:
+    needs: inputs
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: macos-15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A python.org build, the interpreter a user downloads; setup-uv below only adds uv.
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install uv
+        if: matrix.installer == 'uv'
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install from PyPI
+        id: install
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          INSTALLER: ${{ matrix.installer }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: >-
+          "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
+          --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
+
+      - name: Walk the starter offline
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
+            --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
+            --record "$RUNNER_TEMP/proof/records/first-run.json"
+          /usr/bin/sandbox-exec -p '(version 1)(allow default)(deny network*)' \
+            "$@" --isolation "sandbox-exec, every network operation denied"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-first-run-macOS-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #138 on Windows: the firewall blocks outbound traffic of the interpreter and the venv
+  # launchers. A README line whose location Windows displays with its directory holds as a
+  # recorded known difference, never silently.
+  first-run-windows:
+    needs: inputs
+    runs-on: windows-2025
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.13"]
+        installer: [pip, uv]
+    env:
+      PROOF_RUNNER: windows-2025
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A python.org build, the interpreter a user downloads; setup-uv below only adds uv.
+      - name: Set up Python
+        id: python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install uv
+        if: matrix.installer == 'uv'
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: false
+
+      - name: Install from PyPI
+        id: install
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          INSTALLER: ${{ matrix.installer }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: >-
+          "$PYTHON" -m proofs install --installer "$INSTALLER" --version "$VERSION"
+          --project "$RUNNER_TEMP/proof/project" --record "$RUNNER_TEMP/proof/records/install.json"
+      - name: Cut the network (Windows)
+        shell: pwsh
+        env:
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $venv = Join-Path $env:RUNNER_TEMP 'proof\project\.venv\Scripts'
+          $programs = @($env:PYTHON, (Join-Path $venv 'python.exe'), (Join-Path $venv 'guardana.exe'))
+          # Whether this worked is decided by the canary inside the next step, not here:
+          # an error is recorded and the proof still runs, so a reachable network fails it.
+          $errors = @()
+          try { Start-Service -Name MpsSvc } catch { $errors += "$_" }
+          try { Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True } catch { $errors += "$_" }
+          foreach ($program in $programs) {
+            try {
+              New-NetFirewallRule -DisplayName 'guardana proof offline' -Direction Outbound `
+                -Action Block -Program $program | Out-Null
+            } catch { $errors += "$_" }
+          }
+          [ordered]@{
+            errors = $errors
+            services = @(Get-Service BFE, MpsSvc | ForEach-Object { @{ name = $_.Name; status = "$($_.Status)" } })
+            profiles = @(Get-NetFirewallProfile | ForEach-Object { @{ name = $_.Name; enabled = "$($_.Enabled)"; outbound = "$($_.DefaultOutboundAction)" } })
+            blocked = $programs
+          } | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $env:RUNNER_TEMP 'proof\records\isolation-windows.json') -Encoding utf8
+
+      # Runs even when the isolation step failed: the canary then records the network as
+      # reachable and the record fails, which says more than a skipped step.
+      - name: Walk the starter offline
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PYTHON: ${{ steps.python.outputs.python-path }}
+        run: |
+          set -- "$PYTHON" -m proofs first-run --venv "$RUNNER_TEMP/proof/project/.venv" \
+            --project "$RUNNER_TEMP/proof/project" --version "$VERSION" \
+            --record "$RUNNER_TEMP/proof/records/first-run.json"
+          "$@" --isolation "Windows Firewall, outbound blocked for python.exe (base and venv) and guardana.exe only; another executable would not be blocked"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-first-run-Windows-${{ matrix.python }}-${{ matrix.installer }}
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #141: the reference pack from PyPI, its own published suite and the conformance kit,
+  # offline after the install.
+  customization:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:3.13-slim container"
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install from PyPI, then run the pack and the kit offline
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+          PACK: ${{ needs.inputs.outputs.pack }}
+        run: >-
+          python3 -m proofs container --proof customization --python 3.13 --installer pip
+          --version "$VERSION" ${PACK:+--pack "$PACK"} --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-customization-linux-3.13-pip
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #139 and #140: the reference retrieval application from this checkout, installed beside
+  # guardana-cli from PyPI and probed offline. Its files must be the ones the version was
+  # tagged with; that comparison runs first and its record counts like the others.
+  retrieval-pilot:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:3.13-slim container"
+    steps:
+      - name: Check out the proof scripts and the pilot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: The pilot is the one the version was tagged with
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          git fetch --no-tags --depth=1 origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+          python3 -m proofs same-as-tag --repository .. --version "$VERSION" \
+            --path examples/retrieval_pilot --record "$RUNNER_TEMP/proof/records/same-as-tag.json"
+
+      - name: Install from PyPI, then probe the pilot offline, fixed and broken both ways
+        if: ${{ !cancelled() }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: >-
+          python3 -m proofs container --proof pilot --python 3.13 --installer pip
+          --version "$VERSION" --application ../examples/retrieval_pilot --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-pilot-linux-3.13-pip
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  regression-loop:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PROOF_RUNNER: "ubuntu-24.04, python:3.13-slim container"
+    steps:
+      - name: Check out the proof scripts and the pilot
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: The pilot is the one the version was tagged with
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          git fetch --no-tags --depth=1 origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+          python3 -m proofs same-as-tag --repository .. --version "$VERSION" \
+            --path examples/retrieval_pilot --record "$RUNNER_TEMP/proof/records/same-as-tag.json"
+
+      # The uploaded records hold every saved run, kept recording, regraded report and the
+      # suite before and after the promotion: the reviewable artifact #140 asks for.
+      - name: Install from PyPI, then save, redact, regrade, gate and promote a regression offline
+        if: ${{ !cancelled() }}
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: >-
+          python3 -m proofs container --proof regression --python 3.13 --installer pip
+          --version "$VERSION" --application ../examples/retrieval_pilot --out "$RUNNER_TEMP/proof"
+          --uv-version "$UV_VERSION" --pytest-version "$PYTEST_VERSION"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-regression-linux-3.13-pip
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  # #143: the collector's migration, backup and restore runbooks on disposable state, with
+  # guardana-server from PyPI and the collector image from ghcr.io. Not an offline proof: the
+  # runbooks talk to their own containers on loopback after the images are pulled.
+  recovery-runbooks:
+    needs: inputs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PROOF_RUNNER: ubuntu-24.04
+    steps:
+      - name: Check out the proof scripts, the deployment files and the runbooks
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Migrate, back up and restore the collector as the documentation says
+        working-directory: scripts
+        env:
+          VERSION: ${{ needs.inputs.outputs.version }}
+        run: |
+          git fetch --no-tags --depth=1 origin "refs/tags/v$VERSION:refs/tags/v$VERSION"
+          python3 -m proofs recovery --version "$VERSION" --old-version "$RECOVERY_FROM" \
+            --repository .. --work "$RUNNER_TEMP/proof/work" \
+            --record "$RUNNER_TEMP/proof/records/recovery.json"
+
+      - name: Upload the records
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proof-recovery-linux
+          path: ${{ runner.temp }}/proof/records
+          if-no-files-found: error
+          retention-days: 90
+
+  summary:
+    needs:
+      - first-run-linux
+      - first-run-macos
+      - first-run-windows
+      - customization
+      - retrieval-pilot
+      - regression-loop
+      - recovery-runbooks
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the proof scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Download every record
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: proof-*
+          path: ${{ runner.temp }}/records
+
+      # The first-run count is the matrix sizes above: 2 × 2 cells each on Linux, macOS and
+      # Windows. The pilot and the regression loop each compare the pilot with the tag.
+      - name: Every expected record passed
+        working-directory: scripts
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set +e
+          python3 -m proofs summary --records "$RUNNER_TEMP/records" --out "$RUNNER_TEMP/summary" \
+            --expect first-run=12 --expect customization=1 --expect pilot=1 \
+            --expect regression=1 --expect recovery=1 --expect same-as-tag=2 --needs "$NEEDS"
+          verdict=$?
+          cat "$RUNNER_TEMP/summary/summary.md" >> "$GITHUB_STEP_SUMMARY"
+          exit $verdict
+
+      - name: Upload the summary
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: proofs-summary
+          path: ${{ runner.temp }}/summary
+          if-no-files-found: error
+          retention-days: 90

@@ -65,13 +65,15 @@ class AcmePromptLibraryTarget(Target):
         """Walk the library in a stable order, optionally by suffix; nothing when absent."""
         if not self._root.is_dir():
             return
+        # Suffixes compare in any case: a loader opens `model.PKL` like `model.pkl`.
+        wanted = None if suffixes is None else {suffix.lower() for suffix in suffixes}
         for path in sorted(p for p in self._root.rglob("*") if p.is_file()):
-            if suffixes is None or path.suffix in suffixes:
+            if wanted is None or path.suffix.lower() in wanted:
                 yield path
 
     def python_source(self, path: Path) -> PythonSource | None:
         """Read and index a Python file once; every rule asks through here."""
-        if path.suffix != ".py":
+        if path.suffix.lower() != ".py":
             return None
         if path not in self._sources:
             result = read_source(path)

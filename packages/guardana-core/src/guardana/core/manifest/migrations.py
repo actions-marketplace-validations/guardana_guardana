@@ -21,7 +21,7 @@ from guardana.core.manifest.load import (
     _target_kind,
     _text,
 )
-from guardana.core.manifest.serialize import SCHEMA_URL
+from guardana.core.manifest.serialize import schema_url
 from guardana.core.manifest.settings import EvidenceMode
 from guardana.core.report.skipped import SkipReason
 from guardana.core.taxonomy import resolve_recorded
@@ -80,7 +80,7 @@ def migrate_v2(document: Mapping[str, Any]) -> dict[str, Any]:
         # migrated document that still pointed at it would tell a consumer it is
         # holding a document it is not. `run migrate` writes this file to disk, so
         # the wrong identifier travels.
-        "$schema": SCHEMA_URL,
+        "$schema": schema_url(3),
         "findings": _titled(document.get("findings")),
         "unverified": _titled(document.get("unverified")),
         "waived": _titled(document.get("waived")),
@@ -108,7 +108,7 @@ def migrate_v3(document: Mapping[str, Any]) -> dict[str, Any]:
     `run migrate` writes this document to disk, and one still pointing at the v3
     contract would tell its next reader it is holding a document it is not.
     """
-    return {**document, "schema_version": 4, "$schema": SCHEMA_URL}
+    return {**document, "schema_version": 4, "$schema": schema_url(4)}
 
 
 def migrate_v4(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -129,7 +129,7 @@ def migrate_v4(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
         **document,
         "schema_version": 5,
-        "$schema": SCHEMA_URL,
+        "$schema": schema_url(5),
         "run": {
             **run,
             "coverage": {**(coverage if isinstance(coverage, dict) else {}), "shortfall": []},
@@ -153,7 +153,7 @@ def migrate_v5(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
         **document,
         "schema_version": 6,
-        "$schema": SCHEMA_URL,
+        "$schema": schema_url(6),
         "assessments": list(document.get("assessments") or []),
         "run": {
             **run,
@@ -168,6 +168,17 @@ def migrate_v5(document: Mapping[str, Any]) -> dict[str, Any]:
             },
         },
     }
+
+
+def _rules(raw: object) -> list[object]:
+    """Return a document's rule records, refusing anything that is not a list of them.
+
+    A missing or malformed `run.rules` migrated to an empty list would load as a run in
+    which no rule ran, which is a different document from the one on disk.
+    """
+    if not isinstance(raw, list):
+        raise ManifestLoadError("run.rules must be a list of rule records")
+    return raw
 
 
 def migrate_v6(document: Mapping[str, Any]) -> dict[str, Any]:
@@ -190,18 +201,290 @@ def migrate_v6(document: Mapping[str, Any]) -> dict[str, Any]:
     return {
         **document,
         "schema_version": 7,
-        "$schema": SCHEMA_URL,
+        "$schema": schema_url(7),
         "assessments": [
             {**_mapping(entry, "assessments[]"), "trial": None} for entry in (assessments or [])
         ],
         "run": {
             **run,
             "execution": {**(execution if isinstance(execution, dict) else {}), "trials": 1},
-            "rules": [
-                _renamed_rule(_mapping(rule, "run.rules[]"))
-                for rule in (rules if isinstance(rules, list) else [])
+            "rules": [_renamed_rule(_mapping(rule, "run.rules[]")) for rule in _rules(rules)],
+        },
+    }
+
+
+def migrate_v7(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-7 saved run as a schema-8 one, recomputing nothing.
+
+    Every **`run.rules[].trial_summary.correction`** and the nine per-class fields of
+    every **`run.evaluators[].calibration`** arrive null, overwriting whatever the
+    document holds: no version-7 build could correct a rate, so a value found there was
+    not written by one, and a correction computed now would be this build's calibration
+    written into another build's evidence.
+    """
+    run = _mapping(document.get("run"), "run")
+    rules = run.get("rules")
+    evaluators = run.get("evaluators")
+    return {
+        **document,
+        "schema_version": 8,
+        "$schema": schema_url(8),
+        "run": {
+            **run,
+            "rules": [_uncorrected_rule(_mapping(rule, "run.rules[]")) for rule in _rules(rules)],
+            "evaluators": [
+                _unmeasured_per_class(_mapping(entry, "run.evaluators[]"))
+                for entry in (evaluators if isinstance(evaluators, list) else [])
             ],
         },
+    }
+
+
+def migrate_v8(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-8 saved run as a schema-9 one, recomputing nothing.
+
+    Every **`run.rules[].suite`** arrives null, overwriting whatever the document holds:
+    no version-8 build ran a suite, so a summary found there was not written by one and
+    would otherwise reach a pipeline as a stored pass nobody measured.
+    """
+    run = _mapping(document.get("run"), "run")
+    rules = run.get("rules")
+    return {
+        **document,
+        "schema_version": 9,
+        "$schema": schema_url(9),
+        "run": {
+            **run,
+            "rules": [{**_mapping(rule, "run.rules[]"), "suite": None} for rule in _rules(rules)],
+        },
+    }
+
+
+def migrate_v9(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-9 saved run as a schema-10 one, recomputing nothing.
+
+    **`run.usage.judge`** arrives null, overwriting whatever the document holds: no
+    version-9 build counted judge calls, so the judges' spend is unknown, never zero.
+    """
+    run = _mapping(document.get("run"), "run")
+    usage = run.get("usage")
+    return {
+        **document,
+        "schema_version": 10,
+        "$schema": schema_url(10),
+        "run": {**run, "usage": {**(usage if isinstance(usage, dict) else {}), "judge": None}},
+    }
+
+
+def migrate_v10(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-10 saved run as a schema-11 one, recomputing nothing.
+
+    **`run.target.document`** arrives null, overwriting whatever the document holds: no
+    version-10 build recorded a document digest, so none is relabelled and nothing is
+    ever read as a digest of content.
+    """
+    run = _mapping(document.get("run"), "run")
+    target = run.get("target")
+    return {
+        **document,
+        "schema_version": 11,
+        "$schema": schema_url(11),
+        "run": {
+            **run,
+            "target": {**(target if isinstance(target, dict) else {}), "document": None},
+        },
+    }
+
+
+def migrate_v11(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-11 saved run as a schema-12 one, recomputing nothing.
+
+    **`scope`** and **`run.configuration.plugins`** arrive null, overwriting whatever the
+    document holds: no version-11 build recorded a listing or the trust in force, so both
+    are unknown, never "listed nothing" or "built-ins only".
+    """
+    run = _mapping(document.get("run"), "run")
+    configuration = run.get("configuration")
+    return {
+        **document,
+        "schema_version": 12,
+        "$schema": schema_url(12),
+        "run": {
+            **run,
+            "configuration": {
+                **(configuration if isinstance(configuration, dict) else {}),
+                "plugins": None,
+            },
+        },
+        "scope": None,
+    }
+
+
+def migrate_v12(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-12 saved run as a schema-13 one, recomputing nothing.
+
+    **`run.exchanges`**, **`run.recording`**, every **`run.evaluators[].judge`** and every
+    **`assessments[].reason`** arrive null, overwriting whatever the document holds: no
+    version-12 build kept exchanges, graded a recording or recorded a judge identity or why
+    a trial went unmeasured, so each is unknown, never "kept nothing" or "graded live".
+    """
+    run = _mapping(document.get("run"), "run")
+    evaluators = run.get("evaluators")
+    assessments = document.get("assessments")
+    if assessments is not None and not isinstance(assessments, list):
+        raise ManifestLoadError("'assessments' must be a list")
+    return {
+        **document,
+        "schema_version": 13,
+        "$schema": schema_url(13),
+        "assessments": [
+            {**_mapping(entry, "assessments[]"), "reason": None} for entry in (assessments or [])
+        ],
+        "run": {
+            **run,
+            "evaluators": [
+                {**_mapping(entry, "run.evaluators[]"), "judge": None}
+                for entry in (evaluators if isinstance(evaluators, list) else [])
+            ],
+            "exchanges": None,
+            "recording": None,
+        },
+    }
+
+
+def migrate_v13(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-13 saved run as a schema-14 one, recomputing nothing.
+
+    **`run.recipe`** and **`run.configuration.provider`** arrive null, overwriting whatever
+    the document holds: no version-13 build ran a recipe or recorded the provider wire, so
+    both are unknown, never "no recipe" or "the OpenAI wire".
+    """
+    run = _mapping(document.get("run"), "run")
+    configuration = run.get("configuration")
+    return {
+        **document,
+        "schema_version": 14,
+        "$schema": schema_url(14),
+        "run": {
+            **run,
+            "configuration": {
+                **(configuration if isinstance(configuration, dict) else {}),
+                "provider": None,
+            },
+            "recipe": None,
+        },
+    }
+
+
+def migrate_v14(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-14 saved run as a schema-15 one, recomputing nothing.
+
+    **`run.fixtures`** arrives null, overwriting whatever the document holds: no
+    version-14 build took a fixtures file, so the run was given none. Every
+    **`run.evaluators[].deterministic`** arrives false: no version-14 build recorded it,
+    and an evaluator that says nothing is read as a judge.
+    """
+    run = _mapping(document.get("run"), "run")
+    evaluators = run.get("evaluators")
+    return {
+        **document,
+        "schema_version": 15,
+        "$schema": schema_url(15),
+        "run": {
+            **run,
+            "fixtures": None,
+            "evaluators": [
+                {**_mapping(entry, "run.evaluators[]"), "deterministic": False}
+                for entry in (evaluators if isinstance(evaluators, list) else [])
+            ],
+        },
+    }
+
+
+def migrate_v15(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-15 saved run as a schema-16 one, recomputing nothing.
+
+    **`run.execution.max_requests_per_minute`** arrives null, overwriting whatever the
+    document holds: no version-15 build paced its requests, so the run set no rate.
+    """
+    run = _mapping(document.get("run"), "run")
+    execution = _mapping(run.get("execution"), "run.execution")
+    return {
+        **document,
+        "schema_version": 16,
+        "$schema": schema_url(16),
+        "run": {**run, "execution": {**execution, "max_requests_per_minute": None}},
+    }
+
+
+def migrate_v16(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-16 saved run as a schema-17 one, recomputing nothing.
+
+    Only the version moves: schema 17 adds the `not_offered` skip reason and the
+    `target_changed` stop, and no version-16 build wrote either.
+    """
+    _mapping(document.get("run"), "run")
+    return {**document, "schema_version": 17, "$schema": schema_url(17)}
+
+
+def migrate_v17(document: Mapping[str, Any]) -> dict[str, Any]:
+    """Rewrite a schema-17 saved run as a schema-18 one, recomputing nothing.
+
+    A recorded **`scope`** gains `kept_models: []`, since a version-17 build let a
+    target's ignore file exclude any file and so kept none, and `skipped_models: null`,
+    since no version-17 build searched the skipped directories. Each exclude gains
+    `file: null`: the file a pattern was read from was not recorded.
+    """
+    _mapping(document.get("run"), "run")
+    scope = document.get("scope")
+    if scope is None:
+        return {**document, "schema_version": 18, "$schema": schema_url(18)}
+    scope = _mapping(scope, "scope")
+    excludes = scope.get("excludes")
+    if excludes is not None and not isinstance(excludes, list):
+        raise ManifestLoadError("scope.excludes must be null or a list")
+    return {
+        **document,
+        "schema_version": 18,
+        "$schema": schema_url(18),
+        "scope": {
+            **scope,
+            "excludes": None
+            if excludes is None
+            else [{**_mapping(entry, "scope.excludes[]"), "file": None} for entry in excludes],
+            "kept_models": [],
+            "skipped_models": None,
+        },
+    }
+
+
+_PER_CLASS_CALIBRATION = (
+    "assessor",
+    "judge_identity",
+    "starter_corpus",
+    "positives",
+    "negatives",
+    "positives_inconclusive",
+    "negatives_inconclusive",
+    "sensitivity",
+    "specificity",
+)
+
+
+def _uncorrected_rule(rule: dict[str, Any]) -> dict[str, Any]:
+    summary = rule.get("trial_summary")
+    if not isinstance(summary, dict):
+        return rule
+    return {**rule, "trial_summary": {**summary, "correction": None}}
+
+
+def _unmeasured_per_class(evaluator: dict[str, Any]) -> dict[str, Any]:
+    calibration = evaluator.get("calibration")
+    if not isinstance(calibration, dict):
+        return evaluator
+    return {
+        **evaluator,
+        "calibration": {**calibration, **dict.fromkeys(_PER_CLASS_CALIBRATION)},
     }
 
 

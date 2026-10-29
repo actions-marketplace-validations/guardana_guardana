@@ -7,20 +7,26 @@ false-negative the fixture law exists to prevent. Kept separate from
 `yaml_rule.py` so the parsing vocabulary and the `YamlRule` type each stay small.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
 from guardana.core.evaluator.amplification import AmplificationEvaluator
+from guardana.core.evaluator.answered import AnsweredEvaluator
 from guardana.core.evaluator.base import Expectation, check_expectation
 from guardana.core.evaluator.canary import CanaryEvaluator
+from guardana.core.evaluator.contains import ContainsEvaluator
+from guardana.core.evaluator.exact_match import ExactMatchEvaluator
 from guardana.core.evaluator.guard import GuardEvaluator
+from guardana.core.evaluator.json_valid import JsonValidEvaluator
 from guardana.core.evaluator.keyword import KeywordEvaluator
 from guardana.core.evaluator.length import LengthEvaluator
 from guardana.core.evaluator.llm_judge import LlmJudgeEvaluator
+from guardana.core.evaluator.reference_judge import ReferenceJudgeEvaluator
+from guardana.core.evaluator.regex import RegexEvaluator
 from guardana.core.rule.base import RuleMeta
 from guardana.core.rule.errors import RuleLoadError
-from guardana.core.safety import Impact
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
 from guardana.core.taxonomy import TaxonomyError, TaxonomyRef, resolve
@@ -37,6 +43,7 @@ _ALLOWED_RULE_KEYS = frozenset(
         "prompts",
         "expect",
         "fixtures",
+        "detection",
     }
 )
 _TYPED_EXPECT_KEYS = frozenset({"canary", "goal"})
@@ -50,20 +57,42 @@ _BUILTIN_EXPECTS: dict[str, Mapping[str, bool]] = {
     e.id: e.expects
     for e in (
         AmplificationEvaluator,
+        AnsweredEvaluator,
         CanaryEvaluator,
+        ContainsEvaluator,
+        ExactMatchEvaluator,
         GuardEvaluator,
+        JsonValidEvaluator,
         KeywordEvaluator,
         LengthEvaluator,
+        RegexEvaluator,
     )
 }
 _BUILTIN_EXPECTS[LlmJudgeEvaluator.id] = LlmJudgeEvaluator.expects
+_BUILTIN_EXPECTS[ReferenceJudgeEvaluator.id] = ReferenceJudgeEvaluator.expects
+
+# The types of a built-in's fields, checked at load for the same reason as their
+# names: `contains_any: "x"` or a pattern that does not compile grades nothing.
+_BUILTIN_FIELD_CHECKS: dict[str, Callable[[Expectation], str | None]] = {
+    e.id: e.check_fields
+    for e in (
+        AnsweredEvaluator,
+        ContainsEvaluator,
+        ExactMatchEvaluator,
+        JsonValidEvaluator,
+        KeywordEvaluator,
+        LengthEvaluator,
+        ReferenceJudgeEvaluator,
+        RegexEvaluator,
+    )
+}
 
 
 def reject_unknown_keys(
     raw: dict[str, Any], allowed: frozenset[str], what: str, path: Path
 ) -> None:
     """Reject any key not in `allowed` — a misspelled key must fail, not be ignored."""
-    unknown = sorted(set(raw) - allowed)
+    unknown = sorted(str(key) for key in raw if key not in allowed)
     if unknown:
         raise RuleLoadError(
             f"invalid rule in {path}: unknown {what} field(s): {', '.join(unknown)}"
@@ -137,6 +166,22 @@ def _parse_severity(raw: dict[str, Any], path: Path) -> Severity:
         raise RuleLoadError(f"invalid rule in {path}: unknown severity {name!r}") from exc
 
 
+def parse_detection(raw: dict[str, Any], path: Path) -> Detection:
+    """Read the optional `detection:` key, refusing any value that is not a `Detection`.
+
+    Matched exactly, case included: a label on a rule is read by people and by the
+    generated documentation, and a near-miss accepted here would print as a claim
+    nobody made.
+    """
+    value = raw.get("detection", Detection.UNDECLARED.value)
+    allowed = ", ".join(member.value for member in Detection)
+    if not isinstance(value, str) or value not in {member.value for member in Detection}:
+        raise RuleLoadError(
+            f"invalid rule in {path}: unknown detection {value!r}; expected one of {allowed}"
+        )
+    return Detection(value)
+
+
 def _parse_target_kind(raw: dict[str, Any], path: Path) -> TargetKind:
     name = _require_str(raw, "target_kind", path)
     try:
@@ -171,6 +216,7 @@ def parse_meta(
         required_capabilities=capabilities,
         evaluator=_require_str(raw, "evaluator", path),
         impact=impact_for(kind, capabilities),
+        detection=parse_detection(raw, path),
     )
 
 
@@ -220,17 +266,18 @@ def check_evaluator_expectations(
     *,
     planted_in_declaration: bool = False,
 ) -> None:
-    """Reject a rule whose evaluator — one core ships — needs an `expect` field it lacks.
+    """Reject a rule whose evaluator — one core ships — cannot use its `expect` fields.
+
+    A required field missing, a field the evaluator does not read, and a field of
+    the wrong type all fail here.
 
     `planted_in_declaration` is how an agent-run rule says it carries the marker
     itself, in a tool schema or a canned tool result, rather than needing the probe
     to plant one in a system prompt.
     """
-    expects = _BUILTIN_EXPECTS.get(meta.evaluator or "")
-    if expects is not None:
-        problem = check_expectation(meta.evaluator or "", expects, expectation)
-        if problem is not None:
-            raise RuleLoadError(f"invalid rule in {path}: {problem}")
+    problem = builtin_expectation_problem(meta.evaluator or "", expectation)
+    if problem is not None:
+        raise RuleLoadError(f"invalid rule in {path}: {problem}")
     require_canary_is_plantable(
         expectation.canary is not None,
         meta.required_capabilities,
@@ -238,6 +285,22 @@ def check_evaluator_expectations(
         planted_in_declaration=planted_in_declaration,
     )
     require_chat(meta.required_capabilities, path)
+
+
+def builtin_expectation_problem(evaluator_id: str, expectation: Expectation) -> str | None:
+    """Return why `expectation` does not fit the built-in evaluator `evaluator_id`, or None.
+
+    Checks the field names first, then their types. None for an evaluator core
+    does not ship: the runner checks those once discovery has loaded them.
+    """
+    expects = _BUILTIN_EXPECTS.get(evaluator_id)
+    if expects is None:
+        return None
+    problem = check_expectation(evaluator_id, expects, expectation)
+    if problem is not None:
+        return problem
+    check_fields = _BUILTIN_FIELD_CHECKS.get(evaluator_id)
+    return None if check_fields is None else check_fields(expectation)
 
 
 def require_chat(capabilities: frozenset[Capability], path: Path) -> None:

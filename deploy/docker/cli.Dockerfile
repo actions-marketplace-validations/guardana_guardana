@@ -9,26 +9,42 @@
 # Two stages so the shipped image carries no build tooling, and a non-root user
 # because a scanner reads other people's code and never needs to own it.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed AS builder
 
 WORKDIR /src
+COPY deploy/docker/build-requirements.txt deploy/docker/cli-requirements.txt ./
 COPY packages/guardana-core packages/guardana-core
 COPY packages/guardana-rules packages/guardana-rules
 COPY packages/guardana-report packages/guardana-report
 COPY packages/guardana-cli packages/guardana-cli
 COPY LICENSE LICENSE
 
-# One environment, four distributions, resolved together so the inter-package
-# pins are satisfied from this source tree rather than from PyPI.
-RUN python -m venv /opt/guardana \
-    && /opt/guardana/bin/pip install --no-cache-dir --upgrade pip \
-    && /opt/guardana/bin/pip install --no-cache-dir \
+# Every third-party version and hash comes from uv.lock, the set CI tests, and only
+# as a wheel: a source build would resolve its own unpinned build requirements. The
+# four packages are built from this tree by the locked backend in a separate venv,
+# so the shipped one carries no build tooling, and installed by their own digests
+# because pip checks no hash for a local wheel unless it is given one; `pip check`
+# fails the build if the locked set does not satisfy what the packages declare.
+RUN python -m venv /opt/build \
+    && /opt/build/bin/pip install --no-cache-dir --only-binary=:all: \
+        --require-hashes --no-deps -r build-requirements.txt \
+    && /opt/build/bin/pip wheel --no-cache-dir --no-deps --no-build-isolation \
+        --wheel-dir /src/wheels \
         ./packages/guardana-core \
         ./packages/guardana-rules \
         ./packages/guardana-report \
-        ./packages/guardana-cli
+        ./packages/guardana-cli \
+    && python -m venv /opt/guardana \
+    && /opt/guardana/bin/pip install --no-cache-dir --only-binary=:all: \
+        --require-hashes --no-deps -r cli-requirements.txt \
+    && sha256sum /src/wheels/*.whl > /src/wheels.sha256 \
+    && sed -E 's/^([0-9a-f]{64}) [ *](.+)$/\2 --hash=sha256:\1/' /src/wheels.sha256 \
+        > /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip install --no-cache-dir --require-hashes --no-deps \
+        -r /src/wheel-hashes.txt \
+    && /opt/guardana/bin/pip check
 
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-bookworm@sha256:5024f48ba9441d4b13a95d3945abc6365538e3a31109833367a1923523c6efed
 
 ARG VERSION=0.0.0
 LABEL org.opencontainers.image.title="guardana" \

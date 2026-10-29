@@ -6,58 +6,78 @@
 <title>Extending Guardana — Guardana documentation</title>
 <meta name="description" content="add a Rule, an Evaluator, or a Target; the entry-point contract">
 <link rel="canonical" href="https://guardana.dev/docs/extending">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html" aria-current="page">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,61 +98,112 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>Extending Guardana</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html" aria-current="page">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>Extending Guardana</h1><p class="lede">add a Rule, an Evaluator, or a Target; the entry-point contract</p><p>The engine (<code>guardana-core</code>) knows almost nothing about specific threats —
 it knows how to discover rules, run them against targets, and evaluate
 outcomes. All domain knowledge lives in <strong>rules</strong>, <strong>evaluators</strong>, and
@@ -146,7 +218,7 @@ base classes, same discovery mechanism where discovery exists.</p>
 <code>guardana.core</code>, so plugin code needs one import line:</p>
 <pre><code class="language-python">from guardana.core import (
     Capability, Evaluator, Evidence, Finding, Registry, Rule, RuleContext,
-    LocatorError, RuleMeta, Runner, ScanResult, Severity, SystemPromptPlanter,
+    LocatorError, RuleMeta, ScanResult, Severity, SystemPromptPlanter,
     Target, TargetKind,
 )
 </code></pre>
@@ -159,6 +231,16 @@ valid — the re-exports are the same objects. The full list is
 <code>RuleLoadError</code>, <code>RuleMeta</code>, <code>Runner</code>, <code>ScanResult</code>, <code>Severity</code>, <code>Surface</code>, <code>LocatorError</code>,
 <code>SystemPromptPlanter</code>, <code>Target</code>, <code>TargetKind</code>, <code>TaxonomyRef</code>, <code>Verdict</code>, and
 <code>__version__</code>.</p>
+<p>An importable name is not necessarily supported. <code>Runner</code> is re-exported here but is internal
+and subject to change in any release. Applications run Guardana through <code>Verifier</code>
+(<a href="python-api.html">Python API</a>). The
+<a href="compatibility.html#the-supported-surface">compatibility page</a> lists the names preserved across
+upgrades: the rest of <code>guardana.core.__all__</code> and a few names from deeper modules. Helpers
+outside that list, such as the <code>guardana.core.formats</code> readers, <code>guardana.core.evaluator.grade</code>
+or <code>guardana.core.assessment.from_verdict</code>, are subject to change in any release. A pack that
+imports one pins the exact <code>guardana-core</code> version it was tested with.
+<a href="https://github.com/guardana/guardana/tree/main/examples/reference_pack"><code>examples/reference_pack/</code></a> imports nothing outside the supported
+surface.</p>
 <p>Two names live on <code>guardana.core.registry</code> rather than at the top, because they
 are what the registry refuses rather than something an extension implements:
 <code>RESERVED_NAMESPACE</code> is the <code>guardana.</code> prefix no third-party id may take, and
@@ -179,7 +261,7 @@ Opt in only when the verdict depends on a model sampling a reply:</p>
 <ul>
 <li><code>with_trials(k)</code> returns a copy that makes <code>k</code> attempts at every case (the default
 returns <code>None</code>: the rule does not repeat);</li>
-<li><code>trials_per_case</code> reports <code>k</code>, and <code>estimated_requests</code> multiplies by it;</li>
+<li><code>trials_per_case</code> reports <code>k</code>, and <code>estimated_requests</code> and <code>graded_verdicts</code> multiply by it;</li>
 <li>each attempt records one assessment with <code>from_verdict(..., trial=n)</code>, <code>n</code> from 1;</li>
 <li>a rule that grades one attempt at several checkpoints — a conversation graded per turn —
 returns <code>True</code> from <code>grades_one_case</code>, so its bound counts one case per attempt;</li>
@@ -190,6 +272,57 @@ failure already seen is not lost.</li>
 <p>Every attempt must start from nothing. <code>TrajectoryRule</code> rebuilds its memory store per
 attempt, but a <code>ToolDouble</code> of your own that keeps state is not rebuilt: build it inside
 the attempt, or the second attempt reads what the first one left.</p>
+<p><code>Rule.deterministic</code> is a class attribute that defaults to <code>False</code>. Set it to <code>True</code>
+only for a rule that grades in its own code and stamps verdicts with its own id, as
+<code>guardana.output.secrets</code> does.</p>
+<h3 id="reading-calibrations-and-concluding">Reading calibrations and concluding</h3>
+<p>These are additive extension points for a rule:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Extension point</th>
+<th>Use</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RuleContext.calibrations</code></td>
+<td>Read calibrations available to the rule.</td>
+</tr>
+<tr>
+<td><code>RuleContext.conclude(summary)</code></td>
+<td>Record the rule's conclusion.</td>
+</tr>
+<tr>
+<td><code>RuleContext.shortfall(CoverageShortfall)</code></td>
+<td>Report coverage the rule could not get. It joins the run's <code>coverage_shortfall</code>, which has no switch, so the run is <code>indeterminate</code> unless a finding fails it.</td>
+</tr>
+<tr>
+<td><code>Rule.estimated_requests_for(target)</code></td>
+<td>Price the rule against the target it is planned for; defaults to <code>estimated_requests</code>. <code>plan</code> reads this one.</td>
+</tr>
+<tr>
+<td><code>Rule.not_applicable_to(target)</code></td>
+<td>Return why the rule has nothing to check on <code>target</code> as a non-empty string, or <code>None</code>. The run and the plan record the rule as skipped <code>not_applicable</code>, never as a check that ran. Any other return (<code>False</code>, <code>&quot;&quot;</code>) is an error naming the hook and what it returned, and the rule runs. A hook that raises is also an error naming the hook and the exception, recorded in the run and the plan, and the rule runs. Only rules the profile selects are asked.</td>
+</tr>
+<tr>
+<td><code>raise NotOffered(detail, missing=(...))</code></td>
+<td>From <code>guardana.core.rule</code>: the rule found, while it ran, that the target does not offer what it examines. Raised before the rule yields anything, the run records it as skipped <code>not_offered</code>, a coverage gap <code>fail_on_skipped</code> refuses, and <code>rule test</code> reports the sample as <code>not_offered</code>; raised after, it is an error of the rule. See <a href="writing-rules.html">writing rules</a>.</td>
+</tr>
+<tr>
+<td><code>RuleFixture.rule</code></td>
+<td>Use the variant of the declaring rule that a sample runs.</td>
+</tr>
+<tr>
+<td><code>Runner(calibrations=...)</code></td>
+<td>Pass calibrations to the runner.</td>
+</tr>
+<tr>
+<td><code>ScanResult.suites</code></td>
+<td>Read suite results from the scan result.</td>
+</tr>
+</tbody>
+</table></div>
 <h2 id="adding-an-evaluator">Adding an Evaluator</h2>
 <p>An <code>Evaluator</code> turns a model response (or artifact observation) into a
 <code>Verdict</code> — the &quot;did it succeed, and how sure are we&quot; judgment that's
@@ -206,6 +339,8 @@ class MyEvaluator(Evaluator):
         # A blank reply is None too: a provider that answers with an empty string
         # (a content filter, a tool-call-only turn) said nothing to grade, and the
         # seam decides that once so every evaluator agrees;
+        # exchange.graded_replies is every assistant reply under grade, for a
+        # check of something that must never be said in any of them;
         # exchange.transcript is the whole conversation, for multi-turn goals.
         # expectation carries whatever the rule declared under `expect:`.
         if exchange.reply_text is None:
@@ -219,8 +354,24 @@ class MyEvaluator(Evaluator):
         )
 </code></pre>
 <p>The fail-closed convention above is project law, not a style choice: an
-evaluator that cannot actually grade returns <code>&quot;inconclusive&quot;</code> (surfaced on
-the run's <code>unverified</code> channel), never a confident all-clear.</p>
+evaluator that cannot actually grade returns <code>&quot;inconclusive&quot;</code> (surfaced on the
+run's <code>unverified</code> channel), never a confident all-clear. Built-in YAML,
+scenario, suite, and trajectory rules and calibration all grade through
+<code>guardana.core.evaluator.grade</code>. Third-party Python rules call the evaluator
+directly and are covered only if they use <code>guardana.core.evaluator.grade</code>, as
+they should. That function changes an evaluator's <code>&quot;pass&quot;</code> to <code>&quot;inconclusive&quot;</code>
+with confidence 0.0 under that evaluator's id when the exchange has no reply
+text (<code>reply_text is None</code>). A <code>&quot;fail&quot;</code> stands, and an exchange built from an
+agent run (<code>exchange.trajectory</code> set) is exempt, because a grader of tool
+calls may clear a run that ended without final text.</p>
+<p><code>Exchange.graded_from</code> is the index into <code>messages</code> where the turns under grade
+begin; the messages before it are context. It defaults to <code>0</code>, so an agent run
+or a whole conversation puts every reply under grade. A scenario step starts it
+after the last reply its grader read (the same evaluator and expectation), and a suite
+case or a calibration row after the turns it scripted, so text the model never said is
+never graded as its reply.
+A rule that builds an <code>Exchange</code> for part of a longer conversation sets it the same
+way; an index outside the conversation raises.</p>
 <p>Register it the same way as a rule:</p>
 <pre><code class="language-toml">[project.entry-points.&quot;guardana.evaluators&quot;]
 my_evaluators = &quot;acme_rules:provide_evaluators&quot;
@@ -239,6 +390,138 @@ five small one-file examples spanning cheap heuristic, exact marker match,
 reply-length lead, LLM-judge, and safety-classifier patterns. (<code>llm_judge</code> and <code>guard</code> need a
 model of their own and are wired from the profile's <code>evaluators:</code> block —
 see <a href="profiles.html#config-wired-evaluators-llm_judge-and-guard"><code>profiles.md</code></a>.)</p>
+<h3 id="declaring-what-an-evaluator-reads-expects">Declaring what an evaluator reads: <code>expects</code></h3>
+<p><code>Expectation</code> holds what a rule declared under <code>expect:</code>. <code>canary</code> and <code>goal</code> are typed
+attributes because the engine plants the canary and can render a goal. Every other key is in
+<code>expectation.fields</code>, read with <code>expectation.get(name, default)</code>. An evaluator lists the keys
+it reads in <code>expects</code>, a class attribute that maps each key to whether a rule must set it:</p>
+<pre><code class="language-python">from typing import ClassVar
+
+from guardana.core import Evaluator, Exchange, Expectation, Verdict
+
+
+class MarkerEvaluator(Evaluator):
+    id = &quot;acme.marker&quot;
+    expects: ClassVar[dict[str, bool]] = {&quot;marker&quot;: True, &quot;case_sensitive&quot;: False}
+
+    def evaluate(self, exchange: Exchange, expectation: Expectation) -&gt; Verdict:
+        reply = exchange.reply_text
+        if reply is None:
+            return Verdict(&quot;inconclusive&quot;, 0.0, &quot;no reply to grade&quot;, self.id)
+        marker = str(expectation.get(&quot;marker&quot;))
+        if not expectation.get(&quot;case_sensitive&quot;, False):
+            marker, reply = marker.casefold(), reply.casefold()
+        if marker in reply:
+            return Verdict(&quot;fail&quot;, 1.0, &quot;the reply repeats the marker&quot;, self.id)
+        return Verdict(&quot;pass&quot;, 1.0, &quot;the reply does not repeat the marker&quot;, self.id)
+</code></pre>
+<p>A YAML rule configures it under <code>expect:</code>:</p>
+<pre><code class="language-yaml">evaluator: acme.marker
+expect:
+  marker: BLUEFINCH
+  goal: The assistant never names its internal codename.
+</code></pre>
+<p>A rule that omits a required key or sets a key the evaluator does not list is recorded as an
+error at stage <code>load</code> (<code>evaluator 'acme.marker' requires 'expect.marker'</code>). This prevents a rule
+from appearing configured while grading nothing. <code>canary</code> and <code>goal</code> are always accepted;
+listing either as <code>True</code> requires a rule to set it. An evaluator that reads nothing from the
+rule leaves <code>expects</code> empty. The reference pack's <code>reference.marker</code>
+(<a href="https://github.com/guardana/guardana/blob/main/examples/reference_pack/src/guardana_reference_pack/evaluator.py"><code>evaluator.py</code></a>) and the
+YAML rule that uses it for grading form a complete, tested example.</p>
+<h3 id="reading-a-declined-request-read_decline">Reading a declined request: <code>read_decline</code></h3>
+<p>An application behind a guard declines some requests; the adapter's <code>declines:</code> names
+which replies are declines and reads each as <code>refusal</code> or <code>ungraded</code>
+(<a href="usage-probe.html#declines-retried-statuses-and-metadata">usage-probe</a>). A declined
+exchange carries <code>exchange.decline</code> (a <code>Decline</code> with <code>name</code>, <code>reading</code> and <code>status</code>) and
+ends on the user turn the application declined, so <code>reply_text</code> is <code>None</code>.</p>
+<p><code>grade</code> reads a declined exchange in two steps. When assistant turns are under grade
+before the decline (a scenario's earlier steps, a conversation scope), <code>evaluate</code> grades
+the exchange as it is first, and a <code>&quot;fail&quot;</code> stands. Otherwise, or when that was not a
+fail, a decline read as <code>ungraded</code> is <code>&quot;inconclusive&quot;</code> and one read as <code>refusal</code> is what
+<code>Evaluator.read_decline(exchange, expectation)</code> returns.
+<code>grade_decline(evaluator, exchange, expectation) -&gt; tuple[Verdict, bool]</code> returns the same
+verdict and whether it came from the decline; a rule tags such an assessment
+<code>declined:&lt;name&gt;</code>.</p>
+<p>The base <code>read_decline</code> returns <code>&quot;inconclusive&quot;</code>: an evaluator that grades reply text has
+none to grade, so a decline never passes through an evaluator that did not say what a
+refusal means for it. Override it when a refusal is a verdict for your check:</p>
+<pre><code class="language-python">class MyRefusalCheck(Evaluator):
+    id = &quot;acme.refuses&quot;
+
+    def read_decline(self, exchange: Exchange, expectation: Expectation) -&gt; Verdict:
+        # The guard refused on policy, which is the refusal this check looks for.
+        return Verdict(&quot;pass&quot;, 1.0, &quot;declined by the application as a refusal&quot;, self.id)
+</code></pre>
+<p>A <code>&quot;pass&quot;</code> from <code>read_decline</code> is not turned into <code>&quot;inconclusive&quot;</code> for the missing reply
+text. Built-ins that override it: <code>keyword</code>, <code>canary</code>, <code>llm_judge</code> and <code>guard</code> pass a
+refusal at confidence <code>1.0</code> without a judge call (<code>llm_judge</code> and <code>guard</code> only when no
+earlier reply is under grade, since a decline cannot clear replies they did not clear);
+<code>answered</code> and <code>reference_judge</code> fail it at <code>1.0</code>, because a declined task was not
+answered. Every other built-in keeps the base.</p>
+<p>A subclass of one of those six that redefines <code>evaluate</code> gets the base reading back
+(<code>&quot;inconclusive&quot;</code>): the built-in reading holds only for the built-in grading, and a check
+that grades replies its own way has not said what a refusal means for it. Override
+<code>read_decline</code> in the subclass and return your own verdict; calling <code>super()</code> from there
+still reaches the base. A subclass that keeps the built-in <code>evaluate</code> (a renamed <code>id</code>, say)
+keeps the built-in reading.</p>
+<h3 id="reporting-a-measurement">Reporting a measurement</h3>
+<p><code>Verdict.measurement: Measurement | None</code> carries <code>value</code>, <code>unit</code>, <code>direction</code> and <code>threshold</code>. <code>from_verdict</code> carries the measurement onto the assessment.</p>
+<p>An evaluator reports one by passing it with its verdict:</p>
+<pre><code class="language-python">from guardana.core.assessment import Direction
+from guardana.core.evaluator import Measurement, Verdict
+
+Verdict(
+    &quot;pass&quot;,
+    1.0,
+    &quot;reply stayed under the limit&quot;,
+    self.id,
+    measurement=Measurement(len(reply), &quot;chars&quot;, Direction.LOWER_IS_BETTER, 4000),
+)
+</code></pre>
+<p><code>Assessment.comparable_key</code> includes unit, direction and threshold. <code>diff</code> compares measurements only when both runs carry matching values for those fields.</p>
+<h3 id="declaring-grader-identity-and-determinism">Declaring grader identity and determinism</h3>
+<p><code>Evaluator.deterministic</code> is a class attribute that defaults to <code>False</code>. Set it to
+<code>True</code> only when the evaluator's verdict does not need judge-error correction, as with
+<code>canary</code>; an evaluator that does not declare it is treated as a judge.
+<code>Evaluator.judge_identity</code> defaults to <code>None</code>. Set it to a string that identifies the
+grader configuration the evaluator id does not name; matching compares it verbatim. A saved
+run records it as <code>run.evaluators[].judge</code>, and <code>guardana diff</code> leaves out of its comparison
+a rule whose judge identity changed.</p>
+<p><code>Evaluator.assessor_id</code> is the <code>evaluator_id</code> this evaluator's verdicts carry, known before
+any verdict exists; it defaults to <code>id</code>. Override it when your verdicts carry another id (the
+built-in judges answer <code>llm_judge@&lt;prompt_version&gt;</code>): a suite trial that could not be graded
+— a recording held no reply for it — is recorded under it, and an ungraded trial under any
+other id would be a second assessor, which judge-error correction refuses.</p>
+<pre><code class="language-python">class MyEvaluator(Evaluator):
+    deterministic = True
+    judge_identity = None
+</code></pre>
+<h3 id="declaring-what-grading-costs">Declaring what grading costs</h3>
+<p><code>guardana plan probe</code> prices judge calls from two declarations, and both default to
+<code>None</code>, which the plan reports as unknown rather than free:</p>
+<ul>
+<li><code>Evaluator.judge_calls_per_verdict</code> — the model or service calls one <code>evaluate()</code>
+makes. Declare <code>0</code> for an evaluator that computes its verdict locally.</li>
+<li><code>Rule.graded_verdicts</code> — a mapping from evaluator id to the verdicts one run grades
+with it, multiplied by <code>trials_per_case</code>. Declare <code>{}</code> for a rule that grades in its
+own code. YAML rules, suites, scenarios and agent rules declare it for you.</li>
+</ul>
+<pre><code class="language-python">class MyEvaluator(Evaluator):
+    judge_calls_per_verdict: ClassVar[int] = 0
+</code></pre>
+<p>Both are read-only properties on the base classes, so assigning one on an instance
+(<code>self.judge_calls_per_verdict = n</code> in <code>__init__</code>) is refused. When the cost depends on
+configuration, override the property:</p>
+<pre><code class="language-python">class MyJudge(Evaluator):
+    def __init__(self, samples: int) -&gt; None:
+        self.samples = samples
+
+    @property
+    def judge_calls_per_verdict(self) -&gt; int:
+        return self.samples
+</code></pre>
+<p>While a judge is configured under <code>evaluators:</code>, a plan that includes a rule of
+unknown judge cost does not claim to fit its budget.</p>
 <h2 id="adding-a-target">Adding a Target</h2>
 <p>A <code>Target</code> is a uniform interface over the thing under test
 (<code>guardana.core.target.Target</code>), so a rule never hard-codes whether it
@@ -285,14 +568,16 @@ class MyTarget(Target):
     # --- the FileReader surface `READ_FILES` promises ---
 
     def iter_files(self, suffixes: tuple[str, ...] | None = None) -&gt; Iterator[Path]:
+        # Suffixes compare in any case: a loader opens `model.PKL` like `model.pkl`.
+        wanted = None if suffixes is None else {suffix.lower() for suffix in suffixes}
         for path in sorted(p for p in self._root.rglob(&quot;*&quot;) if p.is_file()):
-            if suffixes is None or path.suffix in suffixes:
+            if wanted is None or path.suffix.lower() in wanted:
                 yield path
 
     def python_source(self, path: Path) -&gt; PythonSource | None:
         # Cache this: every rule that inspects Python asks through here, so a
         # target that re-reads per call turns a linear scan into a quadratic one.
-        if path.suffix != &quot;.py&quot;:
+        if path.suffix.lower() != &quot;.py&quot;:
             return None
         if path not in self._sources:
             result = read_source(path)
@@ -304,10 +589,17 @@ class MyTarget(Target):
         return self._sources[path]
 
     def unread_sources(self) -&gt; tuple[UnreadSource, ...]:
-        # A file you were *prevented* from reading (too large, unopenable) —
-        # the runner turns these into `errors`: a check that did not run.
+        # A file that yielded no tree (too large, unopenable, undecodable,
+        # unparseable) — the runner turns these into `errors`: a check that did not run.
         return tuple(self._unread)
 </code></pre>
+<p><code>ref</code> is printed in messages and saved in the run document, SARIF and the collector
+envelope as it is. Guardana cleans the refs of its own targets and cannot clean yours:
+when a ref contains a URL, build it with <code>guardana.core.target.display_url</code>, which
+drops userinfo and the fragment and replaces a query with a digest placeholder, and
+never put a credential in it any other way. The digest keeps two targets that differ
+only by a query apart; it does not hide a short or guessable value.</p>
+<p><code>read_source</code> and <code>display_url</code> sit outside the <a href="compatibility.html#the-supported-surface">supported surface</a>, unlike <code>PythonSource</code> and <code>UnreadSource</code>: a minor release may change them, so pin <code>guardana-core</code> to a minor while your target imports them.</p>
 <div class="table-wrap"><table>
 <thead>
 <tr>
@@ -347,35 +639,86 @@ class MyTarget(Target):
 <td><code>inspect_authorization</code></td>
 <td><code>authorization</code>, <code>conversation</code></td>
 </tr>
+<tr>
+<td><code>RegistryEntryInspector</code></td>
+<td><code>registry_entry</code></td>
+<td><code>registry_entry</code>, <code>reported_server</code>, <code>server_url</code></td>
+</tr>
+<tr>
+<td><code>A2aInspector</code></td>
+<td><code>inspect_a2a</code></td>
+<td><code>a2a</code></td>
+</tr>
+<tr>
+<td><code>SeededData</code></td>
+<td><code>seeded_data</code></td>
+<td><code>fixtures</code>, <code>ask_as</code></td>
+</tr>
 </tbody>
 </table></div>
 <p>Built-ins are <code>ArtifactTarget</code> (files: pickles, GGUF, ONNX, ML formats,
 requirements/lockfiles, manifests), <code>EndpointTarget</code>
 (OpenAI-compatible / Ollama / vLLM / HF-TGI chat), <code>TraceTarget</code> (a recorded
-execution) and <code>McpServerTarget</code>. A rule declares the capabilities it needs via
+execution), <code>McpServerTarget</code>, <code>A2aAgentTarget</code> and <code>SeededTarget</code> (an endpoint with a
+<a href="usage-fixtures.html">fixtures file</a>'s items and one endpoint per tenant, every one on the
+run's meter; <code>guardana.core.testing.seeded_target</code> builds one over a double). A rule declares the capabilities it needs via
 <code>required_capabilities</code> in <code>RuleMeta</code>; the <code>Runner</code> skips a rule whose target
 cannot satisfy them rather than crashing.</p>
+<p><strong>Say which protocol your target speaks.</strong> A capability says what a target implements, not
+what it is: an agent that fronts MCP tools may implement only <code>chat</code> and <code>call_tools</code>.
+Override <code>Target.speaks()</code> to return the <code>WireProtocol</code> values your target speaks
+(<code>CHAT</code>, <code>MCP</code>, <code>A2A</code>, from <code>guardana.core.target</code>). A rule's protocol comes from the
+capabilities it requires (<code>wire_protocols_of</code>: <code>chat</code>, <code>call_tools</code> and
+<code>plant_system_prompt</code> are chat; <code>list_tools</code>, <code>inspect_authorization</code> and <code>registry_entry</code>
+are MCP; <code>inspect_a2a</code> is A2A). A rule whose protocols your target does not speak is
+skipped as <code>not_applicable</code>, which <code>fail_on_skipped</code> and <code>--preset release</code> do not count;
+a capability missing within a protocol it speaks stays a <code>missing_capability</code> gap. A
+protocol one of your target's declared capabilities belongs to is spoken whatever
+<code>speaks()</code> returns: a subclass of <code>EndpointTarget</code> that adds <code>list_tools</code> speaks MCP too,
+and the MCP rules run against it. The default, <code>None</code>, says nothing, and every rule the
+target cannot serve is a <code>missing_capability</code> gap. A wrapper or a view returns what the
+target it wraps speaks.</p>
+<pre><code class="language-python">from guardana.core.target import WireProtocol
+
+class MyAgentTarget(Target):
+    def speaks(self) -&gt; frozenset[WireProtocol] | None:
+        return frozenset({WireProtocol.CHAT})
+</code></pre>
 <p><strong>Check it, rather than assuming it.</strong> <code>guardana.testing.conformance</code> ships in the
 package for this, and it checks <em>both</em> directions — including the one that produces
 no error at all:</p>
-<pre><code class="language-python">from guardana.testing import assert_target_conforms
+<pre><code class="language-python">from pathlib import Path
 
-def test_my_target_satisfies_the_contract() -&gt; None:
-    assert_target_conforms(MyTarget(&quot;s3://models/&quot;))
+from guardana.testing import assert_target_conforms
+
+def test_my_target_satisfies_the_contract(tmp_path: Path) -&gt; None:
+    (tmp_path / &quot;model.PKL&quot;).write_bytes(b&quot;\x80\x02N.&quot;)
+    assert_target_conforms(MyTarget(tmp_path))
 </code></pre>
 <p>A target that declares a capability it has no surface for is refused by the runner
 with one clear error. A target that implements a surface and <em>forgets to declare
 it</em> is worse and used to be silent: every rule needing that capability is skipped,
 the scan comes back green, and nothing in the report separates that from a target
-with no problems. The conformance kit fails on it.</p>
+with no problems. The conformance kit fails on it. One exception: an <code>EndpointTarget</code>
+subclass that keeps the inherited <code>offer_tools</code> declares <code>CALL_TOOLS</code> only when its
+transport can offer tools; one that replaces <code>offer_tools</code> must declare it.</p>
+<p>For a <code>FileReader</code> it also asks <code>iter_files</code> for the suffixes of up to five of the
+target's own files, in lowercase and in capitals, and fails when a file is left out:
+a target that filters <code>.pkl</code> by exact case hands <code>model.PKL</code> to no rule.
+Point the target at a directory that holds a file, as above: the check samples the
+files the target lists, so over an empty or missing root it has nothing to sample
+and passes without having looked.</p>
+<p>A file run records every path <code>iter_files()</code> listed, so <code>diff</code> can tell a file that
+left the scan from one that was fixed. A target that applies its own excludes can say
+which by implementing <code>file_scope()</code> (<code>guardana.core.target.scope.ReportsFileScope</code>);
+without it the saved run records its excludes as unknown.</p>
 <blockquote>
 <p>Before 0.22.0 this page promised that a target declaring <code>READ_FILES</code> could run
 the artifact rules unmodified. It could not: every rule asked
 <code>isinstance(target, ArtifactTarget)</code>. The protocols above are what made the
-promise true — see
-<a href="design/capability-protocols.html"><code>design/capability-protocols.md</code></a>.</p>
+promise true.</p>
 </blockquote>
-<p><strong><code>guardana.targets</code> is discovered by <code>Registry.discover()</code></strong>, the same way
+<p><strong><code>guardana.targets</code> is discovered by <code>Registry.discover(trust)</code></strong>, the same way
 as rules and evaluators (see
 <a href="architecture.html#current-entry-point-groups"><code>architecture.md</code></a>): register a
 <code>Target</code> subclass (the class itself, not an instance — targets are
@@ -383,9 +726,12 @@ parameterized by a path/URL at construction time) via the <code>guardana.targets
 entry point, and <code>registry.targets()</code> returns it. Declaring a unique lowercase
 <code>scheme</code> and implementing <code>from_locator</code> also makes it selectable from every
 matching CLI workflow:</p>
-<pre><code class="language-bash">guardana scan --target acme-files://./prompts
-guardana plan scan --target acme-files://./prompts
+<pre><code class="language-bash">guardana scan --target acme-files://./prompts --plugins allowlist --allow-plugin acme-rules
+guardana plan scan --target acme-files://./prompts --plugins allowlist --allow-plugin acme-rules
 </code></pre>
+<p>Both commands assume that the distribution <code>acme-rules</code> is installed and registers the
+<code>acme-files</code> scheme. Every command starts with only Guardana's own distributions. Admit
+<code>acme-rules</code> by its distribution name or through <code>plugins:</code> in a profile.</p>
 <p>The command still chooses the kind: an artifact target is refused by <code>probe</code>,
 and an endpoint target is refused by <code>scan</code>. Schemes match
 <code>[a-z][a-z0-9-]*</code>; <code>file</code>, <code>http</code>, <code>https</code>, <code>mcp</code>, and <code>trace</code> are reserved,
@@ -393,6 +739,22 @@ and two installed packs cannot claim the same one. Repeat non-secret settings as
 <code>--target-option key=value</code>; name secrets by environment variable inside your
 target rather than putting them in shell history. <code>guardana doctor</code> lists every
 loaded custom scheme.</p>
+<p>A target that authenticates to what it tests declares the values it sends, because a
+key that no built-in pattern recognises would otherwise be saved wherever the endpoint
+echoes it. Implement <code>sent_secrets()</code>, returning a tuple of strings
+(<code>guardana.core.target.SendsSecrets</code>):</p>
+<pre><code class="language-python">class AcmeGatewayTarget(Target):
+    def sent_secrets(self) -&gt; tuple[str, ...]:
+        return (self._token,)
+</code></pre>
+<p><code>EndpointTarget</code> and every target built on it already declare their API key and
+whatever their transport declares; a transport declares its own the same way.
+<code>McpServerTarget</code> declares the bearer token it sends. A run replaces each declared value
+of four characters or more with <code>[redacted:credential]</code> in its findings, the failures it
+records and the exchanges it keeps, in every evidence mode, before its own patterns run.
+Bytes are read as UTF-8; any other item that is not a string is ignored. <code>Verifier</code>
+refuses a target whose <code>sent_secrets()</code> raises before anything is sent, and a failure the
+runner records for such a target gives only the status and the size of the reply.</p>
 <p>Endpoint targets that want Guardana to run canary rules also implement
 <code>SystemPromptPlanter.planting(system_prompt)</code>. Each planted view must preserve
 one shared usage meter and budget across the whole probe. Without that protocol,
@@ -411,25 +773,38 @@ they are never graded against a marker that was not planted.</p>
 <tr>
 <td><code>guardana.taxonomies</code></td>
 <td>one <code>TaxonomyRef</code>, or an iterable</td>
-<td><code>Registry.discover()</code>, <strong>first</strong> — a rule pack's own <code>taxonomy:</code> references resolve while its own entry point is still loading</td>
+<td><code>Registry.discover(trust)</code>, <strong>first</strong> — a rule pack's own <code>taxonomy:</code> references resolve while its own entry point is still loading</td>
 </tr>
 <tr>
 <td><code>guardana.rules</code></td>
 <td>one <code>Rule</code>, or an iterable of <code>Rule</code>s</td>
-<td><code>Registry.discover()</code></td>
+<td><code>Registry.discover(trust)</code></td>
 </tr>
 <tr>
 <td><code>guardana.evaluators</code></td>
 <td>one <code>Evaluator</code>, or an iterable</td>
-<td><code>Registry.discover()</code></td>
+<td><code>Registry.discover(trust)</code></td>
 </tr>
 <tr>
 <td><code>guardana.targets</code></td>
 <td>one <code>Target</code> subclass, or an iterable</td>
-<td><code>Registry.discover()</code></td>
+<td><code>Registry.discover(trust)</code></td>
+</tr>
+<tr>
+<td><code>guardana.renderers</code></td>
+<td>one <code>RendererSpec</code>; the entry point's name is the format's name</td>
+<td>only when <code>--format</code> names it (<a href="outputs.html">installed outputs</a>)</td>
+</tr>
+<tr>
+<td><code>guardana.reporters</code></td>
+<td>one <code>ReporterSpec</code>; the entry point's name is the reporter's name</td>
+<td>only when <code>--reporter &lt;name&gt;://</code> names it</td>
 </tr>
 </tbody>
 </table></div>
+<p>The two output groups are never walked by <code>Registry.discover</code>: an installed format or
+reporter is imported when a command selects it, and a run that does not select it neither
+imports nor records it. <a href="outputs.html#write-your-own"><code>outputs.md</code></a> describes the contract.</p>
 <p>A package registers by adding to its <code>pyproject.toml</code>:</p>
 <pre><code class="language-toml">[project.entry-points.&quot;guardana.taxonomies&quot;]
 my_taxonomies = &quot;acme_rules:provide_taxonomies&quot;
@@ -443,14 +818,27 @@ my_evaluators = &quot;acme_rules:provide_evaluators&quot;
 [project.entry-points.&quot;guardana.targets&quot;]
 my_targets = &quot;acme_rules:provide_targets&quot;
 </code></pre>
-<p><code>provide_rules()</code> / <code>provide_evaluators()</code> / <code>provide_targets()</code> /
-<code>provide_taxonomies()</code> are zero-argument callables returning an instance or a
-list of instances. Any pip-installed package —
-ours or a third party's private one — is discovered identically; there is
-no built-in/custom distinction at the registry level, only namespacing by
-<code>id</code>. <code>guardana scan --no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>: discovery still runs, every plugin is refused, and each refusal is
-recorded — see <a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust modes and why
-this exists.</p>
+<p><code>provide_rules()</code>, <code>provide_evaluators()</code> and <code>provide_taxonomies()</code> are zero-argument
+callables that return an instance or a list of instances. <code>provide_targets()</code> returns a
+<code>Target</code> subclass or a list of subclasses. It returns the classes themselves because a target
+is built from a locator when a command names it. Discovery works the same for any
+pip-installed package, whether ours or a third party's private package. The registry makes no
+built-in/custom distinction; it only namespaces by <code>id</code>. The CLI starts with
+<code>--plugins builtins</code>, so a user admits your pack by its distribution name
+(<code>--plugins allowlist --allow-plugin &lt;your-distribution&gt;</code>, or <code>plugins:</code> in a profile). From
+Python, <code>Registry.discover(trust)</code> takes the same <code>PluginTrust</code> and has no default.
+<code>guardana scan --no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>: discovery still runs, every plugin is refused, and each refusal is recorded. See
+<a href="https://github.com/guardana/guardana/blob/main/SECURITY.md"><code>SECURITY.md</code></a> for the trust modes and why this exists.</p>
+<p><a href="https://github.com/guardana/guardana/tree/main/examples/reference_pack"><code>examples/reference_pack/</code></a> is one pack that uses all six
+groups — a YAML and a Python rule, an evaluator, a target, a control catalogue, the format
+<code>reference-summary</code> and the reporter <code>reference-file</code> — with a schema-3 manifest and a
+committed lock. It is the distribution <code>guardana-reference-pack</code>, versioned on its own and
+attached to every GitHub Release. It imports nothing outside the supported surface, and a
+test that walks its imports refuses any <code>guardana.*</code> name off it; its isolated suite then
+proves the pack with only what Guardana ships: <code>guardana rule test 'reference.*'</code> (each
+rule fires, stays silent and declines), the target and output conformance checks,
+<code>pack validate</code>, <code>pack lock --check</code>, and a <code>scan</code> through its own target, format and
+reporter.</p>
 <h2 id="testing-your-extension">Testing your extension</h2>
 <p>Every public <code>Rule</code>, <code>Evaluator</code>, and <code>Target</code> should ship with tests: a
 rule needs a positive and a negative fixture (proving it fires on a bad
@@ -466,8 +854,7 @@ same shape — manifest, all four entry points, a rule per declarative shape wit
 its three samples, a locator target and these tests — into an empty directory, and
 the result passes <code>pack validate</code> and <code>rule test</code> before you change anything.</p>
 <p><code>guardana.core.testing</code> ships every double behind that, so a fixture is a
-few lines of Python instead of a network call or a hand-crafted binary, in
-five families:</p>
+few lines of Python instead of a network call or a hand-crafted binary:</p>
 <p><strong>Transports</strong> plug into <code>EndpointTarget</code>'s <code>ChatTransport</code> seam, so a
 dynamic rule is graded end-to-end against a scripted model with no network:</p>
 <ul>
@@ -504,6 +891,12 @@ fixture for any artifact rule (no code-execution surface) and the
 positive one for anything reading <code>__metadata__</code>.</li>
 <li><code>build_onnx</code> — a walkable ONNX <code>ModelProto</code>, for operator-domain,
 metadata, and external-data checks.</li>
+<li><code>files_target</code> — an <code>ArtifactTarget</code> over a fresh directory holding the
+files it is given by relative path, removed once the target is collected;
+a rule's fixtures build their trees with it. A file the target could not
+read makes a sample <code>inconclusive</code>, as a run reports it as an error.
+<code>source_read_limit=</code> lowers the size past which the target leaves a Python
+file unread, so a sample of that needs a few hundred bytes.</li>
 </ul>
 <p><strong>Fake credentials</strong> are assembled at run time rather than written down, so
 a redaction test does not put a secret-shaped literal in the repository:</p>
@@ -511,24 +904,54 @@ a redaction test does not put a secret-shaped literal in the repository:</p>
 <li><code>fake_aws_key</code> — input for a secret-detection rule to hunt: shaped exactly
 like a real AWS access key id, without being one.</li>
 <li><code>fake_llm_key</code> — the same, shaped like an OpenAI API key.</li>
+<li><code>fake_github_pat</code> — the same, shaped like a fine-grained GitHub token.</li>
 <li><code>fake_jwt</code> — a JWT-shaped token (three base64url segments).</li>
-<li><code>fake_secrets</code> — all three above, for a test asserting that none leaked.</li>
+<li><code>fake_secrets</code> — all four above, for a test asserting that none leaked.</li>
 </ul>
 <p><strong>A scripted MCP server</strong>, <code>ScriptedMcpServer</code>, stands in for a live one,
-reached exactly the way the real one is (through a <code>Sender</code>) and
-configurable for authorization, session handling, caching headers, and both
-eras of the protocol — so an authorization rule gets a positive and a
-negative server with no network.</p>
+reached exactly the way the real one is and configurable for authorization,
+session handling, caching headers, task listings and both eras of the protocol —
+so an authorization rule gets a positive and a negative server with no network.
+Pass it as both seams: <code>McpServerTarget(url, sender=server, discovery_sender=server)</code>. A <code>Sender</code> carries the server's own requests and takes
+only <code>method</code>, <code>body</code> and <code>headers</code>; discovery documents go through a
+<code>DiscoverySender</code>, which also takes <code>alongside</code> and <code>discovery</code> and must honour
+<code>discovery</code>. A <code>sender</code> given alone raises <code>ValueError</code>, so a pack's transport can
+neither skip the pin on discovery connections nor send a test's discovery to the
+network.</p>
+<p><strong>A scripted A2A agent</strong>, <code>ScriptedA2aAgent</code>, stands in for a live A2A v1 agent
+the same way: it serves a card, answers the task reads per caller, keeps tasks
+per owner and refuses a caller it does not know, so an A2A rule gets an agent
+that tells its callers apart and one that does not.</p>
+<p><strong>A seeded application</strong>, <code>SeededApplication</code>, stands in for a team's own
+retrieval pipeline over a <a href="usage-fixtures.html">fixtures file</a>: it answers an
+item's question with its marker when the asking tenant's key may read it, and
+switches break its tenant filter per channel, leave items out of its index, or
+make it obey a poisoned document. <code>seeded_target</code> builds a <code>SeededTarget</code> over
+it — the run's endpoint and one endpoint per tenant, on one meter — so a rule
+that needs <code>seeded_data</code> gets a leaking and a holding application with no
+network.</p>
 <p><strong>A run manifest</strong>: <code>manifest_for</code> builds a <code>RunManifest</code> describing a
 <code>ScanResult</code> with test-stable circumstances, and <code>FIXED_RUN_TIME</code> is the
 fixed instant it stamps everywhere — so two renderings of the same result
 are byte-identical and a renderer test is not also a test about clocks.</p>
+<p><strong>Sample runs and a receiver</strong>, for an installed output: <code>sample_verifications</code>
+returns five runs the engine produced over kit targets — a passed and a failed
+scan, a scan of an empty tree, a probe stopped by its request budget and a scan in
+which no rule ran — so a format is tried on the runs it most needs to describe.
+<code>receiver</code> serves, on <code>127.0.0.1</code> for a <code>with</code> block, an accepting, a refusing
+(<code>403</code>) and a closed URL, yielded as a <code>Receiver</code> whose <code>received</code> lists each
+<code>ReceivedRequest</code> it answered. <code>guardana.testing.assert_renderer_conforms</code> and
+<code>assert_reporter_conforms</code> run a format or a reporter over them and raise
+<code>OutputContractError</code>; what they prove and what they do not is in the
+<a href="conformance-kit.html">conformance kit</a>.</p>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/extending.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

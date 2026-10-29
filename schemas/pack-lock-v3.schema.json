@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/pack-lock/v3.schema.json",
+  "title": "Guardana Pack Lock v3",
+  "description": "guardana-lock.yaml: every installed extension pinned by what it is, written by `guardana pack lock` and compared by `guardana pack lock --check`. Version 3 adds `renderers` and `reporters` to every pack and is written only when a pack pins an output or an output is unlocked; otherwise the lock is written as version 2. This build reads versions 1 and 2 too.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "extension_api",
+    "packs",
+    "unlocked"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 3
+    },
+    "extension_api": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The extension contract the lock was taken against; a lock taken under another one is not compared."
+    },
+    "packs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pack"
+      }
+    },
+    "unlocked": {
+      "type": "array",
+      "description": "Every id registered by no pack that declares a manifest; an output is spelled renderer:<name> or reporter:<name>.",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "digests": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "digest"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "names": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/text"
+      }
+    },
+    "output_names": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$",
+        "maxLength": 40
+      }
+    },
+    "pack": {
+      "type": "object",
+      "required": [
+        "name",
+        "distribution",
+        "version",
+        "rules",
+        "evaluators",
+        "targets",
+        "renderers",
+        "reporters",
+        "taxonomies"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/text"
+        },
+        "distribution": {
+          "$ref": "#/$defs/text"
+        },
+        "version": {
+          "$ref": "#/$defs/text"
+        },
+        "rules": {
+          "$ref": "#/$defs/digests",
+          "description": "Each rule the pack declares, pinned by the digest of its declaration."
+        },
+        "evaluators": {
+          "$ref": "#/$defs/names"
+        },
+        "targets": {
+          "$ref": "#/$defs/names"
+        },
+        "renderers": {
+          "$ref": "#/$defs/output_names",
+          "description": "Each installed format the pack declares, pinned by name; the distribution version is the coarse pin."
+        },
+        "reporters": {
+          "$ref": "#/$defs/output_names",
+          "description": "Each installed reporter the pack declares, pinned by name; the distribution version is the coarse pin."
+        },
+        "taxonomies": {
+          "$ref": "#/$defs/digests",
+          "description": "Each catalogue the pack declares, pinned by a digest over the references it registers."
+        }
+      }
+    }
+  }
+}

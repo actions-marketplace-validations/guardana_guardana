@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://guardana.dev/schemas/recipe/v3.schema.json",
+  "title": "Guardana Recipe v3",
+  "description": "guardana-recipe.yaml: the profile a team's checks come from, what answers them, and where the artifact goes. Hand-written; Guardana never rewrites it. Relative paths are read beside the recipe.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "name",
+    "profile",
+    "subject"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 3,
+      "description": "Version 3 adds `subject.target`; this build reads versions 1 and 2 too."
+    },
+    "name": {
+      "$ref": "#/$defs/text"
+    },
+    "profile": {
+      "$ref": "#/$defs/text",
+      "description": "The guardana.yaml the checks come from."
+    },
+    "subject": {
+      "type": "object",
+      "dependentRequired": {
+        "connection": [
+          "kind"
+        ],
+        "target": [
+          "kind"
+        ]
+      },
+      "additionalProperties": false,
+      "description": "What answers, and how: exactly one of `connection`, `recording` or `target`, and with a connection optionally the fixtures the application runs with.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "application",
+            "model_harness"
+          ],
+          "description": "Declared by the team; there is no default. Required with `connection` and `target`; with `recording` it may be left to the recording's `subject_kind`, and the run is refused when the two differ or neither declares one."
+        },
+        "connection": {
+          "type": "object",
+          "required": [
+            "url",
+            "model"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "url": {
+              "$ref": "#/$defs/text"
+            },
+            "model": {
+              "$ref": "#/$defs/text"
+            },
+            "provider": {
+              "$ref": "#/$defs/text"
+            },
+            "api_key_env": {
+              "$ref": "#/$defs/text"
+            },
+            "adapter": {
+              "$ref": "#/$defs/text"
+            },
+            "system_prompt_file": {
+              "$ref": "#/$defs/text"
+            }
+          }
+        },
+        "recording": {
+          "$ref": "#/$defs/text"
+        },
+        "target": {
+          "type": "object",
+          "required": [
+            "locator"
+          ],
+          "additionalProperties": false,
+          "description": "An installed endpoint target, named as `probe --target` names it. The lock pins its scheme and the distribution that registers it.",
+          "properties": {
+            "locator": {
+              "$ref": "#/$defs/text",
+              "description": "`scheme://value`; the scheme of an installed endpoint target."
+            },
+            "options": {
+              "type": "object",
+              "description": "Non-secret options, as `--target-option key=value` passes them.",
+              "propertyNames": {
+                "pattern": "^[^=]*[^=\\s][^=]*$"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "fixtures": {
+          "$ref": "#/$defs/text",
+          "description": "A guardana-fixtures.yaml beside the recipe. The lock pins its digest and every tenant adapter; refused together with `recording` or `target`."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "connection"
+          ]
+        },
+        {
+          "required": [
+            "recording"
+          ]
+        },
+        {
+          "required": [
+            "target"
+          ]
+        }
+      ],
+      "dependentSchemas": {
+        "fixtures": {
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "recording"
+                ]
+              },
+              {
+                "required": [
+                  "target"
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ai_system": {
+          "$ref": "#/$defs/text"
+        },
+        "environment": {
+          "$ref": "#/$defs/text"
+        },
+        "deployment_id": {
+          "$ref": "#/$defs/text"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "$ref": "#/$defs/text",
+          "description": "A subdirectory beside the recipe; never the recipe's own directory or a path outside it."
+        },
+        "exchanges": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "text": {
+      "type": "string",
+      "pattern": "\\S"
+    }
+  }
+}

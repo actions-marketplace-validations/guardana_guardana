@@ -100,6 +100,7 @@ def test_run_inspect_shows_how_honest_the_judge_was(tmp_path: Path) -> None:
                 calibration=CalibrationRecord(dataset_digest="sha256:a", brier=0.08, ece=0.03),
             ),
             EvaluatorRecord(id="keyword"),
+            EvaluatorRecord(id="tool_call", deterministic=True),
         ),
     )
     path = tmp_path / "run.json"
@@ -107,14 +108,23 @@ def test_run_inspect_shows_how_honest_the_judge_was(tmp_path: Path) -> None:
         "schema_version": REPORT_SCHEMA_VERSION,
         "run": manifest_to_dict(manifest),
         "findings": [],
+        "unverified": [],
+        "waived": [],
+        "errors": [],
+        "observations": [],
+        "assessments": [],
+        "scope": None,
     }
     path.write_text(json.dumps(document), encoding="utf-8")
 
     result = runner.invoke(app, ["run", "inspect", str(path)])
 
     assert result.exit_code == 0, result.output
-    assert "canary — brier 0.08" in result.output
+    assert "canary — brier 0.08, ECE 0.03" in result.output
+    assert "per-class error not measured" in result.output
     assert "keyword — confidence not measured" in result.output, (
         "an unmeasured evaluator says so; omitting it would let a reader assume the "
         "listed ones are all of them"
     )
+    assert "tool_call — deterministic — no error rate" in result.output
+    assert "tool_call — confidence not measured" not in result.output

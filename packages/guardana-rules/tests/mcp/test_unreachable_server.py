@@ -1,13 +1,19 @@
-"""A server nobody could reach is not a secure server, and every rule has to say so.
+"""A server nobody could reach stops the run, and no rule turns that into a verdict.
 
-Three of the original six used to decline explicitly while three returned nothing, and
-silence from a rule here means *the invariant holds*. A report where half the
-checks said "not established" and half said nothing at all invites reading the
-second half as clean, which is the same false green in a quieter voice.
+Silence from a rule here means *the invariant holds*, so a rule that said nothing
+about a server it never reached would read as clean. An inconclusive verdict from
+each rule was honest and still wrong about the cause: the server failed, not eight
+checks, and a run that carried on spent one failure per rule before exiting `2`.
 """
 
+import pytest
+from _offline import refuse_name_lookups
+from guardana.core.gate import StopReason
+from guardana.core.profile import Policy, Profile
+from guardana.core.registry import Registry
 from guardana.core.rule import Rule, RuleContext
-from guardana.core.target import McpServerTarget
+from guardana.core.runner import Runner, target_failures
+from guardana.core.target import EndpointUnreachable, McpServerTarget
 from guardana.rules.mcp import (
     McpAuthorizationDiscoveryRule,
     McpCacheScopeRule,
@@ -19,6 +25,8 @@ from guardana.rules.mcp import (
     McpUnauthenticatedAccessRule,
 )
 from mcp_fixtures import ROUTABLE, unreachable
+
+pytestmark = pytest.mark.usefixtures(refuse_name_lookups.__name__)
 
 EVERY_MCP_RULE: list[Rule] = [
     McpUnauthenticatedAccessRule(),
@@ -32,25 +40,26 @@ EVERY_MCP_RULE: list[Rule] = [
 ]
 
 
-def test_no_rule_stays_silent_about_a_server_it_never_reached() -> None:
+@pytest.mark.parametrize("rule", EVERY_MCP_RULE, ids=lambda rule: rule.meta.id)
+def test_a_rule_meets_a_server_it_never_reached_as_the_servers_failure(rule: Rule) -> None:
+    target = McpServerTarget(ROUTABLE, sender=unreachable, discovery_sender=unreachable)
+
+    with pytest.raises(EndpointUnreachable) as raised:
+        list(rule.run(target, RuleContext()))
+
+    assert f"the MCP server at {ROUTABLE} did not answer" in str(raised.value)
+
+
+def test_a_run_against_a_server_nobody_reached_stops_with_no_verdict() -> None:
+    registry = Registry()
     for rule in EVERY_MCP_RULE:
-        target = McpServerTarget(ROUTABLE, sender=unreachable)
+        registry.register_rule(rule)
+    target = McpServerTarget(ROUTABLE, sender=unreachable, discovery_sender=unreachable)
 
-        reported = list(rule.run(target, RuleContext()))
+    result = Runner(registry=registry, profile=Profile("t", Policy()), concurrency=1).run(target)
 
-        assert reported, f"{rule.meta.id} said nothing about a server it could not reach"
-        assert [f.verdict.outcome for f in reported if f.verdict] == ["inconclusive"], (
-            f"{rule.meta.id} reached a verdict on a server that never answered"
-        )
-
-
-def test_each_one_says_what_it_would_have_established() -> None:
-    # A generic "could not run" is true and useless. The reason names the invariant
-    # so an operator reading the report knows what they are missing.
-    for rule in EVERY_MCP_RULE:
-        target = McpServerTarget(ROUTABLE, sender=unreachable)
-
-        summary = next(iter(rule.run(target, RuleContext()))).evidence.summary
-
-        assert "could not be reached" in summary
-        assert summary.count("so ") == 1, f"{rule.meta.id}: {summary}"
+    assert result.stopped_by is StopReason.TARGET_UNAVAILABLE
+    assert result.findings == ()
+    assert result.rules_run == ()
+    (said,) = target_failures(result)
+    assert f"the MCP server at {ROUTABLE} did not answer" in said

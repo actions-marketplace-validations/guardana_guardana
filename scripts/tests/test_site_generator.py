@@ -19,12 +19,29 @@ runs, but nothing compares its answer to the page a rule lands on, so a wrong
 bucket renders exactly as cleanly as a right one — a declared `0` filed next to a
 declared `3` looks like an ordinary page, not a defect. Pinned directly against
 the function, below.
+
+The stylesheet is pinned for what a reader of a wide page needs and no built page
+can show to a test: a scroll cue that stays visible, and headings that break inside
+a long code span.
 """
+
+import re
 
 import pytest
 
 from sitegen import explorer, render
-from sitegen.build import _tables
+from sitegen.theme import CSS
+
+
+def _declarations(selector: str) -> str:
+    """Join every declaration block of the stylesheet whose selector list names `selector`."""
+    uncommented = re.sub(r"/\*.*?\*/", "", CSS, flags=re.DOTALL)
+    blocks = re.findall(r"([^{}]+)\{([^{}]*)\}", uncommented)
+    return ";".join(
+        body
+        for selectors, body in blocks
+        if selector in (part.strip() for part in selectors.split(","))
+    ).replace(" ", "")
 
 
 def test_a_heading_with_a_link_stays_in_the_body_rather_than_losing_its_rewrite() -> None:
@@ -50,7 +67,7 @@ def test_a_plain_heading_is_still_lifted_out_of_the_body() -> None:
 
 
 def test_the_parser_escapes_raw_html_so_the_table_wrapper_cannot_reach_prose() -> None:
-    """`_tables` substitutes on the literal `<table>`, and that is safe for one reason only.
+    """`wrap_tables` substitutes on the literal `<table>`, and that is safe for one reason only.
 
     Raw HTML is off, so a document mentioning `<table>` in prose or in a code fence
     renders it escaped and the substitution never sees it. Turning raw HTML on would
@@ -64,7 +81,7 @@ def test_the_parser_escapes_raw_html_so_the_table_wrapper_cannot_reach_prose() -
     )
 
     html = render.render(markdown, lambda href: href).html
-    wrapped = _tables(html)
+    wrapped = render.wrap_tables(html)
 
     assert "&lt;table&gt;" in html, "raw HTML is no longer escaped; the table wrapper is now unsafe"
     assert wrapped.count('<div class="table-wrap">') == 1
@@ -100,3 +117,54 @@ def test_cost_bucket_keeps_a_declared_zero_out_of_the_cheapest_paid_band(
     same page as a declared `2`, which is the false claim this pins shut.
     """
     assert explorer.cost_bucket({"estimated_requests": declared}) == bucket
+
+
+def _explorer_entry(**overrides: object) -> dict[str, object]:
+    entry: dict[str, object] = {
+        "severity": "HIGH",
+        "surface": "runtime",
+        "family": "prompt",
+        "impact": "active",
+        "target_kind": "endpoint",
+        "estimated_requests": 1,
+        "evaluator": "canary",
+        "maturity": "stable",
+        "destructive": False,
+        "requires": ["chat"],
+        "detection": "invariant",
+    }
+    entry.update(overrides)
+    return entry
+
+
+def test_a_rule_page_states_what_its_findings_are() -> None:
+    assert "<li><b>Detection</b>invariant</li>" in explorer.rule_properties(_explorer_entry(), "")
+
+
+def test_a_rule_entry_without_a_detection_reads_as_undeclared() -> None:
+    """A `rules.json` written before the field existed says nothing, which is not a label."""
+    entry = _explorer_entry()
+    del entry["detection"]
+
+    assert "<li><b>Detection</b>undeclared</li>" in explorer.rule_properties(entry, "")
+
+
+@pytest.mark.parametrize("box", ["pre", ".table-wrap"])
+def test_a_wide_block_scrolls_in_its_own_box_with_a_cue_that_stays_visible(box: str) -> None:
+    """An overlay scrollbar is drawn only while scrolling, so a cut-off line reads as complete.
+
+    The scrollbar is styled so WebKit and Blink keep it drawn, and an edge shadow that
+    the content covers once scrolled to that end marks the side with more to read in
+    browsers that keep overlay scrollbars.
+    """
+    assert "overflow-x:auto" in _declarations(box)
+    assert "height:" in _declarations(f"{box}::-webkit-scrollbar")
+    assert "background:" in _declarations(f"{box}::-webkit-scrollbar-thumb")
+    assert "no-repeatlocal" in _declarations(box)
+    assert "no-repeatscroll" in _declarations(box)
+
+
+@pytest.mark.parametrize("heading", ["main h1", "main h2", "main h3", "main h4"])
+def test_a_long_code_span_in_a_heading_wraps_instead_of_leaving_the_column(heading: str) -> None:
+    """A dotted id or a signature has no space to break at, so the heading must break inside it."""
+    assert "overflow-wrap:anywhere" in _declarations(heading)

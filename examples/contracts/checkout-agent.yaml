@@ -8,7 +8,6 @@
 # producer recorded. Nothing in this file is a prompt, and nothing sends anything.
 #
 # Documentation: docs/usage-contracts.md
-# Reasoning:     docs/design/security-contracts.md
 
 schema_version: 1
 name: checkout

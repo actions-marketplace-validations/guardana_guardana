@@ -44,6 +44,9 @@ def _manifest() -> PackManifest:
         evaluators=("acme.strict_refusal",),
         targets=("AcmePromptLibraryTarget",),
         taxonomies=("ACME-CONTROLS",),
+        renderers=("acme-table",),
+        reporters=("acme-webhook",),
+        output_api=Range(minimum=1, below=2),
     )
 
 
@@ -59,9 +62,11 @@ against a build that has something the lock cannot attribute to a pack.
 def _installed() -> Installed:
     return Installed(
         rules={"acme.agent.customer_data": "1111222233334444", _UNPINNABLE: "cafebabe00000000"},
-        evaluators=("acme.strict_refusal",),
-        targets=("AcmePromptLibraryTarget",),
+        evaluators={"acme.strict_refusal": "acme-guardana-rules"},
+        targets={"AcmePromptLibraryTarget": "acme-guardana-rules"},
         catalogues={"ACME-CONTROLS": catalogue_digest([_ACME])},
+        renderers={"acme-table": "acme-guardana-rules"},
+        reporters={"acme-webhook": "acme-guardana-rules"},
     )
 
 
@@ -205,7 +210,8 @@ def test_no_key_of_a_lock_can_be_deleted_without_the_reader_noticing() -> None:
 
 
 def test_the_fixture_occupies_every_field_a_lock_has() -> None:
-    empty = undemonstrative_fields(_lock(), "lock")
+    """`migrated_from` describes the file that was read and is never written, so it is exempt."""
+    empty = undemonstrative_fields(_lock(), "lock", exempt=frozenset({"lock.migrated_from"}))
 
     assert not empty, f"fields the lock fixture leaves empty, so nothing is proved: {empty}"
 
@@ -287,3 +293,141 @@ def test_the_lock_is_written_in_a_stable_order() -> None:
 
     packs = cast("list[dict[str, str]]", written["packs"])
     assert [pack["name"] for pack in packs] == ["alpha", "zeta"]
+
+
+# --- what a lock refuses to pin, and what it must not overlook ---------------------
+
+
+def test_the_same_pack_shipped_by_another_distribution_is_drift() -> None:
+    """Same name, version and ids, other code: the evaluators behind those ids are not pinned."""
+    fork = "acme-rules-fork"
+    installed = replace(
+        _installed(),
+        evaluators={"acme.strict_refusal": fork},
+        targets={"AcmePromptLibraryTarget": fork},
+        renderers={"acme-table": fork},
+        reporters={"acme-webhook": fork},
+    )
+    replaced = lock_of([(fork, "0.3.1", _manifest())], installed)
+
+    drift = compare(_lock(), replaced)
+
+    assert drift, "a pack now shipped by another distribution compared as matching"
+    assert [entry.kind for entry in drift] == ["distribution_changed"]
+    assert "acme-rules-fork" in drift[0].detail
+
+
+_PROMISING = {
+    "rule": replace(_manifest(), rules=(*_manifest().rules, "acme.promised")),
+    "evaluator": replace(_manifest(), evaluators=(*_manifest().evaluators, "acme.promised")),
+    "target": replace(_manifest(), targets=(*_manifest().targets, "acme.promised")),
+    "catalogue": replace(_manifest(), taxonomies=(*_manifest().taxonomies, "acme.promised")),
+}
+
+
+@pytest.mark.parametrize("group", sorted(_PROMISING))
+def test_a_lock_is_refused_when_a_pack_declares_what_nothing_registers(group: str) -> None:
+    """A partial lock is a pin a later `--check` matches while the declared check never runs."""
+    manifest = _PROMISING[group]
+
+    with pytest.raises(PackError, match=rf"acme-guardana-rules declares {group} acme\.promised"):
+        lock_of([("acme-guardana-rules", "0.3.1", manifest)], _installed())
+
+
+_IMPOSTER = "acme-imposter"
+
+_REGISTERED_ELSEWHERE = {
+    "evaluator": replace(_installed(), evaluators={"acme.strict_refusal": _IMPOSTER}),
+    "target": replace(_installed(), targets={"AcmePromptLibraryTarget": _IMPOSTER}),
+    "renderer": replace(_installed(), renderers={"acme-table": _IMPOSTER}),
+    "reporter": replace(_installed(), reporters={"acme-webhook": _IMPOSTER}),
+}
+
+_DECLARED = {
+    "evaluator": "acme.strict_refusal",
+    "target": "AcmePromptLibraryTarget",
+    "renderer": "acme-table",
+    "reporter": "acme-webhook",
+}
+
+
+@pytest.mark.parametrize("kind", sorted(_REGISTERED_ELSEWHERE))
+def test_a_lock_is_not_written_over_an_extension_another_distribution_registers(
+    kind: str,
+) -> None:
+    """The id is the pack's; the code behind it is not, so pinning it would pin the wrong code."""
+    with pytest.raises(PackError) as refused:
+        lock_of(
+            [("acme-guardana-rules", "0.3.1", _manifest())],
+            _REGISTERED_ELSEWHERE[kind],
+            writing=True,
+        )
+
+    named = f"acme-guardana-rules declares {kind} {_DECLARED[kind]}, which {_IMPOSTER} registers"
+    assert str(refused.value) == (
+        "a pack declares an extension another distribution registers, so a lock would "
+        f"pin code the pack does not ship: {named}"
+    )
+
+
+@pytest.mark.parametrize("kind", sorted(_REGISTERED_ELSEWHERE))
+def test_a_check_reports_an_extension_another_distribution_now_registers_as_removed(
+    kind: str,
+) -> None:
+    """Dropped from the pack rather than kept, so the lock on disk no longer matches it."""
+    present = lock_of([("acme-guardana-rules", "0.3.1", _manifest())], _REGISTERED_ELSEWHERE[kind])
+
+    drift = compare(_lock(), present)
+
+    removed = [entry for entry in drift if entry.kind == DriftKind.REMOVED]
+    assert [entry.subject for entry in removed] == [_DECLARED[kind]]
+    assert removed[0].detail == f"{kind} was locked and is gone"
+
+
+def test_an_evaluator_no_distribution_can_be_named_for_is_not_the_packs_either() -> None:
+    """Registered in code, it cannot be shown to be what the pack ships."""
+    unnamed = replace(_installed(), evaluators={"acme.strict_refusal": None})
+
+    with pytest.raises(PackError, match=r"acme\.strict_refusal, which an unnamed distribution"):
+        lock_of([("acme-guardana-rules", "0.3.1", _manifest())], unnamed, writing=True)
+
+
+def test_the_packs_own_evaluators_and_targets_are_still_pinned() -> None:
+    """The inversion: a pack registering what it declares writes and checks clean."""
+    written = lock_of([("acme-guardana-rules", "0.3.1", _manifest())], _installed(), writing=True)
+
+    (pack,) = written.packs
+    assert pack.evaluators == ("acme.strict_refusal",)
+    assert pack.targets == ("AcmePromptLibraryTarget",)
+    assert compare(_lock(), written) == ()
+
+
+def test_two_installed_packs_of_one_name_are_refused_rather_than_one_dropped() -> None:
+    """Keyed by name, the second pack and its rules would never be compared at all."""
+    fork = replace(_manifest(), rules=())
+
+    with pytest.raises(PackError, match="acme-guardana-rules from acme-fork, acme-guardana-rules"):
+        lock_of(
+            [("acme-guardana-rules", "0.3.1", _manifest()), ("acme-fork", "9.9.9", fork)],
+            _installed(),
+        )
+
+
+def test_a_lock_file_naming_one_pack_twice_is_refused() -> None:
+    written = lock_to_dict(_lock())
+    packs = cast("list[dict[str, object]]", written["packs"])
+    written["packs"] = [*packs, {**packs[0], "distribution": "acme-fork"}]
+
+    with pytest.raises(PackError, match="more than once"):
+        lock_from_dict(written, "guardana-lock.yaml")
+
+
+def test_a_comparison_of_a_hand_built_lock_naming_one_pack_twice_is_refused() -> None:
+    twice = replace(_lock(), packs=(*_lock().packs, replace(_lock().packs[0], distribution="fork")))
+
+    with pytest.raises(PackError, match="more than once"):
+        compare(_lock(), twice)
+
+
+def test_one_pack_name_from_one_distribution_still_locks() -> None:
+    assert [pack.name for pack in _lock().packs] == ["acme-guardana-rules"]

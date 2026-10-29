@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://guardana.dev/schemas/run/v6.schema.json",
-  "title": "Guardana Saved Run v5",
+  "title": "Guardana Saved Run v6",
   "description": "One Guardana run written to disk: the manifest (what was verified, against what, under which configuration and limits, at what cost, with what reach, and with what verdict) plus the finding channels. Versioned independently of the CLI.",
   "type": "object",
   "required": [

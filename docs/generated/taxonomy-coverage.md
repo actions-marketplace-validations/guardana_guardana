@@ -10,7 +10,7 @@ status: stable
 
 Which entries of each framework at least one built-in rule maps to.
 Coverage of an entry is not a claim that the entry is fully addressed —
-see `ROADMAP.md` for the honest per-category assessment.
+See [detection limits](detection-limits.md) for what each rule proves.
 
 | Framework | Entries covered |
 |---|---|
@@ -19,5 +19,5 @@ see `ROADMAP.md` for the honest per-category assessment.
 | OWASP-ASI-2026 | `ASI01`, `ASI02`, `ASI03`, `ASI04`, `ASI05`, `ASI06`, `ASI07`, `ASI09` |
 | OWASP-LLM-2025 | `LLM01`, `LLM02`, `LLM03`, `LLM04`, `LLM05`, `LLM06`, `LLM07`, `LLM08`, `LLM10` |
 | OWASP-LLM-2026 | `LLM01`, `LLM02`, `LLM03`, `LLM04`, `LLM05`, `LLM06`, `LLM08`, `LLM09`, `LLM10` |
-| OWASP-MCP-2025 | `MCP01`, `MCP02`, `MCP03`, `MCP04`, `MCP06`, `MCP07`, `MCP10` |
+| OWASP-MCP-2025 | `MCP01`, `MCP02`, `MCP03`, `MCP04`, `MCP06`, `MCP07`, `MCP09`, `MCP10` |
 | OWASP-ML-2023 | `ML02`, `ML06` |

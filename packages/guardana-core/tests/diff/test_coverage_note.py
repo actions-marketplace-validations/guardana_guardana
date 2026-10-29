@@ -113,6 +113,18 @@ def test_a_changed_catalogue_edition_is_named() -> None:
     assert any("framework catalogue(s) OWASP-LLM-2026 differ" in note for note in notes)
 
 
+def test_a_built_in_catalogue_that_moved_beside_an_unchanged_extension_is_named() -> None:
+    extension = TaxonomyCatalogRecord(framework="OWASP-LLM-2026", digest="sha256:ext", entries=1)
+    moved = TaxonomyCatalogRecord(framework="OWASP-LLM-2026", digest="sha256:bb", entries=10)
+
+    notes = _notes(
+        CoverageRecord(digest="sha256:one", taxonomies=(_CATALOGUE, extension)),
+        CoverageRecord(digest="sha256:two", taxonomies=(moved, extension)),
+    )
+
+    assert any("framework catalogue(s) OWASP-LLM-2026 differ" in note for note in notes)
+
+
 def test_a_catalogue_that_was_not_installed_before_is_named() -> None:
     notes = _notes(
         CoverageRecord(digest="sha256:one"),

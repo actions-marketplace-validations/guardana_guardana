@@ -6,58 +6,78 @@
 <title>guardana pack — Guardana documentation</title>
 <meta name="description" content="guardana pack validate and guardana pack lock: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks">
 <link rel="canonical" href="https://guardana.dev/docs/usage-pack">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html" aria-current="page">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,66 +98,114 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code> and <code>guardana pack lock</code>: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks</p><p>1.0 promises that <code>Rule</code>, <code>Evaluator</code> and <code>Target</code> will not break under you. A
-promise is only worth something if you can check whether <em>this</em> build keeps it for
-<em>your</em> package — so a pack declares what it needs and what it provides, and this
-command answers both questions.</p>
-<pre><code class="language-bash">guardana pack validate
+<details class="mnav">
+<summary>Menu · <b>guardana pack</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html" aria-current="page">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana pack validate</code> — can this build load your pack, and does it do what it says</h1><p class="lede"><code>guardana pack validate</code> and <code>guardana pack lock</code>: the manifest declaring which extension API your pack needs, and the pin that keeps CI running the same checks</p><p><code>guardana pack validate</code> checks a pack's declarations when you need to verify extension compatibility for <code>Rule</code>, <code>Evaluator</code>, and <code>Target</code>.</p>
+<pre><code class="language-bash">guardana pack validate --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>
 <pre><code>extension APIs implemented by this build: 1, 2 (newest 2)
 
@@ -144,6 +213,11 @@ command answers both questions.</p>
 
 1 pack(s) checked, 0 with problems.
 </code></pre>
+<p>Both commands start with Guardana's own distributions only, like every other command,
+so a pack author admits their own distribution by name, or states it once in a profile
+given with <code>--profile</code> (<a href="profiles.html#plugin-trust-plugins">plugin trust</a>). If plugin trust
+refused anything, both stop with exit <code>2</code> before they read a single manifest: finding a
+manifest means importing the package that holds it, and a refused pack is never imported.</p>
 <h2 id="the-manifest">The manifest</h2>
 <p><code>guardana-pack.yaml</code>, <strong>inside your package directory</strong> — not at your repository
 root:</p>
@@ -165,7 +239,9 @@ provides:
   taxonomies:
     - ACME-CONTROLS
 </code></pre>
-<p><code>provides:</code> names all four extension groups. <code>taxonomies:</code> lists <strong>framework
+<p><code>provides:</code> names all four run groups. A pack that adds an <a href="outputs.html">installed output</a>
+also lists <code>renderers:</code> and <code>reporters:</code> by name, declares the output API it was written
+against as <code>output_api: &quot;&gt;=1,&lt;2&quot;</code>, and uses <code>schema_version: 3</code>. <code>taxonomies:</code> lists <strong>framework
 names</strong>, not individual controls — a pack registers a catalogue, and a team shipping
 two hundred controls would otherwise maintain two hundred lines that say one thing.</p>
 <p>It goes inside the package because <code>pack validate</code> runs against an <strong>installed
@@ -174,14 +250,14 @@ read from what they installed cannot be checked at the only moment that matters 
 which is also why the declaration is not <code>[tool.guardana]</code> in <code>pyproject.toml</code>.</p>
 <h2 id="extension_api-is-not-the-product-version"><code>extension_api</code> is not the product version</h2>
 <p>This is the field worth understanding before you pin anything.</p>
-<p>Guardana's own version breaks API on every minor while it is pre-1.0, by design. A
-pack pinned to <code>guardana&gt;=0.17,&lt;0.18</code> would need re-releasing on every minor even
-when nothing it touches has moved. <strong><code>extension_api</code> moves only when <code>Rule</code>,
-<code>Evaluator</code>, <code>Target</code> or <code>Finding</code> actually change shape</strong>, so it is the thing a
-pack can usefully bind to. API 2 adds CLI target locators. Guardana retains API
-1 alongside it, so a rule/evaluator pack declaring <code>&gt;=1,&lt;2</code> continues to load;
-a pack using <code>Target.scheme</code> and <code>from_locator</code> declares <code>&gt;=2,&lt;3</code> and is refused
-by older builds that cannot make its target selectable.</p>
+<p>Guardana's minor version moves for new opt-in checks, features and deprecations
+(<a href="compatibility.html#versioning">compatibility</a>), even when the extension contract stays the
+same. A pack pinned to one product minor version needs a new release for every minor
+version, even when nothing it uses changes. <strong><code>extension_api</code> moves only when <code>Rule</code>,
+<code>Evaluator</code>, <code>Target</code> or <code>Finding</code> actually change shape</strong>, so a pack can bind to it. API 2
+adds CLI target locators. Guardana retains API 1 alongside it, so a rule/evaluator pack
+declaring <code>&gt;=1,&lt;2</code> continues to load. A pack using <code>Target.scheme</code> and <code>from_locator</code> declares
+<code>&gt;=2,&lt;3</code>; older builds refuse it because they cannot make its target selectable.</p>
 <p>Both ends are required. An open range claims compatibility with an API nobody has
 written yet.</p>
 <p><strong>Both directions refuse, with different messages and one outcome:</strong></p>
@@ -211,6 +287,19 @@ direction that matters is the <strong>missing</strong> one: a pack promising
 <code>acme.agent.customer_data</code> and not registering it leaves a team believing a check
 runs that never does — a false green arriving through documentation instead of
 through code.</p>
+<p>Each id is looked up under its own group: a rule id that only an evaluator registers is
+not a rule your pack provides. For an installed pack, a declared rule, evaluator or
+target must also be registered by <strong>your</strong> distribution. One another pack registers
+runs today and disappears with that pack, while your manifest still promises it; the
+problem names the distribution that does register it. An id registered by no
+distribution this build can name (registered in code rather than through an entry
+point) is not shown to be yours either, and fails the same way. A framework can have several
+owners, because a pack may add controls to a built-in one or to another pack's: a
+declared framework passes when your distribution registered at least one reference
+into it. The built-in frameworks are owned by the distribution that ships their
+catalogues, so declaring one your pack adds nothing to fails. A manifest named on
+the command line is not tied to an installed distribution, so it is matched by group
+only.</p>
 <p>Registering <em>more</em> than you list is not an error. That is untidy, not a lie, and
 failing a build over it would make this something teams switch off.</p>
 <h2 id="exit-codes">Exit codes</h2>
@@ -232,6 +321,11 @@ failing a build over it would make this something teams switch off.</p>
 <td>a pack is unloadable, or promises what it does not register</td>
 <td>fail</td>
 <td><code>1</code></td>
+</tr>
+<tr>
+<td>plugin trust refused an installed extension; no manifest was read</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
 </tr>
 <tr>
 <td>nothing declared a manifest</td>
@@ -270,6 +364,10 @@ for it to name. <code>pack validate</code> says so where it happened:</p>
 <p>A schema 1 manifest that <em>does</em> name <code>taxonomies:</code> is refused. A key invented after
 the version that names it is a manifest whose own <code>schema_version</code> no longer
 describes it, and an older build reading the same file would drop the key silently.</p>
+<p><strong>Schema 3 adds <code>provides.renderers</code>, <code>provides.reporters</code> and <code>output_api</code>.</strong> Write it only
+for a pack that adds an output: schema 2 is still current, and a pack without outputs stays
+readable by older builds at 2. <code>output_api</code> is required exactly when an output is declared.
+A schema 2 manifest naming any of the three is refused, as above.</p>
 <p><strong>There is no <code>pack migrate</code> command, deliberately.</strong> A saved run is generated and
 Guardana may rewrite it; a manifest is hand-written and belongs to you.</p>
 <h2 id="guardana-pack-lock--pin-what-a-check-is"><code>guardana pack lock</code> — pin what a check <em>is</em></h2>
@@ -280,20 +378,31 @@ comparison would blame the model for it.</p>
 <pre><code class="language-bash">guardana pack lock                # write ./guardana-lock.yaml
 guardana pack lock --check        # in CI: fail if the build has drifted
 </code></pre>
-<pre><code class="language-yaml">schema_version: 1
+<p>The lock is written whole, through a temporary file and a rename: a write that fails
+part-way leaves the earlier lock as it was, and a lock that cannot be written exits <code>3</code>.</p>
+<pre><code class="language-yaml">schema_version: 2
 extension_api: 2
 packs:
   - name: acme-guardana-rules
     distribution: acme-guardana-rules
     version: 0.3.1
     rules:
-      acme.agent.customer_data: 7ac9df6f3a247391
+      acme.agent.customer_data:
+        digest: 7ac9df6f3a247391
     evaluators: [acme.strict_refusal]
     targets: [AcmeWarehouseTarget]
     taxonomies:
-      ACME-CONTROLS: &quot;sha256:1c4f…&quot;
+      ACME-CONTROLS:
+        digest: &quot;sha256:1c4f…&quot;
 unlocked: []
 </code></pre>
+<p>Every digest sits under a <code>digest:</code> key of its own. An id can contain <code>secret</code>,
+<code>key</code> or <code>token</code>, and an id beside a hex value on one line is what a secret scanner
+such as gitleaks reports as a credential. A schema 1 lock, which wrote
+<code>&lt;id&gt;: &lt;digest&gt;</code>, is still read and checked; <code>--check</code> then says to rewrite it with
+<code>guardana pack lock</code>. A lock with a schema newer than the build is refused with the
+advice to upgrade Guardana, never to regenerate the file, which would rewrite a
+teammate's lock in the older layout.</p>
 <p><strong>Three things are pinned three different ways, and the file says which is which:</strong></p>
 <div class="table-wrap"><table>
 <thead>
@@ -311,7 +420,7 @@ unlocked: []
 </tr>
 <tr>
 <td>evaluators, targets</td>
-<td>id only</td>
+<td>id (a target by class name), and only when the pack's own distribution registers it</td>
 <td>an <code>Evaluator</code> is Python and has no declaration to hash; inventing a digest from a class name would claim to detect a change it cannot see</td>
 </tr>
 <tr>
@@ -320,13 +429,29 @@ unlocked: []
 <td>a third-party catalogue has no <em>file</em> to pin, but what it registered is content</td>
 </tr>
 <tr>
+<td>formats, reporters</td>
+<td>name, as <code>renderers:</code> and <code>reporters:</code> in the pack entry, and only when the pack's own distribution registers it</td>
+<td>Python, with nothing declared to hash, as for evaluators</td>
+</tr>
+<tr>
 <td>everything else</td>
-<td>the distribution version beside it</td>
+<td>the distribution name and version beside it</td>
 <td>the coarse pin, and the only one that covers an implementation whose declaration did not move</td>
 </tr>
 </tbody>
 </table></div>
-<p><code>unlocked:</code> lists extensions registered by a package that declares <strong>no manifest</strong>.
+<p>A lock is schema 3 only when it pins a format or reporter, or lists one under <code>unlocked:</code>
+as <code>renderer:&lt;name&gt;</code> or <code>reporter:&lt;name&gt;</code>; otherwise it stays schema 2, which older builds
+read. A schema 2 lock checked against a build with an installed output reports the output as
+added and asks for <code>guardana pack lock</code>. Both commands also exit <code>2</code> when trust refused an
+installed output, it failed to load, or two distributions install one output name.</p>
+<p>A pack pins only the evaluators, targets and outputs its own distribution registers. An id
+another distribution registers is that distribution's code, not the pack's: <code>pack lock</code>
+refuses to write and names both the pack and the distribution, and <code>--check</code> reports the id
+<code>removed</code>. Two distributions registering a target class of the same name is a load error
+naming both, so both commands exit <code>2</code> rather than pin either.</p>
+<p><code>unlocked:</code> lists installed extensions that <strong>no manifest declares</strong>: extensions from packages
+with no manifest, and extensions a package registers but omits from its own manifest.
 They are recorded and not attributed to a pack, and the command says so on stderr —
 a lock that stayed silent about them would read as a fully pinned repository that
 is not one.</p>
@@ -348,6 +473,10 @@ have; one that appeared is a check nobody reviewed running against production.</
 <tr>
 <td><code>pack_unlocked</code></td>
 <td>installed and the lock does not mention it</td>
+</tr>
+<tr>
+<td><code>distribution_changed</code></td>
+<td>the same pack name now ships from another distribution, so the code behind its ids is not the code that was pinned</td>
 </tr>
 <tr>
 <td><code>version_changed</code></td>
@@ -383,12 +512,37 @@ have; one that appeared is a check nobody reviewed running against production.</
 <td><code>1</code></td>
 </tr>
 <tr>
+<td>plugin trust refused an installed extension; nothing was pinned or compared</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
 <td>nothing installed declares a manifest, so there is nothing to pin</td>
 <td><strong>indeterminate</strong></td>
 <td><code>2</code></td>
 </tr>
 <tr>
-<td>the lock could not be read, or was taken against another <code>extension_api</code></td>
+<td>two installed packs declare the same name; no lock is written or compared</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td>a pack declares an id nothing registers under that group; no lock is written or compared</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>pack lock</code>: a pack declares an evaluator, target or output another distribution registers; no lock is written</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
+<td><code>--check</code>: an evaluator, target or output the lock pins is now registered by another distribution</td>
+<td>fail (<code>removed</code>)</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>the lock cannot be read, names one pack twice, or has a different <code>extension_api</code></td>
 <td>refused</td>
 <td><code>3</code></td>
 </tr>
@@ -403,24 +557,29 @@ answer to all of them is one line, so the command says that line. Regenerate the
 lock.</p>
 <p><code>--check</code> never writes. A check that created the file it was asked to compare
 against would pass on every first run, which is the one run nobody looks at.</p>
+<p><strong>A pack that declares what nothing registers is refused, not pinned.</strong> A lock written
+without that id would match every later build where the check never runs, so the
+command names the missing ids on stderr and writes nothing. Run <code>pack validate</code> to see
+which promise broke.</p>
 <h2 id="guardanas-own-pack-has-one">Guardana's own pack has one</h2>
 <p><code>guardana-rules</code> ships a manifest and goes through this same door. Its <code>provides:</code>
-block is <em>generated</em> from the registry — 56 ids is too many to hand-maintain, and a
-hand-maintained list of that length is how every stale count in this repository
-began. Yours is short, so you write it.</p>
+block is <em>generated</em> from the registry — one id per built-in rule is too many to
+hand-maintain, and a hand-maintained list of that length is how every stale count in
+this repository began. Yours is short, so you write it.</p>
 <p>A validator this project exempted itself from would be a bar we ask other people to
 clear alone, and the first drift it would stop catching is our own.</p>
 <h2 id="a-complete-example">A complete example</h2>
 <p><a href="https://github.com/guardana/guardana/tree/main/examples/custom_rule"><code>examples/custom_rule/</code></a> is a real third-party package —
 a plugin rule, YAML rules, a custom evaluator and this manifest — and CI runs its
 tests in an isolated environment on every push.</p>
-<p>Reasoning: <a href="design/extension-author-tooling.html"><code>design/extension-author-tooling.md</code></a>.</p>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-pack.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

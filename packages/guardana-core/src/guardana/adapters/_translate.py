@@ -22,8 +22,8 @@ _BINARY_KINDS = {
 def provenance_of(producer: str, source: str, version: str | None) -> Provenance:
     """Describe where an in-process translation came from, without inventing a file.
 
-    `document_digest` stays absent, and that is the honest answer: a digest covers the
-    bytes as read, and there were no bytes — the run happened in this process. Filling
+    `document` stays absent, and that is the honest answer: a document digest covers
+    the bytes as read, and there were no bytes — the run happened in this process. Filling
     it with a hash of our own rendering would offer an auditor a provenance chain that
     leads back to us rather than to the producer.
     """

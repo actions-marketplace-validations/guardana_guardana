@@ -24,7 +24,6 @@ python3 -m http.server -d site 8099            # http://localhost:8099/
 | `/docs/` | the documentation home: the sidebar mirrors `docs/index.md`, every section has its pages |
 | `/docs/usage-scan.html` (any usage page) | fenced commands render as code, tables fit at 400 px, the status badge matches the page's front matter |
 | `/docs/generated/rule-catalog.html` and one rule page from the explorer | the rule count, taxonomy links, no "do not edit" marker leaking into the page |
-| `/docs/design/<any>.html` | the status word matches the document's `**Status:**` line |
 
 Live (`https://guardana.dev`): look only. There is nothing to log into and nothing to submit.
 

@@ -1,8 +1,113 @@
 {
   "schema_version": 1,
   "generated_by": "scripts/generate_docs.py from the installed registry \u2014 do not edit by hand",
-  "guardana_version": "0.27.0",
+  "guardana_version": "1.0.0",
   "rules": [
+    {
+      "id": "guardana.a2a.agent_card",
+      "namespace": "guardana",
+      "family": "a2a",
+      "title": "A2A agent card is incomplete, or declares what no caller can satisfy",
+      "severity": "MEDIUM",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "inspect_a2a"
+      ],
+      "estimated_requests": 1,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "ASI07:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI07",
+          "title": "Insecure Inter-Agent Communication",
+          "rank": 7
+        },
+        {
+          "reference": "ASI04:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI04",
+          "title": "Agentic Supply Chain Vulnerabilities",
+          "rank": 4
+        }
+      ]
+    },
+    {
+      "id": "guardana.a2a.caller_identity",
+      "namespace": "guardana",
+      "family": "a2a",
+      "title": "A2A agent answers a caller presenting no credential",
+      "severity": "HIGH",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "inspect_a2a"
+      ],
+      "estimated_requests": 4,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "ASI03:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI03",
+          "title": "Identity and Privilege Abuse",
+          "rank": 3
+        },
+        {
+          "reference": "ASI07:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI07",
+          "title": "Insecure Inter-Agent Communication",
+          "rank": 7
+        }
+      ]
+    },
+    {
+      "id": "guardana.a2a.task_visibility",
+      "namespace": "guardana",
+      "family": "a2a",
+      "title": "A2A agent shows a task to a caller who does not own it",
+      "severity": "HIGH",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "inspect_a2a"
+      ],
+      "estimated_requests": 9,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "ASI03:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI03",
+          "title": "Identity and Privilege Abuse",
+          "rank": 3
+        },
+        {
+          "reference": "ASI07:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI07",
+          "title": "Insecure Inter-Agent Communication",
+          "rank": 7
+        }
+      ]
+    },
     {
       "id": "guardana.agent.credential_exfiltration",
       "namespace": "guardana",
@@ -15,6 +120,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat",
@@ -72,6 +178,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat"
@@ -121,6 +228,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat"
@@ -170,10 +278,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "list_tools"
       ],
-      "estimated_requests": 3,
+      "estimated_requests": 22,
       "goal": null,
       "taxonomy": [
         {
@@ -267,6 +376,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat"
@@ -323,6 +433,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat"
@@ -379,6 +490,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "call_tools",
         "chat"
@@ -449,10 +561,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 9,
+      "estimated_requests": 10,
       "goal": null,
       "taxonomy": [
         {
@@ -490,11 +603,12 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization",
         "list_tools"
       ],
-      "estimated_requests": 5,
+      "estimated_requests": 25,
       "goal": null,
       "taxonomy": [
         {
@@ -532,10 +646,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 9,
+      "estimated_requests": 10,
       "goal": null,
       "taxonomy": [
         {
@@ -573,10 +688,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 9,
+      "estimated_requests": 10,
       "goal": null,
       "taxonomy": [
         {
@@ -603,6 +719,48 @@
       ]
     },
     {
+      "id": "guardana.mcp.registry_entry",
+      "namespace": "guardana",
+      "family": "mcp",
+      "title": "MCP server is not the one its registry entry publishes",
+      "severity": "MEDIUM",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "registry_entry"
+      ],
+      "estimated_requests": 2,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "MCP09:2025",
+          "framework": "OWASP-MCP-2025",
+          "id": "MCP09",
+          "title": "Shadow MCP Servers",
+          "rank": 9
+        },
+        {
+          "reference": "MCP04:2025",
+          "framework": "OWASP-MCP-2025",
+          "id": "MCP04",
+          "title": "Software Supply Chain Attacks & Dependency Tampering",
+          "rank": 4
+        },
+        {
+          "reference": "ASI04:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI04",
+          "title": "Agentic Supply Chain Vulnerabilities",
+          "rank": 4
+        }
+      ]
+    },
+    {
       "id": "guardana.mcp.scope_breadth",
       "namespace": "guardana",
       "family": "mcp",
@@ -614,10 +772,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 9,
+      "estimated_requests": 10,
       "goal": null,
       "taxonomy": [
         {
@@ -655,10 +814,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 7,
+      "estimated_requests": 9,
       "goal": null,
       "taxonomy": [
         {
@@ -667,6 +827,48 @@
           "id": "MCP07",
           "title": "Insufficient Authentication & Authorization",
           "rank": 7
+        },
+        {
+          "reference": "ASI03:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI03",
+          "title": "Identity and Privilege Abuse",
+          "rank": 3
+        }
+      ]
+    },
+    {
+      "id": "guardana.mcp.task_identity",
+      "namespace": "guardana",
+      "family": "mcp",
+      "title": "MCP server shows tasks to a caller who presented no credential",
+      "severity": "HIGH",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "inspect_authorization"
+      ],
+      "estimated_requests": 9,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "MCP07:2025",
+          "framework": "OWASP-MCP-2025",
+          "id": "MCP07",
+          "title": "Insufficient Authentication & Authorization",
+          "rank": 7
+        },
+        {
+          "reference": "MCP10:2025",
+          "framework": "OWASP-MCP-2025",
+          "id": "MCP10",
+          "title": "Context Injection & Over-Sharing",
+          "rank": 10
         },
         {
           "reference": "ASI03:2026",
@@ -689,10 +891,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 5,
+      "estimated_requests": 7,
       "goal": null,
       "taxonomy": [
         {
@@ -730,10 +933,11 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "inspect_authorization"
       ],
-      "estimated_requests": 3,
+      "estimated_requests": 4,
       "goal": null,
       "taxonomy": [
         {
@@ -771,6 +975,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -805,6 +1010,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -846,6 +1052,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -915,6 +1122,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -956,6 +1164,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -990,6 +1199,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1080,6 +1290,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "chat",
         "plant_system_prompt"
@@ -1122,6 +1333,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -1145,6 +1357,76 @@
       ]
     },
     {
+      "id": "guardana.retrieval.poisoned_document",
+      "namespace": "guardana",
+      "family": "retrieval",
+      "title": "The application followed an instruction planted in a retrieved document",
+      "severity": "HIGH",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "seeded_data"
+      ],
+      "estimated_requests": null,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "LLM01:2025",
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM01",
+          "title": "Prompt Injection",
+          "rank": 1
+        },
+        {
+          "reference": "LLM08:2025",
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM08",
+          "title": "Vector and Embedding Weaknesses",
+          "rank": 8
+        },
+        {
+          "reference": "LLM01:2026",
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM01",
+          "title": "Prompt Injection",
+          "rank": 1
+        },
+        {
+          "reference": "LLM09:2026",
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM09",
+          "title": "Vector and Embedding Weaknesses",
+          "rank": 9
+        },
+        {
+          "reference": "ASI06:2026",
+          "framework": "OWASP-ASI-2026",
+          "id": "ASI06",
+          "title": "Memory and Context Poisoning",
+          "rank": 6
+        },
+        {
+          "reference": "AML.T0051",
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0051",
+          "title": "LLM Prompt Injection",
+          "rank": null
+        },
+        {
+          "reference": "AML.T0080",
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0080",
+          "title": "AI Agent Context Poisoning",
+          "rank": null
+        }
+      ]
+    },
+    {
       "id": "guardana.scenario.gradual_jailbreak",
       "namespace": "guardana",
       "family": "scenario",
@@ -1156,6 +1438,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "chat"
       ],
@@ -1197,6 +1480,7 @@
       "impact": "active",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "chat",
         "plant_system_prompt"
@@ -1267,6 +1551,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1336,6 +1621,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1384,6 +1670,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1425,6 +1712,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1459,6 +1747,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1493,6 +1782,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1534,6 +1824,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_files"
       ],
@@ -1596,6 +1887,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1651,6 +1943,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1706,6 +1999,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1754,6 +2048,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1823,6 +2118,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_files"
       ],
@@ -1892,6 +2188,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1933,6 +2230,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -1981,6 +2279,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -2036,6 +2335,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],
@@ -2087,6 +2387,62 @@
       ]
     },
     {
+      "id": "guardana.tenancy.cross_tenant_answer",
+      "namespace": "guardana",
+      "family": "tenancy",
+      "title": "Another tenant's seeded data reached a reply",
+      "severity": "CRITICAL",
+      "surface": "runtime",
+      "target_kind": "endpoint",
+      "evaluator": null,
+      "impact": "active",
+      "destructive": false,
+      "maturity": "stable",
+      "detection": "invariant",
+      "requires": [
+        "seeded_data"
+      ],
+      "estimated_requests": null,
+      "goal": null,
+      "taxonomy": [
+        {
+          "reference": "LLM02:2025",
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM02",
+          "title": "Sensitive Information Disclosure",
+          "rank": 2
+        },
+        {
+          "reference": "LLM08:2025",
+          "framework": "OWASP-LLM-2025",
+          "id": "LLM08",
+          "title": "Vector and Embedding Weaknesses",
+          "rank": 8
+        },
+        {
+          "reference": "LLM02:2026",
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM02",
+          "title": "Sensitive Information Disclosure",
+          "rank": 2
+        },
+        {
+          "reference": "LLM09:2026",
+          "framework": "OWASP-LLM-2026",
+          "id": "LLM09",
+          "title": "Vector and Embedding Weaknesses",
+          "rank": 9
+        },
+        {
+          "reference": "AML.T0057",
+          "framework": "MITRE-ATLAS",
+          "id": "AML.T0057",
+          "title": "LLM Data Leakage",
+          "rank": null
+        }
+      ]
+    },
+    {
       "id": "guardana.trace.consent_scope_exceeded",
       "namespace": "guardana",
       "family": "trace",
@@ -2098,8 +2454,10 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_consent",
+        "read_delegation",
         "read_trace"
       ],
       "estimated_requests": 0,
@@ -2140,6 +2498,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_delegation",
         "read_trace"
@@ -2182,6 +2541,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_retrieval",
         "read_trace"
@@ -2217,6 +2577,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_delegation",
         "read_handoffs",
@@ -2260,6 +2621,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_identity",
         "read_trace"
@@ -2295,6 +2657,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_policy_decisions",
         "read_trace"
@@ -2330,6 +2693,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_tool_calls",
         "read_trace"
@@ -2372,6 +2736,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_identity",
         "read_trace"
@@ -2407,6 +2772,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "invariant",
       "requires": [
         "read_approvals",
         "read_side_effects",
@@ -2450,6 +2816,7 @@
       "impact": "passive",
       "destructive": false,
       "maturity": "stable",
+      "detection": "heuristic",
       "requires": [
         "read_files"
       ],

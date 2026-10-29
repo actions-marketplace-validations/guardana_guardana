@@ -5,8 +5,6 @@ already carries — no kind here needs a field `Trace` does not have. What a kin
 *does* need is a dimension, and that is the hinge this whole release turns on: an
 assertion whose dimension the producer never records is unverifiable, and an
 unverifiable assertion is `indeterminate` rather than either verdict.
-
-See `docs/design/security-contracts.md`.
 """
 
 from abc import ABC, abstractmethod

@@ -12,6 +12,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from guardana.core.contract import SecurityContract, contract_from_dict
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.report import Finding
@@ -89,6 +90,6 @@ def runner_with(rule: Rule) -> Runner:
     Skipping is the runner's job, not the rule's, so the only honest way to test the
     capability gate is through the seam where it is applied.
     """
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     registry.register_rule(rule)
     return Runner(registry=registry, profile=Profile(name="t", policy=Policy()))

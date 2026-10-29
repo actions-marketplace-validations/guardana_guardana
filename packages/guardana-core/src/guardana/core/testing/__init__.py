@@ -49,7 +49,26 @@ not — without either being real:
     from guardana.core.testing import ScriptedMcpServer
 
     open_to_anyone = ScriptedMcpServer(url, tools=[{"name": "read", "description": "..."}])
-    assert list(MyRule().run(McpServerTarget(url, sender=open_to_anyone), RuleContext()))
+    target = McpServerTarget(url, sender=open_to_anyone, discovery_sender=open_to_anyone)
+    assert list(MyRule().run(target, RuleContext()))
+
+**A scripted A2A agent** stands in for a live one, so a rule about whom an agent answers
+can be driven against an agent that tells its callers apart — and one that does not:
+
+    from guardana.core.target import A2aAgentTarget
+    from guardana.core.testing import ScriptedA2aAgent
+
+    shared = ScriptedA2aAgent(url, callers={"a": "alice", "b": "bob"},
+                              tasks={"alice": ["t-1"]}, owner_bound=False)
+    target = A2aAgentTarget(url, credential="a", other_credential="b", sender=shared)
+
+**A seeded application** stands in for a team's own retrieval pipeline over a fixtures
+file, so the tenant and poisoned-document checks can be driven against a filter that
+holds — and one that leaks — without either being real:
+
+    from guardana.core.testing import SeededApplication, seeded_target
+
+    leaky = seeded_target(fixtures, SeededApplication(fixtures, leaking={"documents"}))
 
 **A run manifest** stands in for the circumstances of a run, so a test about what
 a renderer emits does not have to invent a clock, a run id and a tool version:
@@ -57,17 +76,37 @@ a renderer emits does not have to invent a clock, a run id and a tool version:
     from guardana.core.testing import manifest_for
 
     document = JsonRenderer(manifest_for(result)).render(result)
+
+**Sample runs and a receiver** stand in for the runs and the destinations an installed
+output meets, so a format or a reporter is checked against a stopped and an empty run,
+and against a receiver that accepts, one that refuses and one that does not answer:
+
+    from guardana.core.testing import receiver, sample_verifications
+
+    with receiver() as served:
+        for run in sample_verifications():
+            deliver_to(served.accepting, run)
 """
 
-from guardana.core.testing.artifacts import build_gguf, build_onnx, build_safetensors
+from guardana.core.testing.a2a import ScriptedA2aAgent
+from guardana.core.testing.artifacts import (
+    build_gguf,
+    build_onnx,
+    build_safetensors,
+    files_target,
+)
 from guardana.core.testing.manifests import FIXED_RUN_TIME, manifest_for
 from guardana.core.testing.mcp import ScriptedMcpServer
+from guardana.core.testing.receiver import ReceivedRequest, Receiver, receiver
+from guardana.core.testing.samples import sample_verifications
 from guardana.core.testing.secrets import (
     fake_aws_key,
+    fake_github_pat,
     fake_jwt,
     fake_llm_key,
     fake_secrets,
 )
+from guardana.core.testing.seeded import SeededApplication, seeded_target
 from guardana.core.testing.transports import (
     EchoingTransport,
     FailingTransport,
@@ -84,18 +123,27 @@ __all__ = [
     "EchoingTransport",
     "FailingTransport",
     "GullibleAgentTransport",
+    "ReceivedRequest",
+    "Receiver",
     "RefusingTransport",
     "ScriptExhaustedError",
+    "ScriptedA2aAgent",
     "ScriptedAgentTransport",
     "ScriptedMcpServer",
     "ScriptedTransport",
+    "SeededApplication",
     "ToolCallingScriptedTransport",
     "build_gguf",
     "build_onnx",
     "build_safetensors",
     "fake_aws_key",
+    "fake_github_pat",
     "fake_jwt",
     "fake_llm_key",
     "fake_secrets",
+    "files_target",
     "manifest_for",
+    "receiver",
+    "sample_verifications",
+    "seeded_target",
 ]

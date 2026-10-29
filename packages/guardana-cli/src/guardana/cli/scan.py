@@ -1,34 +1,53 @@
-from datetime import UTC, datetime
+from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
 import typer
-from guardana.cli._exit import exit_with, refuse_unenforceable_budget
-from guardana.cli._formats import OutputFormat
-from guardana.cli._output import emit
-from guardana.cli._plugins import resolve_trust
-from guardana.cli._profile import resolve_profile
-from guardana.cli._reporting import check_reporter_url, submit_safely
+from guardana.cli._atomic import write_whole
+from guardana.cli._exit import refuse_invalid_profile, refuse_unenforceable_budget
+from guardana.cli._formats import FORMAT_HELP
+from guardana.cli._outputs import (
+    refuse_collector_beside,
+    refuse_installed_output_beside,
+    refuse_output_beside,
+    select_outputs,
+    warn_without_a_reporter,
+)
+from guardana.cli._plugins import (
+    AllowPluginOption,
+    NoPluginsOption,
+    PluginsOption,
+    hint_refused_plugins,
+    resolve_trust,
+)
+from guardana.cli._profile import PRESET_HELP, resolve_profile
+from guardana.cli._profile_files import NamedFile, profile_file_inputs, rule_flag_inputs
+from guardana.cli._reporting import installed_reporter_or_check, submit_safely
 from guardana.cli._rules_loading import load_custom_rules
-from guardana.cli._run_meta import build_manifest, detect_deployment, target_identity
+from guardana.cli._run_meta import calibrations_or_exit, detect_deployment, detect_source
+from guardana.cli._sidecar import (
+    refuse_writing_over_an_input,
+    refuse_writing_over_named_inputs,
+)
 from guardana.cli._target_locator import resolve_target
+from guardana.cli.baseline import (
+    ignore_file_of,
+    refuse_a_baseline_over_a_scanned_file,
+    refuse_a_baseline_over_an_input,
+    refuse_a_report_over_a_scanned_file,
+    refuse_an_incomplete_baseline,
+)
 from guardana.cli.exit_codes import ExitCode
-from guardana.core.budget import BudgetExhausted
-from guardana.core.gate import gate_outcome
-from guardana.core.redaction import EvidenceRedactor
+from guardana.core.profile import ProfileError
 from guardana.core.registry import Registry
 from guardana.core.report import (
     Baseline,
     BaselineError,
-    apply_baseline,
     read_baseline,
-    relativize,
-    relativize_findings,
     serialize_baseline,
 )
-from guardana.core.runner import Runner
-from guardana.core.target import ArtifactTarget, Target, TargetKind
-from guardana.report import get_renderer
+from guardana.core.target import Target, TargetKind
+from guardana.core.verify import UnenforceableBudgetError, Verification, Verifier
 
 _BASELINE_ERROR_EXIT_CODE = ExitCode.INVALID_USAGE
 """A baseline file that cannot be read is bad input, not an indeterminate result."""
@@ -52,8 +71,9 @@ def _announce_baseline_health(accepted: Baseline) -> None:
         )
     for waiver in accepted.unreviewed:
         typer.echo(
-            f"warning: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) still has "
-            f"the generated placeholder text — an accepted risk needs a reason and an owner",
+            f"warning: waiver {waiver.fingerprint} ({waiver.rule or 'unknown rule'}) has no "
+            f"reason or approver written, or still the generated placeholder — an accepted "
+            f"risk needs a reason and an owner",
             err=True,
         )
 
@@ -75,34 +95,67 @@ def _refuse_a_target_that_is_not_there(path: Path) -> None:
         raise typer.Exit(code=ExitCode.INVALID_USAGE)
 
 
-def _path_target(path: Path | None, excludes: tuple[str, ...]) -> ArtifactTarget:
-    """Build the legacy path target, refusing an omitted positional argument."""
+def _path_to_scan(path: Path | None) -> Path:
+    """Return the positional path, refusing an omitted or missing one."""
     if path is None:
         raise typer.BadParameter("pass a path to scan, or --target scheme://locator")
     _refuse_a_target_that_is_not_there(path)
-    return ArtifactTarget(path, excludes=excludes)
+    return path
+
+
+def _refuse_writing_over_an_input(
+    output: Path | None,
+    write_baseline: Path | None,
+    read: list[Path | None],
+    named: tuple[NamedFile, ...],
+) -> None:
+    """Exit `3` when the report or the baseline would replace a file this scan reads.
+
+    `read` holds the files the command reads as given or of its own accord, such as a
+    scanned directory's `.guardanaignore`; `named` each file with the flag or key naming it.
+    """
+    refuse_a_baseline_over_an_input("--write-baseline", write_baseline, [(None, f) for f in read])
+    refuse_a_baseline_over_an_input("--write-baseline", write_baseline, named)
+    refuse_writing_over_an_input(output, read)
+    refuse_writing_over_named_inputs(output, named)
+
+
+_NAMED_LOCAL_RULES = 3
+"""How many local rules the not-run line names before it says "and N more"."""
+
+
+def _say_which_local_rules_scan_does_not_run(registry: Registry, loaded: tuple[str, ...]) -> None:
+    """Name the local YAML rules this scan loaded and will not run, on one stderr line.
+
+    A rule written for an endpoint is neither selected nor skipped by an artifact
+    scan, so without this line an author's new check vanishes from the result.
+    """
+    kinds = {rule.meta.id: rule.meta.target_kind for rule in registry.rules()}
+    idle = [
+        rule_id
+        for rule_id in loaded
+        if kinds.get(rule_id, TargetKind.ARTIFACT) is not TargetKind.ARTIFACT
+    ]
+    if not idle:
+        return
+    shown = ", ".join(idle[:_NAMED_LOCAL_RULES])
+    more = len(idle) - _NAMED_LOCAL_RULES
+    typer.echo(
+        f"note: scan does not run {len(idle)} local rule(s) written for another target kind: "
+        f"{shown}{f' and {more} more' if more > 0 else ''} — they run against an endpoint "
+        f"with `guardana probe`, or offline with `guardana rule test`",
+        err=True,
+    )
 
 
 def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is the command's surface
     path: Annotated[Path | None, typer.Argument(help="Directory to scan")] = None,
     profile: Annotated[Path | None, typer.Option(help="guardana.yaml path")] = None,
-    preset: Annotated[
-        str | None, typer.Option(help="Named policy preset: ci|pre-training|monitor")
-    ] = None,
-    format: Annotated[
-        OutputFormat, typer.Option(help="human|json|sarif|junit")
-    ] = OutputFormat.human,
-    no_plugins: Annotated[
-        bool, typer.Option("--no-plugins", help="Deprecated alias for --plugins disabled.")
-    ] = False,
-    plugins: Annotated[
-        str,
-        typer.Option(help="Which installed plugins to load: all|builtins|allowlist|disabled"),
-    ] = "all",
-    allow_plugin: Annotated[
-        list[str],
-        typer.Option("--allow-plugin", help="Distribution to trust; repeatable, needs allowlist."),
-    ] = [],  # noqa: B006 — typer builds the option from a literal default
+    preset: Annotated[str | None, typer.Option(help=PRESET_HELP)] = None,
+    format: Annotated[str, typer.Option(help=FORMAT_HELP)] = "human",
+    no_plugins: NoPluginsOption = False,
+    plugins: PluginsOption = None,
+    allow_plugin: AllowPluginOption = None,
     rules: Annotated[
         list[Path],
         typer.Option("--rules", help="Directory or file of custom YAML rules; repeatable."),
@@ -115,11 +168,18 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
         Path | None,
         typer.Option(
             "--write-baseline",
-            help="Write a baseline waiving every current finding to this path, then exit 0.",
+            help=(
+                "Write a baseline waiving every current finding to this path; "
+                "an incomplete run writes none."
+            ),
         ),
     ] = None,
     reporter: Annotated[
-        str | None, typer.Option(help="Collector URL to forward findings to, e.g. server://URL")
+        str | None,
+        typer.Option(
+            help="Collector URL to forward findings to, e.g. server://URL, or an installed "
+            "reporter as name://locator"
+        ),
     ] = None,
     ai_system: Annotated[
         str | None,
@@ -160,91 +220,131 @@ def scan(  # noqa: PLR0913, PLR0917 — one typer.Option per CLI flag; this is t
         raise typer.BadParameter("pass either --baseline or --write-baseline, not both")
     if target is not None and path is not None:
         raise typer.BadParameter("pass either a path or --target, not both")
-    check_reporter_url(reporter)
+    refuse_output_beside("--write-baseline", write_baseline, output)
+    _refuse_writing_over_an_input(
+        output,
+        write_baseline,
+        [path, baseline, profile, *rules, ignore_file_of(path)],
+        rule_flag_inputs(rules),
+    )
+    installed_reporter = installed_reporter_or_check(reporter)
+    refuse_installed_output_beside("--write-baseline", write_baseline, format, installed_reporter)
+    collector = installed_reporter is None and bool(reporter)
+    refuse_collector_beside("--write-baseline", write_baseline, collector=collector)
     prof = resolve_profile(profile, preset)
+    _refuse_writing_over_an_input(output, write_baseline, [], profile_file_inputs(prof))
+    warn_without_a_reporter(prof.delivery_required, reporter)
     # --no-plugins resolves to `--plugins disabled`: discovery below still runs,
     # refuses every entry point, and records each refusal in `errors` (see
     # SECURITY.md). Custom YAML rules still load, but one whose evaluator lives
     # behind an entry point resolves to nothing at run time and is skipped —
     # safe degradation, never a crash.
-    registry = Registry.discover(resolve_trust(plugins, allow_plugin, no_plugins=no_plugins))
-    load_custom_rules(registry, prof, rules)
-    selected: Target = resolve_target(
-        registry,
-        locator=target,
-        options=target_option,
-        kind=TargetKind.ARTIFACT,
-        fallback=lambda: _path_target(path, prof.path_excludes),
-    )
-    started_at = datetime.now(UTC)
-    try:
-        result = Runner(registry=registry, profile=prof).run(selected)
-    except BudgetExhausted as exc:
-        raise refuse_unenforceable_budget(exc) from exc
-    # Make file paths repo-relative (relative to the checkout root) before we
-    # render, baseline, or emit SARIF — so alerts attach to real repo paths and a
-    # baseline fingerprint is portable between a dev machine and CI.
-    result = relativize_findings(result, Path.cwd())
-    # Applied here, before the baseline is written or matched, because a finding's
-    # fingerprint is computed from its evidence summary: redacting later would
-    # change every fingerprint and silently stop every waiver from matching. The
-    # renderers redact again on the way out, which is idempotent and is what keeps
-    # the guarantee true for an embedder that skips this step.
-    result = EvidenceRedactor(prof.privacy).redact_result(result)
-
-    if write_baseline is not None:
-        write_baseline.write_text(serialize_baseline(result), encoding="utf-8")
-        typer.echo(
-            f"wrote baseline waiving {len(result.findings)} finding(s) to {write_baseline} "
-            f"— add a reason to each before committing it.",
-            err=True,
+    resolved = resolve_trust(plugins, allow_plugin, prof, no_plugins=no_plugins)
+    outputs = select_outputs(format, installed_reporter, resolved.trust, collector=collector)
+    with outputs:
+        registry = Registry.discover(resolved.trust)
+        hint_refused_plugins(registry, resolved)
+        _say_which_local_rules_scan_does_not_run(registry, load_custom_rules(registry, prof, rules))
+        # A path is built into its target by the verifier alone, so its ignore file is read once.
+        selected: Target | Path = resolve_target(
+            registry,
+            locator=target,
+            options=target_option,
+            kind=TargetKind.ARTIFACT,
+            fallback=lambda: _path_to_scan(path),
         )
-        # A baseline is written from what the scan saw, so a check that could not
-        # run makes the snapshot incomplete: the team would commit a baseline
-        # missing whatever that rule would have found, and never be told. Report
-        # and gate on it before returning.
-        for error in result.errors:
+        accepted = _read_baseline(baseline)
+        deployment = detect_deployment(ai_system, environment, deployment_id)
+        verifier = Verifier(
+            trust=resolved.trust,
+            profile=prof,
+            registry=registry,
+            calibrations=calibrations_or_exit(prof),
+        )
+        # File paths become repo-relative (relative to the checkout root) before anything
+        # is rendered, baselined or emitted as SARIF, so alerts attach to real repo paths
+        # and a baseline fingerprint is portable between a dev machine and CI. A plugin
+        # owns its locator's identity, so only a path-built target's own ref is rewritten.
+        waived = None if write_baseline is not None else accepted
+        verification = _carried_out(
+            lambda: (
+                verifier.scan(
+                    selected,
+                    relative_to=Path.cwd(),
+                    baseline=waived,
+                    source=detect_source(),
+                    deployment=deployment,
+                )
+                if isinstance(selected, Path)
+                else verifier.run(
+                    selected,
+                    relative_to=Path.cwd(),
+                    baseline=waived,
+                    source=detect_source(),
+                    deployment=deployment,
+                )
+            )
+        )
+        result = verification.result
+
+        if write_baseline is not None:
+            refuse_a_baseline_over_a_scanned_file("--write-baseline", write_baseline, result.scope)
+            refuse_an_incomplete_baseline(result, prof.policy, write_baseline)
+            try:
+                write_whole(write_baseline, serialize_baseline(result).encode("utf-8"))
+            except OSError as exc:
+                typer.echo(
+                    f"error: could not write the baseline to {write_baseline}: {exc}", err=True
+                )
+                raise typer.Exit(code=ExitCode.INVALID_USAGE) from exc
             typer.echo(
-                f"warning: {error.source} did not run ({error.stage}) — the baseline "
-                f"cannot account for it: {error.reason}",
+                f"wrote baseline waiving {len(result.findings)} finding(s) to {write_baseline} "
+                f"— add a reason to each before committing it.",
                 err=True,
             )
-        # Only the errors gate here, never the findings: snapshotting today's
-        # findings is the whole point of this flag, but a check that never ran
-        # means the snapshot is missing whatever it would have found.
-        #
-        # `INDETERMINATE`, not `POLICY_FAILED`, and the same code `baseline create`
-        # uses for the same situation. Nothing failed a policy here — a question
-        # was left unanswered, and two commands answering it with different codes
-        # is an exit-code table only half the tool honours.
-        blocked = bool(result.errors) and prof.policy.fail_on.fail_on_error
-        raise typer.Exit(code=ExitCode.INDETERMINATE if blocked else ExitCode.OK)
-    if baseline is not None:
-        try:
-            accepted = read_baseline(baseline)
-        except BaselineError as exc:
-            typer.echo(f"error: {exc}", err=True)
-            raise typer.Exit(code=_BASELINE_ERROR_EXIT_CODE) from exc
-        _announce_baseline_health(accepted)
-        result = apply_baseline(result, accepted.active())
+            # Only the run's completeness gates here, never its findings: snapshotting
+            # today's findings is the whole point of this flag.
+            raise typer.Exit(code=ExitCode.OK)
 
-    outcome = gate_outcome(result, prof.policy)
-    # A plugin owns the locator's identity. Treating ``scheme://...`` as a local
-    # path can rewrite it relative to the checkout and corrupt the saved ref.
-    target_ref = selected.ref if target is not None else relativize(selected.ref, Path.cwd())
-    deployment = detect_deployment(ai_system, environment, deployment_id)
-    run = build_manifest(
-        registry,
-        prof,
-        result,
-        target_kind=selected.kind,
-        target_ref=target_ref,
-        gate=outcome,
-        started_at=started_at,
-        identity=target_identity(selected, target_ref),
-        deployment=deployment,
-    )
-    emit(get_renderer(format.value, run=run).render(result), output, format.value)
-    if reporter:
-        submit_safely(reporter, result, source=selected.ref, deployment=deployment, run=run)
-    exit_with(outcome, result)
+        refuse_a_report_over_a_scanned_file("--output", output, result.scope)
+        outputs.write(verification, output)
+        acknowledged = None
+        if reporter and collector:
+            source = str(selected) if isinstance(selected, Path) else selected.ref
+            acknowledged = submit_safely(
+                reporter,
+                result,
+                source=source,
+                deployment=deployment,
+                run=verification.manifest,
+                required=prof.delivery_required,
+            )
+        outputs.deliver(verification)
+        outputs.end(
+            verification,
+            delivery_required=prof.delivery_required,
+            collector_acknowledged=acknowledged,
+        )
+
+
+def _carried_out(run: Callable[[], Verification]) -> Verification:
+    """Run, ending a run the verifier refuses before it starts with exit `3`."""
+    try:
+        return run()
+    except UnenforceableBudgetError as exc:
+        raise refuse_unenforceable_budget(exc) from exc
+    except ProfileError as exc:
+        raise refuse_invalid_profile(exc) from exc
+
+
+def _read_baseline(path: Path | None) -> Baseline | None:
+    """Read the baseline a scan waives against, refusing one that cannot be read."""
+    if path is None:
+        return None
+    try:
+        accepted = read_baseline(path)
+    except BaselineError as exc:
+        typer.echo(f"error: {exc}", err=True)
+        raise typer.Exit(code=_BASELINE_ERROR_EXIT_CODE) from exc
+    _announce_baseline_health(accepted)
+    return accepted

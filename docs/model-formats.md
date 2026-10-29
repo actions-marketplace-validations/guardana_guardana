@@ -1,7 +1,7 @@
 ---
 title: "Reading model formats"
 nav_order: 270
-summary: "the public GGUF / safetensors / ONNX readers, and their bounded, fail-closed contract"
+summary: "the importable GGUF / safetensors / ONNX readers, outside the supported surface, and their bounded, fail-closed contract"
 status: stable
 ---
 
@@ -13,8 +13,10 @@ a byte-window scan around a keyword both misses payloads that sit further away
 and invents findings from unrelated neighbouring bytes. Guardana ships the
 parsing so your rule can ship the judgement.
 
-These readers are **public API**. They are what a third-party rule pack is meant
-to build on.
+These readers can be imported but are **outside the supported surface** described
+in [`compatibility.md`](compatibility.md). They may change in any release. A
+third-party rule pack that imports them pins the exact `guardana-core` version it
+was tested with.
 
 ```python
 from guardana.core.formats import FormatError, read_gguf_metadata
@@ -33,9 +35,9 @@ Every reader in the package makes the same four promises.
 | Promise | What it means for you |
 |---|---|
 | **Offline** | It reads the one file it was given. No network, ever. |
-| **Bounded** | Sizes claimed *inside* a file are checked against `Limits` before anything is allocated. A header claiming 2⁶⁴ entries costs a `FormatError`, not the scan. |
+| **Bounded** | Every reader enforces the `Limits` you pass. [The table under Limits](#limits) lists what each bound covers in each reader. Sizes claimed *inside* a file are checked before anything is allocated. A header claiming 2⁶⁴ entries raises `FormatError` instead of exhausting the scan. |
 | **Deterministic** | Same bytes, same result, on every platform and locale. |
-| **Fail-closed** | Anything it cannot parse raises `FormatError`. A reader never returns "empty" to mean "clean". |
+| **Fail-closed** | Anything it cannot parse raises `FormatError`. The ONNX reader can also return a partial summary with `truncated` set at its budget or nesting-depth limit (see the ONNX section below). Treat that as incomplete coverage. A reader never returns "empty" to mean "clean". |
 
 And one non-promise, which is the point: **a reader returns data, never a
 verdict.** It has no opinion about whether what it found is dangerous. That is
@@ -65,6 +67,10 @@ class GgufMetadata:
 `text()` is the safe accessor: it returns `None` when the key is absent *or* is
 not a string, so a rule never has to type-check an entry itself.
 
+Versions 2 and 3 are supported; any other version raises `FormatError`. Version 1
+uses a different layout, and later versions may too. The version 3 layout would
+misread every offset after the header in either case.
+
 ### safetensors — `read_safetensors_header(path, *, limits=DEFAULT_LIMITS) -> SafetensorsHeader`
 
 ```python
@@ -79,6 +85,13 @@ class SafetensorsHeader:
 separated from the tensor index rather than left mixed in with it. A non-string
 value is serialised rather than dropped — a writer smuggling a structure in
 there is exactly what a scanner needs to see.
+
+The header must describe the payload exactly. Every tensor entry must specify a
+format-defined `dtype`, a `shape` list of non-negative integers, and `data_offsets`
+inside the payload. The product of its `shape` dimensions times the dtype's width
+must equal its `data_offsets` range length. The ranges must cover every payload byte
+exactly once, with no overlaps, gaps or undeclared trailing bytes. A violation raises
+`FormatError("malformed safetensors header: ...")`, naming the tensor when there is one.
 
 ### ONNX — `read_onnx_summary(path, *, limits=DEFAULT_LIMITS) -> OnnxSummary`
 
@@ -95,20 +108,39 @@ class OnnxSummary:
 
 The graph is walked straight off disk by a dependency-free streaming protobuf
 reader that seeks past tensor payloads, so summarising a multi-gigabyte model
-reads kilobytes. `STANDARD_ONNX_DOMAINS` is exported alongside it: anything else
-in `node_domains` means the runtime must register a native operator library
-before the model will run.
+reads kilobytes. The walk covers every graph the model carries: the main graph
+and its sparse initializers, tensors and subgraphs held in node attributes
+(Constant values, If/Loop/Scan bodies), model-local functions and training
+graphs. `node_domains` and `external_data_paths` collect from all of them.
+A file whose complete top-level message holds no graph raises
+`FormatError("ONNX model without a graph")`. An empty file parses as an empty
+protobuf message, which is not a model.
+`STANDARD_ONNX_DOMAINS` is exported alongside it: anything else in
+`node_domains` means the runtime must register a native operator library before
+the model will run.
 
-`truncated` is the honest half of the bound — it says the field budget ran out
-before the walk finished. **A partial walk that found nothing has not cleared
-the model**, and a rule must say so:
+`truncated` is the honest half of the bound — it says the walk did not finish:
+the field budget ran out, subgraphs were nested deeper than 32 levels, or the
+strings kept in the summary exceeded `Limits.max_header_bytes`. Metadata entries
+have one allowance of that size. The producer, domains and external-data paths
+share a separate allowance of the same size. This keeps a flood of metadata from
+excluding a graph's domains from the summary.
+The
+`guardana.supply_chain.onnx_graph` rule gives a file one field per two bytes of
+its size, never fewer than 1,000,000 and never more than 8,000,000, so a graph
+below the cap is walked in full. **A partial walk has not cleared the model,
+whatever it found**: a lead in the fields it reached says nothing about a worse
+one past the budget. A rule reports the findings it has and says the walk was
+partial:
 
 ```python
-findings = list(self._graded(path, summary))
-yield from findings
-if summary.truncated and not findings:
-    yield self._unscanned(path, "the graph was too large to walk within the budget")
+yield from self._graded(path, summary)
+if summary.truncated:
+    yield self._unscanned(path, "the model was too large or nested too deeply to walk in full", ctx)
 ```
+
+`_unscanned` there yields the inconclusive finding and reports the file as an
+unexamined component; see [writing a rule on top](#writing-a-rule-on-top).
 
 ### Limits
 
@@ -125,40 +157,71 @@ Defaults are sized off real models — a 20k-tensor safetensors index is ~1.5 Mi
 of JSON, a 256k-token GGUF vocabulary a few MiB — so honest files stay far
 inside them. Pass your own `Limits` to tighten them for a constrained runner.
 
+The table lists what each bound covers in each reader. Exceeding a bound raises
+`FormatError`, except where the table says the ONNX summary is `truncated`.
+
+| Limit | GGUF | safetensors | ONNX |
+|---|---|---|---|
+| `max_header_bytes` | bytes from the start of the file to the end of the metadata block | declared header length, checked before reading the header | separate allowances for metadata entries and other strings kept; exceeding either makes the summary `truncated` |
+| `max_entries` | metadata entries | keys in each JSON object in the header, including the tensor index and `__metadata__` | protobuf fields walked; exceeding the bound makes the summary `truncated` |
+| `max_string_bytes` | each key and string value | each string in the header and each non-string `__metadata__` value after serialisation | each string read |
+| `max_array_items` | each array | each array in the header, including `shape` and `data_offsets` | not used: the summary keeps no arrays |
+
 ## Writing a rule on top
 
-Two rules, one shape. Read the file, turn `FormatError` into a visible finding,
-grade what you got.
+Every rule on a model format has one shape. Read the file, turn `FormatError`
+into a visible finding, grade what you got.
+
+A file the rule could not read, or read only in part, gets two reports. The finding
+carries an `inconclusive` verdict, so it lands on the unverified channel. The
+`unexamined_component` shortfall names the file, so the run is `indeterminate` under
+every policy rather than only under `fail_on_inconclusive`. The built-in model rules
+do both, and a rule that reads the format calls `ctx.examined(path)` either way, so
+the format-level pass does not name the file again
+([`guardana scan`](usage-scan.md#model-files-no-rule-reads)).
+
+Here is that shape in `ApprovedModelRule`, from
+`examples/custom_rule/src/acme_rules/approved_model.py` — a complete third-party
+rule, tested, whose entire body is policy:
 
 ```python
-from guardana.core.formats import FormatError, read_onnx_summary, STANDARD_ONNX_DOMAINS
-
-class UnapprovedOperatorRule(Rule):
-    meta = RuleMeta(
-        id="acme.supply_chain.unapproved_operator",
-        title="ONNX model uses an operator domain we have not vetted",
-        severity=Severity.MEDIUM,
-        target_kind=TargetKind.ARTIFACT,
-        taxonomy=(OWASP_LLM03_2025,),
-        required_capabilities=frozenset({Capability.READ_FILES}),
-    )
-
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
-        if not isinstance(target, ArtifactTarget):
-            return
-        for path in target.iter_files((".onnx",)):
+        """Check the provenance metadata of every GGUF model under the target."""
+        if not isinstance(target, FileReader):
+            raise RuleError(f"{self.meta.id} needs a file target, got {type(target).__name__}")
+        for path in target.iter_files((".gguf",)):
+            ctx.examined(path)
             try:
-                summary = read_onnx_summary(path)
+                metadata = read_gguf_metadata(path)
             except FormatError as exc:
-                yield unscanned(path, str(exc))     # never silence
+                yield self._unscanned(path, f"provenance unreadable: {exc}", ctx)
                 continue
-            unknown = set(summary.node_domains) - STANDARD_ONNX_DOMAINS - APPROVED
-            if unknown:
-                yield Finding(...)
-```
+            organization = metadata.text(_ORGANIZATION_KEY)
+            if organization is None or organization.lower() not in _APPROVED_ORGANIZATIONS:
+                name = metadata.text(_NAME_KEY) or path.name
+                yield self._finding(path, f"'{name}' declares organization {organization!r}")
 
-`examples/custom_rule/src/acme_rules/approved_model.py` is the runnable version
-of this — a complete third-party rule, tested, whose entire body is policy.
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        # Unreadable provenance is a decline, not an accusation: reporting the model
+        # as unapproved would invent evidence. The shortfall keeps the run from
+        # passing under every policy, not only under `fail_on_inconclusive`.
+        ctx.shortfall(
+            CoverageShortfall(
+                ShortfallKind.UNEXAMINED_COMPONENT,
+                name=str(path),
+                detail=f"{self.meta.id} could not read it: {reason}",
+            )
+        )
+        return Finding(
+            rule_id=self.meta.id,
+            severity=self.meta.severity,
+            title=self.meta.title,
+            taxonomy=self.meta.taxonomy,
+            target_ref=str(path),
+            evidence=Evidence(summary=reason, detail=f"file={path.name}"),
+            verdict=Verdict("inconclusive", 0.0, reason, self.meta.id),
+        )
+```
 
 ## Testing your rule
 

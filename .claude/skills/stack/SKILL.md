@@ -13,8 +13,8 @@ Requested: $ARGUMENTS (nothing = `postgres`).
 | collector | `export GUARDANA_DATABASE_URL=postgresql://guardana:guardana@127.0.0.1:55439/guardana` then `uv run guardana-collector migrate` and `uv run guardana-collector serve` | migrations never run on container start; `docs/usage-collector.md` has the token and environment model. The engine reaches it only through `--reporter server://…`. |
 | endpoint | a fake OpenAI-compatible server is a few lines of `http.server` answering `/v1/chat/completions`; `guardana.core.testing` has scripted transports for in-process use | `uv run guardana probe --url http://127.0.0.1:<port>/v1 --model fake …` then read the JSON it wrote. `plan probe` never contacts the endpoint. Never point `probe`, `monitor` or `calibrate` at a paid provider without the user saying so and a budget. |
 | site | `uv run python scripts/build_site.py && python3 -m http.server -d site 8099` | exactly what Cloudflare serves; `site-check` for what to look at. |
-| images | `uv run --no-project python scripts/image_smoke.py` (`--no-build` reuses images) | builds `guardana-cli:smoke` and `guardana-collector:smoke` and runs them; needs docker; no argument parser, so no `--help`. |
+| images | `uv run --no-project python scripts/image_smoke.py` (`--no-build` reuses images) | builds `guardana-cli:smoke` and `guardana-collector:smoke` and runs them; needs docker. |
 | deps | `uv sync` (all five packages plus dev and docs groups) | `uv sync --locked` is what CI runs. |
 
-Nothing here contacts a network host other than what you started; the product's rule is the
-only traffic is to the target under test.
+Nothing here contacts a network host other than what you started; the product's rule is that
+traffic goes only to destinations the run names (principle 3 in `CLAUDE.md`).

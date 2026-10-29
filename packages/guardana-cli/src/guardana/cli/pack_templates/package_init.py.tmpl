@@ -1,29 +1,36 @@
 """__DIST__ — rules, a target, and the manifest that declares them.
 
 Guardana discovers all of this through the four public entry-point groups, the
-same way it discovers its own built-ins. Nothing here is special-cased.
+same way it discovers its own built-ins. Nothing here is special-cased, and
+everything it imports from Guardana is on the supported surface.
 """
 
 import importlib.resources
 
-from guardana.core.evaluator import Evaluator
-from guardana.core.rule import Rule
-from guardana.core.rule.yaml_rule import load_yaml_rules
-from guardana.core.target import Target
-from guardana.core.taxonomy import TaxonomyRef
+from guardana.core import Evaluator, Registry, Rule, RuleLoadError, Target, TaxonomyRef
 
 from __MODULE__.target import __CLASS__Target
 
 
 def provide_rules() -> list[Rule]:
-    """Entry point for `guardana.rules`: every rule in the catalogue."""
+    """Entry point for `guardana.rules`: every rule in the catalogue.
+
+    `Registry.load_yaml_rule_dirs` records a file that does not load instead of
+    raising; raised here, the whole provider fails, so a run reports the pack as
+    broken rather than short a rule. A rule may cite one of `provide_taxonomies()`,
+    because discovery registers every taxonomy before it loads any rule.
+    """
+    registry = Registry()
     catalog = importlib.resources.files("__MODULE__.catalog")
-    rules: list[Rule] = []
     for entry in sorted(catalog.iterdir(), key=lambda item: item.name):
-        if entry.name.endswith(".yaml"):
-            with importlib.resources.as_file(entry) as path:
-                rules.extend(load_yaml_rules(path))
-    return rules
+        if not entry.name.endswith(".yaml"):
+            continue
+        with importlib.resources.as_file(entry) as path:
+            loaded = registry.load_yaml_rule_dirs([path])
+        if loaded.errors:
+            problems = "; ".join(f"{error.source}: {error.reason}" for error in loaded.errors)
+            raise RuleLoadError(f"a rule shipped with __DIST__ did not load: {problems}")
+    return list(registry.rules())
 
 
 def provide_evaluators() -> list[Evaluator]:

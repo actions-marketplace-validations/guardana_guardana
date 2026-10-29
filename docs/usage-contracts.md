@@ -7,14 +7,7 @@ status: stable
 
 # Security contracts — your application's threat model, executable
 
-Built-in rules cover the risks everyone shares. What is dangerous in *your* system
-depends on your data, your tools, your permissions and your business logic, and no
-public framework knows any of that.
-
-A **security contract** is a file your team keeps in its own repository, saying
-what the application is allowed to do. Guardana compiles it into ordinary rules and
-grades a recorded execution against it — deterministically, offline, with the same
-evidence semantics as the built-ins.
+`guardana analyze-trace` checks a recorded execution against a security contract when you need to verify application rules. Your team keeps the contract in its repository. Guardana compiles it into rules and grades the trace offline.
 
 ```bash
 guardana analyze-trace run.jsonl --contract checkout.yaml --ai-system checkout-agent
@@ -63,7 +56,8 @@ assertions:
 
 Each assertion becomes a rule with the id `contract.<name>.<assertion-id>`, so a
 profile can exclude one with a glob and a baseline can waive one without waiving
-the rest.
+the rest. A finding carries the assertion's `severity`; an assertion without
+`severity` is `high`.
 
 ## The five assertion kinds
 
@@ -74,6 +68,9 @@ the rest.
 | `allowed_scopes` | a hop across a named boundary exercised only scopes on the allow list | `delegation` |
 | `credential_boundary` | a named boundary never received a credential at all | `delegation` |
 | `forbidden_sink` | no side effect landed on a sink the application forbids | `effects` |
+
+- **Assertions are deterministic.** They have no evaluator, so `evaluator:` cannot point them at `llm_judge`. They compare recorded values at confidence 1.0.
+- **The OWASP/ASI mapping belongs to the assertion kind.** A contract cannot set or replace `taxonomy:`. The mapping is what has to survive somebody else's audit.
 
 ### `tenant_boundary`
 
@@ -260,6 +257,4 @@ fails the build rather than teaching the schema wrong.
 
 - [`usage-trace-inspect.md`](usage-trace-inspect.md) — what a producer records
 - [`usage-analyze-trace.md`](usage-analyze-trace.md) — grading an execution
-- [`design/security-contracts.md`](design/security-contracts.md) — why a contract is
-  a third entity rather than a rule or a profile, and what was rejected
 - [`profiles.md`](profiles.md) — `contracts:` and `trace.require:` in `guardana.yaml`

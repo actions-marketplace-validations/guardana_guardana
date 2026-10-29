@@ -14,6 +14,7 @@ page is free to describe a subset in words.
 import re
 from pathlib import Path
 
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext, TrajectoryRule, YamlRule
 from guardana.core.rule.scenario_rule import ScenarioRule
@@ -144,24 +145,12 @@ def test_the_roadmap_delegates_rule_counts_to_generated_docs() -> None:
     assert "docs/generated/rule-catalog.md" in roadmap
 
 
-def test_the_rule_test_page_states_how_many_rules_are_really_sampled() -> None:
-    """Two numbers, and the second is the honest one this project keeps pointing at.
+def test_the_rule_test_page_takes_its_sampled_count_from_the_generated_summary() -> None:
+    """A count typed into prose drifts; the page links the one the registry generates."""
+    page = _read("usage-rule-test.md")
 
-    "51 ship and 5 are fully sampled" is a coverage claim, and a coverage claim that
-    drifts upward on its own is the shape of a false green. The ratchet in
-    `test_builtin_fixture_coverage.py` pins the sampled count; nothing pinned the
-    sentence that quotes it.
-    """
-    from test_builtin_fixture_coverage import _FULLY_SAMPLED  # noqa: PLC0415
-
-    total = len(list(provide_rules()))
-
-    (stated,) = _SAMPLED_RE.findall(_read("usage-rule-test.md"))
-
-    assert (int(stated[0]), int(stated[1])) == (total, _FULLY_SAMPLED), (
-        f"docs/usage-rule-test.md says {stated[0]} ship and {stated[1]} are sampled; "
-        f"the registry has {total} and the ratchet pins {_FULLY_SAMPLED}"
-    )
+    assert not _SAMPLED_RE.findall(page), "docs/usage-rule-test.md states a sampled count by hand"
+    assert "generated/rule-summary.md" in page
 
 
 def test_the_rule_test_page_names_every_yaml_rule_left_short_of_all_three_samples() -> None:
@@ -171,7 +160,7 @@ def test_the_rule_test_page_names_every_yaml_rule_left_short_of_all_three_sample
     of them gains its missing sample — or another one loses one — the list is wrong,
     and nothing but this reads it.
     """
-    registry = Registry.discover()
+    registry = Registry.discover(PluginTrust(mode=PluginMode.BUILTINS))
     ctx = RuleContext(evaluators=registry.evaluators())
     declarative = (YamlRule, ScenarioRule, TrajectoryRule)
     unsampled = sorted(

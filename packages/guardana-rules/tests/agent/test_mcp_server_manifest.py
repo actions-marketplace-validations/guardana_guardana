@@ -11,9 +11,12 @@ from pathlib import Path
 
 import pytest
 from guardana.cli._mcp_run import McpConnection, build_mcp_target
+from guardana.core.plugins import PluginMode, PluginTrust
 from guardana.core.profile.model import Policy, Profile
 from guardana.core.registry import Registry
 from guardana.core.rule import RuleContext
+from guardana.core.rule.fixture import DEMANDED_OUTCOMES
+from guardana.core.rule.verify import verify_rule
 from guardana.core.runner import Runner
 from guardana.core.target import Capability, McpError, McpServerTarget
 from guardana.rules.agent.mcp_server_manifest import McpServerManifestRule, pin_document
@@ -34,10 +37,13 @@ class _FakeMcp:
 
     def request(self, method: str, params: Mapping[str, object]) -> Mapping[str, object]:
         if method == "initialize":
-            return {"protocolVersion": "2025-06-18"}
+            return {"protocolVersion": "2025-11-25"}
         if method == "tools/list":
             return {"tools": [{"name": n, "description": d} for n, d in self._tools]}
         raise McpError(f"unexpected MCP method {method!r}")
+
+    def notify(self, method: str) -> None:
+        pass
 
     def close(self) -> None:
         self.closed = True
@@ -115,6 +121,29 @@ def test_an_unusable_pin_is_inconclusive(tmp_path: Path) -> None:
     assert [o for _, o in outcomes] == ["inconclusive"]
 
 
+@pytest.mark.parametrize("entry", [None, 7, ""])
+def test_a_pin_entry_that_is_no_digest_makes_the_pin_unusable(
+    tmp_path: Path, entry: object
+) -> None:
+    pin = tmp_path / "mcp.pin.json"
+    document = {"schema_version": 2, "server": "https://mcp.example/api", "tools": {"gone": entry}}
+    pin.write_text(json.dumps(document), encoding="utf-8")
+
+    outcomes = _run(_target([]), pin)
+
+    assert [o for _, o in outcomes] == ["inconclusive"]
+    assert "'gone'" in outcomes[0][0]
+
+
+def test_a_hidden_character_in_a_tool_name_is_a_finding(tmp_path: Path) -> None:
+    tools = [("read\u200bfile", _BENIGN)]
+    pin = _approve(tmp_path, tools)
+
+    summaries = [s for s, _ in _run(_target(tools), pin)]
+
+    assert any("hidden Unicode in the name of" in s for s in summaries)
+
+
 def test_an_unchanged_manifest_matches_its_pin(tmp_path: Path) -> None:
     pin = _approve(tmp_path, [("read_file", _BENIGN)])
 
@@ -160,16 +189,20 @@ def test_chat_rules_are_skipped_against_an_mcp_server_rather_than_passing_it() -
     # Every shipped dynamic rule declares `requires: [chat]`, which an MCP server
     # cannot satisfy, so the runner skips them. Without that they would be planned,
     # find no chat interface, return nothing, and be counted as rules that ran.
-    result = Runner(registry=Registry.discover(), profile=Profile(name="t", policy=Policy())).run(
-        _target([("read_file", _BENIGN)])
-    )
+    result = Runner(
+        registry=Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)),
+        profile=Profile(name="t", policy=Policy()),
+    ).run(_target([("read_file", _BENIGN)]))
 
     assert result.rules_skipped, "no rule was skipped, so chat rules ran against a server"
     assert "guardana.agent.mcp_server_manifest" not in result.skipped_rule_ids
     # Stated as the property rather than as a count, so adding an MCP rule does not
     # need this number edited — and so a chat rule sneaking in still fails it.
     chat_only = {Capability.CHAT, Capability.PLANT_SYSTEM_PROMPT, Capability.CALL_TOOLS}
-    by_id = {rule.meta.id: rule for rule in Registry.discover().rules()}
+    by_id = {
+        rule.meta.id: rule
+        for rule in Registry.discover(PluginTrust(mode=PluginMode.BUILTINS)).rules()
+    }
     ran_needing_chat = [
         rule_id
         for rule_id in result.rules_run
@@ -197,3 +230,48 @@ def test_the_manifest_is_fetched_once_however_many_rules_read_it() -> None:
     target.list_tools()
 
     assert calls == 1
+
+
+def _approved_run(
+    target: McpServerTarget, approved: Mapping[str, object], pin: Path | None = None
+) -> list[tuple[str, str | None]]:
+    ctx = RuleContext(config={"pin": str(pin)} if pin else {})
+    return [
+        (f.evidence.summary, f.verdict.outcome if f.verdict else None)
+        for f in McpServerManifestRule(approved=approved).run(target, ctx)
+    ]
+
+
+def _document(tools: list[tuple[str, str]]) -> dict[str, object]:
+    target = _target(tools)
+    return pin_document(target.ref, target.list_tools())
+
+
+def test_an_approved_manifest_given_in_memory_compares_like_a_pin_file() -> None:
+    approved = _document([("read_file", _BENIGN)])
+
+    assert _approved_run(_target([("read_file", _BENIGN)]), approved) == []
+    drifted = [s for s, _ in _approved_run(_target([("read_file", _POISONED)]), approved)]
+    assert any("rug pull" in s for s in drifted)
+
+
+def test_an_unusable_approved_manifest_is_inconclusive() -> None:
+    outcomes = _approved_run(_target([("read_file", _BENIGN)]), {"schema_version": 99})
+
+    assert [o for _, o in outcomes] == ["inconclusive"]
+
+
+def test_an_approved_manifest_given_in_memory_is_compared_instead_of_the_configured_pin(
+    tmp_path: Path,
+) -> None:
+    pin = _approve(tmp_path, [("read_file", _POISONED)])
+    approved = _document([("read_file", _BENIGN)])
+
+    assert _approved_run(_target([("read_file", _BENIGN)]), approved, pin) == []
+
+
+def test_the_rule_proves_all_three_outcomes_on_its_own_samples() -> None:
+    verified = verify_rule(McpServerManifestRule())
+
+    assert verified.is_proven, verified
+    assert {r.observed for r in verified.results} >= set(DEMANDED_OUTCOMES)

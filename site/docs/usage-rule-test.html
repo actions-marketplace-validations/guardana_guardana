@@ -6,58 +6,78 @@
 <title>guardana rule test — Guardana documentation</title>
 <meta name="description" content="guardana rule test: a rule&#x27;s positive, negative and inconclusive fixtures, run as a command">
 <link rel="canonical" href="https://guardana.dev/docs/usage-rule-test">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html" aria-current="page">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,75 +98,121 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
-<h1><code>guardana rule test</code> — a rule's own samples, run as a command</h1><p class="lede"><code>guardana rule test</code>: a rule's positive, negative and <strong>inconclusive</strong> fixtures, run as a command</p><p>A rule that cannot fire is caught by a positive sample. A rule that fires on
-everything is caught by a negative one. <strong>A rule that cannot say &quot;I could not tell&quot;
-is caught by nothing</strong> — and it is the one that will eventually report clean about
-something it never examined.</p>
-<p>That third sample is what this command exists for.</p>
-<pre><code class="language-bash">guardana rule test 'acme.*'
+<details class="mnav">
+<summary>Menu · <b>guardana rule test</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html" aria-current="page">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana rule test</code> — a rule's own samples, run as a command</h1><p class="lede"><code>guardana rule test</code>: a rule's positive, negative and <strong>inconclusive</strong> fixtures, run as a command</p><p><code>guardana rule test</code> checks positive, negative, and inconclusive samples when you need to verify a rule's classifications.</p>
+<pre><code class="language-bash">guardana rule test 'acme.*' --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>
 <pre><code>5 rule(s); 15 fixture(s) passed, 0 failed, 0 could not run. 0 rule(s) not fully sampled.
 </code></pre>
-<p>Sends nothing anywhere — every fixture is a scripted double — so it is safe to run
-on every save. The same fact bounds what a fixture proves: it checks how a rule
-classifies the reply or the run it is handed. A scripted model answers the same
-whatever it is sent, so a fixture says nothing about whether the rule's prompts or
-tool results carry an attack.</p>
+<p>That is the output for <a href="https://github.com/guardana/guardana/blob/main/examples/custom_rule/README.md"><code>examples/custom_rule</code></a>, installed as
+the distribution <code>acme-guardana-rules</code>. Every command starts with only Guardana's own
+distributions, so an installed pack is admitted by name.</p>
+<p>Scripted fixtures send their replies to a judge configured by the profile for grading; nothing else is contacted. They test classification, but cannot show whether prompts or tool results carry an attack.</p>
 <h2 id="declaring-fixtures-in-a-yaml-rule">Declaring fixtures in a YAML rule</h2>
 <pre><code class="language-yaml">id: acme.demo.canary
 title: Our support agent never repeats its instructions
@@ -196,6 +263,9 @@ fixtures:
 </tr>
 </tbody>
 </table></div>
+<p>Each sample runs on its own. A sample comes out <code>inconclusive</code> when the rule yields an
+inconclusive verdict or reports a coverage shortfall, when recorded cases are all ungraded, or when a suite declines to conclude, whatever else it yields; otherwise
+<code>finding</code> when it yields anything, and <code>clean</code> when it yields nothing.</p>
 <p><code>reply</code> builds an endpoint over a scripted transport. That is enough because a YAML
 rule's <code>target_kind</code> is <code>endpoint</code> by construction — its double is always a model.</p>
 <h3 id="a-scenario-one-reply-per-step">A scenario: one reply per step</h3>
@@ -317,6 +387,31 @@ class MyRule(Rule):
             RuleFixture(&quot;a file we could not parse&quot;, _artifact(b&quot;&quot;), FixtureOutcome.INCONCLUSIVE),
         ]
 </code></pre>
+<h2 id="suites">Suites</h2>
+<p>Suite fixtures use the single-turn shape. One <code>reply:</code> answers every case; a fixture can instead name its own <code>dataset:</code>. Each case in that fixture dataset may carry <code>reply</code>, falling back to the fixture's <code>reply:</code>.</p>
+<p>This fixture list shows a separate dataset and a single reply:</p>
+<pre><code class="language-yaml">fixtures:
+  - name: every answer names the setting
+    dataset: ./fixtures/answers-pass.jsonl
+    outcome: clean
+  - name: the model says nothing
+    reply: &quot;&quot;
+    outcome: inconclusive
+</code></pre>
+<p>A case-level <code>reply</code> is allowed only in a fixture dataset. Two different replies to the same messages are refused. A fixture dataset with fewer cases than <code>gate.min_sample</code> is refused at load. A suite without clean, finding and inconclusive samples is reported <code>indeterminate</code>, like any rule. See <a href="usage-suites.html">quality suites</a>.</p>
+<h3 id="regression-cases">Regression cases</h3>
+<p>A suite whose dataset holds regression cases (<a href="usage-case.html"><code>guardana case add</code></a>) has each
+case's <code>observed</code> and <code>accepted</code> regraded with the rule as it is now, sending nothing. A pair
+holds while <code>observed</code> grades <code>fail</code> and <code>accepted</code> grades <code>pass</code>; the totals line says how
+many hold, and a case whose pair no longer holds is named by its dataset line:</p>
+<pre><code>✖ acme.quality.support — regression case at dataset line 3
+    the pair no longer holds: observed graded pass, accepted graded pass
+</code></pre>
+<p>Only an evaluator that declares itself deterministic and declares that a verdict asks no judge
+can regrade without sending; a suite holding pairs with any other evaluator is refused, never
+skipped. <code>rule test</code> tells the states of a pair apart in its exit code (<code>1</code>, <code>2</code> or <code>3</code>, in the
+table below); <code>recipe lock</code> refuses all of them with one code, <code>1</code>
+(<a href="usage-recipe.html">recipes</a>).</p>
 <h2 id="exit-codes">Exit codes</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -328,12 +423,17 @@ class MyRule(Rule):
 </thead>
 <tbody>
 <tr>
-<td>every fixture classified as declared</td>
+<td>every fixture classified as declared, and every regression pair holds</td>
 <td>pass</td>
 <td><code>0</code></td>
 </tr>
 <tr>
 <td>a fixture classified wrongly</td>
+<td>fail</td>
+<td><code>1</code></td>
+</tr>
+<tr>
+<td>a regression pair's side graded the wrong way</td>
 <td>fail</td>
 <td><code>1</code></td>
 </tr>
@@ -353,12 +453,22 @@ class MyRule(Rule):
 <td><code>2</code></td>
 </tr>
 <tr>
+<td>a regression pair's side declined, or its evaluator raised</td>
+<td><strong>indeterminate</strong></td>
+<td><code>2</code></td>
+</tr>
+<tr>
 <td>a rule file or a plugin could not be loaded</td>
 <td><strong>indeterminate</strong></td>
 <td><code>2</code></td>
 </tr>
 <tr>
 <td>the selector matched no rule</td>
+<td>refused</td>
+<td><code>3</code></td>
+</tr>
+<tr>
+<td>a suite holds regression pairs its evaluator cannot regrade without sending</td>
 <td>refused</td>
 <td><code>3</code></td>
 </tr>
@@ -377,9 +487,13 @@ through: an escape hatch that hid its own effect would be worse than none.</p>
 <h2 id="turning-fixtures-into-a-labelled-corpus">Turning fixtures into a labelled corpus</h2>
 <p>A fixture set, once run, <em>is</em> a labelled corpus — so an evaluator author gets one
 without hand-writing it:</p>
-<pre><code class="language-bash">guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl
-guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl
+<pre><code class="language-bash">guardana rule test 'acme.*' --rules ./my-rules/ --write-corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
+guardana calibrate --evaluator acme.strict_refusal --corpus mine.jsonl \
+  --plugins allowlist --allow-plugin acme-guardana-rules
 </code></pre>
+<p><code>examples/custom_rule</code> installs the evaluator <code>acme.strict_refusal</code>. A rule under
+<code>./my-rules/</code> that uses it for grading needs the same distribution admitted.</p>
 <p><code>finding</code> becomes <code>attack_succeeded: true</code>, <code>clean</code> becomes <code>false</code>, and
 <strong><code>inconclusive</code> is left out and counted</strong>: calibration measures a judge's
 confidence against a known outcome, and a sample whose outcome is undecidable has
@@ -400,19 +514,13 @@ the rule sends one prompt or its evaluator does not read the prompt; an
 <code>amplification</code> label is the first prompt's ratio.</p>
 <p>Everything else is left out and counted by reason. A scenario of several steps is
 graded on a part of the conversation only the rule knows, and an agent run is
-graded on its tool calls, which a corpus row has no place for. A fixture the rule
+graded on its tool calls, which a corpus row has no place for. Artifact and trace samples have no corpus row because the corpus holds model replies, and are counted under a reason that names them. A fixture the rule
 classified wrongly carries a label one of the two disagrees with.</p>
 <h2 id="built-in-coverage-stated-plainly">Built-in coverage, stated plainly</h2>
-<p>51 rules ship and <strong>11 are fully sampled</strong> today. <code>guardana rule test 'guardana.*'</code>
-reports the rest as <code>indeterminate</code>, truthfully — that is the command working, not
-the command being unready. A gate pins the number so it can only rise.</p>
-<p>YAML rules in the default catalog that are not fully sampled:
-<code>guardana.agent.tool_argument_scope</code>. It ships a finding and an inconclusive sample
-and no clean one: the exact path its task names is graded as over-broad today, and
-a clean sample written around that would test nothing.</p>
-<p>Sampling the rest in an afternoon would mean writing fixtures to move a counter,
-and a fixture written for that reason is a test that cannot fail — which this
-project treats as worse than no test at all.</p>
+<p>Every built-in rule ships a finding, a clean and an inconclusive sample of its own, so
+<code>guardana rule test 'guardana.*'</code> proves each one; <a href="generated/rule-summary.html">the rule summary</a>
+states the count generated by running the samples. A gate refuses a built-in rule without all three, unless the
+gate lists it as exempt with the reason it can never decline.</p>
 <h2 id="options">Options</h2>
 <div class="table-wrap"><table>
 <thead>
@@ -436,7 +544,7 @@ project treats as worse than no test at all.</p>
 </tr>
 <tr>
 <td><code>--write-corpus PATH</code></td>
-<td>write the fixtures out as a labelled corpus</td>
+<td>write the fixtures out as a labelled corpus, whole: through a temporary file and a rename, so a failed write leaves an earlier corpus as it was and exits <code>3</code></td>
 </tr>
 <tr>
 <td><code>--unsampled-ok</code></td>
@@ -444,18 +552,18 @@ project treats as worse than no test at all.</p>
 </tr>
 <tr>
 <td><code>--plugins</code>, <code>--allow-plugin</code></td>
-<td>the usual plugin-trust controls</td>
+<td>the usual plugin-trust controls; <code>builtins</code> unless the flag or the profile's <code>plugins:</code> says otherwise. While an installed pack is refused, a selector that matches only its rules, such as <code>'acme.*'</code>, matches nothing and exits <code>3</code>; a selector that matches admitted rules exits <code>2</code> when a refused pack or a rule that failed to load leaves a gap. A pack author admits their own distribution: <code>--plugins allowlist --allow-plugin &lt;distribution&gt;</code></td>
 </tr>
 </tbody>
 </table></div>
-<p>Reasoning: <a href="design/extension-author-tooling.html"><code>design/extension-author-tooling.md</code></a>,
-<a href="design/declarative-fixtures.html"><code>design/declarative-fixtures.md</code></a>.</p>
 
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/usage-rule-test.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

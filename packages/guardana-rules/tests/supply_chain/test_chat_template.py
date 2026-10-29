@@ -3,10 +3,12 @@ import os
 from pathlib import Path
 
 import pytest
+from guardana.core.report import Finding, ShortfallKind
 from guardana.core.rule import RuleContext
 from guardana.core.severity import Severity
 from guardana.core.target import ArtifactTarget, EndpointTarget
 from guardana.core.testing import RefusingTransport, build_gguf
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES
 from guardana.rules.supply_chain.chat_template import ChatTemplateRule
 from guardana.rules.supply_chain.model_format import ModelFormatRule
 
@@ -39,7 +41,19 @@ _REAL_TEMPLATE = """
 """
 
 
-def _run(root: Path) -> list[object]:
+def _unread(root: Path) -> list[str]:
+    """The files the rule names as unread components when run over `root`."""
+    ctx = RuleContext()
+    list(ChatTemplateRule().run(ArtifactTarget(root), ctx))
+    return [
+        gap.name
+        for gap in ctx.shortfalls()
+        if gap.kind is ShortfallKind.UNEXAMINED_COMPONENT
+        and gap.detail.startswith("guardana.supply_chain.chat_template could not read it: ")
+    ]
+
+
+def _run(root: Path) -> list[Finding]:
     return list(ChatTemplateRule().run(ArtifactTarget(root), RuleContext()))
 
 
@@ -50,6 +64,31 @@ def _severities(root: Path) -> list[str]:
 def test_flags_a_gadget_in_a_gguf_chat_template(tmp_path: Path) -> None:
     (tmp_path / "m.gguf").write_bytes(build_gguf({_KEY: _PAYLOAD}))
     assert _severities(tmp_path) == [Severity.CRITICAL.name]
+
+
+def test_flags_a_gadget_in_a_named_gguf_chat_template(tmp_path: Path) -> None:
+    (tmp_path / "m.gguf").write_bytes(
+        build_gguf({_KEY: _REAL_TEMPLATE, f"{_KEY}.tool_use": _PAYLOAD})
+    )
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL]
+    assert f"source={_KEY}.tool_use " in findings[0].evidence.detail
+
+
+def test_a_clean_named_gguf_chat_template_is_clean(tmp_path: Path) -> None:
+    (tmp_path / "m.gguf").write_bytes(
+        build_gguf({_KEY: _REAL_TEMPLATE, f"{_KEY}.tool_use": _REAL_TEMPLATE})
+    )
+
+    assert _run(tmp_path) == []
+
+
+def test_a_key_that_only_shares_the_prefix_is_not_a_template(tmp_path: Path) -> None:
+    (tmp_path / "m.gguf").write_bytes(build_gguf({f"{_KEY}s": _PAYLOAD}))
+
+    assert _run(tmp_path) == []
 
 
 def test_flags_a_gadget_appended_after_a_full_length_real_template(tmp_path: Path) -> None:
@@ -123,6 +162,39 @@ def test_template_inclusion_is_high_not_critical(tmp_path: Path) -> None:
     assert _severities(tmp_path) == [Severity.HIGH.name]
 
 
+def test_every_additional_chat_template_is_read(tmp_path: Path) -> None:
+    """transformers loads each `additional_chat_templates/*.jinja`, `default` ahead of the rest."""
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps({"chat_template": "{{ x }}"}))
+    extra = tmp_path / "additional_chat_templates"
+    extra.mkdir()
+    (extra / "default.jinja").write_text(_PAYLOAD)
+    (extra / "tool_use.jinja").write_text("{{ cycler.__init__.__globals__ }}")
+    (extra / "rag.jinja").write_text(_REAL_TEMPLATE)
+
+    findings = _run(tmp_path)
+
+    assert sorted(Path(f.target_ref).name for f in findings) == ["default.jinja", "tool_use.jinja"]
+    assert {f.severity for f in findings} == {Severity.CRITICAL}
+
+
+def test_an_unreadable_additional_chat_template_is_not_cleared(tmp_path: Path) -> None:
+    extra = tmp_path / "additional_chat_templates"
+    extra.mkdir()
+    (extra / "default.jinja").write_text("{{ 'x' }}\n" + " " * (MAX_SCAN_BYTES + 1))
+
+    assert _unread(tmp_path) == [str(extra / "default.jinja")]
+
+
+def test_a_jinja_file_beside_a_template_directory_of_another_name_is_not_read(
+    tmp_path: Path,
+) -> None:
+    pages = tmp_path / "templates"
+    pages.mkdir()
+    (pages / "default.jinja").write_text("{% include 'base.jinja' %}")
+
+    assert _run(tmp_path) == []
+
+
 def test_an_unrelated_jinja_file_is_not_a_chat_template(tmp_path: Path) -> None:
     # A web template using `{% extends %}` is not this rule's business; scanning
     # every `.jinja` in a repo would be general template security, not AI risk.
@@ -136,12 +208,14 @@ def test_an_unreadable_gguf_is_reported_as_unscanned(tmp_path: Path) -> None:
     assert [f.severity for f in findings] == [Severity.LOW]
     assert findings[0].verdict is not None
     assert "not scanned" in findings[0].evidence.summary
+    assert _unread(tmp_path) == [str(tmp_path / "broken.gguf")]
 
 
 def test_an_unparseable_tokenizer_config_is_reported_as_unscanned(tmp_path: Path) -> None:
     (tmp_path / "tokenizer_config.json").write_text("{ not json")
     findings = list(ChatTemplateRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert [f.severity for f in findings] == [Severity.LOW]
+    assert _unread(tmp_path) == [str(tmp_path / "tokenizer_config.json")]
 
 
 def test_a_gguf_without_a_chat_template_is_clean(tmp_path: Path) -> None:
@@ -149,6 +223,7 @@ def test_a_gguf_without_a_chat_template_is_clean(tmp_path: Path) -> None:
     # and it carries no template. That is different from "could not be read".
     (tmp_path / "base.gguf").write_bytes(build_gguf({"general.architecture": "llama"}))
     assert _run(tmp_path) == []
+    assert _unread(tmp_path) == []
 
 
 def test_a_config_whose_template_is_an_unreadable_shape_is_not_cleared(tmp_path: Path) -> None:
@@ -165,9 +240,43 @@ def test_a_named_list_of_unreadable_entries_is_not_cleared(tmp_path: Path) -> No
     assert _severities(tmp_path) == [Severity.LOW.name]
 
 
+@pytest.mark.parametrize(
+    "entry",
+    [42, {"name": "tools"}, {"name": "tools", "template": 7}, "bare string"],
+    ids=["number", "no-template", "template-not-a-string", "string"],
+)
+def test_a_readable_template_does_not_hide_an_unreadable_sibling(
+    tmp_path: Path, entry: object
+) -> None:
+    document = {"chat_template": [{"name": "default", "template": "plain"}, entry]}
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps(document))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.LOW]
+    assert "entry 1" in findings[0].evidence.summary
+    assert _unread(tmp_path) == [str(tmp_path / "tokenizer_config.json")]
+
+
+def test_a_gadget_and_every_unreadable_entry_beside_it_are_both_reported(tmp_path: Path) -> None:
+    document = {"chat_template": [42, {"name": "rag", "template": _PAYLOAD}, None]}
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps(document))
+
+    findings = _run(tmp_path)
+
+    assert [f.severity for f in findings] == [Severity.CRITICAL, Severity.LOW]
+    assert "entries 0, 2" in findings[1].evidence.summary
+
+
 def test_a_config_that_is_not_a_json_object_is_not_cleared(tmp_path: Path) -> None:
     (tmp_path / "tokenizer_config.json").write_text("[1, 2, 3]")
     assert _severities(tmp_path) == [Severity.LOW.name]
+
+
+def test_a_config_nested_too_deep_to_parse_is_not_cleared(tmp_path: Path) -> None:
+    (tmp_path / "tokenizer_config.json").write_text("[" * 200_000)
+
+    assert _unread(tmp_path) == [str(tmp_path / "tokenizer_config.json")]
 
 
 def test_a_config_without_a_template_is_clean(tmp_path: Path) -> None:
@@ -181,6 +290,7 @@ def test_an_unreadable_template_file_is_not_cleared(tmp_path: Path) -> None:
     # skipped — but skipped loudly.
     os.mkfifo(tmp_path / "chat_template.jinja")
     assert _severities(tmp_path) == [Severity.LOW.name]
+    assert _unread(tmp_path) == [str(tmp_path / "chat_template.jinja")]
 
 
 def test_a_template_padded_past_the_read_bound_is_not_cleared(tmp_path: Path) -> None:
@@ -202,3 +312,23 @@ def test_model_format_no_longer_reports_on_gguf(tmp_path: Path) -> None:
     # findings with different severities for a single fact.
     (tmp_path / "m.gguf").write_bytes(build_gguf({_KEY: _PAYLOAD}))
     assert list(ModelFormatRule().run(ArtifactTarget(tmp_path), RuleContext())) == []
+
+
+def test_a_gadget_before_the_read_bound_does_not_hide_the_unread_rest(tmp_path: Path) -> None:
+    (tmp_path / "chat_template.jinja").write_text("{% include 'x' %}\n" + " " * MAX_SCAN_BYTES)
+
+    findings = list(ChatTemplateRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.severity for f in findings] == [Severity.HIGH, Severity.LOW]
+    assert findings[1].title == "Chat template not scanned"
+    assert _unread(tmp_path) == [str(tmp_path / "chat_template.jinja")]
+
+
+def test_a_tokenizer_config_past_the_read_bound_says_so(tmp_path: Path) -> None:
+    document = {"pad": "x" * MAX_SCAN_BYTES, "chat_template": _PAYLOAD}
+    (tmp_path / "tokenizer_config.json").write_text(json.dumps(document))
+
+    findings = list(ChatTemplateRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.severity for f in findings] == [Severity.LOW]
+    assert "read bound" in findings[0].evidence.summary

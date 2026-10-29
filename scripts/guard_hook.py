@@ -10,22 +10,89 @@ Wired in `.claude/settings.json`; the case table lives in
 `scripts/tests/test_guard_hook.py`.
 """
 
+from __future__ import annotations
+
 import json
+import os
 import re
+import shlex
 import subprocess
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-# Spelled in two halves so this file does not trip its own rule.
-FORBIDDEN_MODEL = re.compile(
-    r"claude-(?:fab" + r"le|myth" + r"os)|--model[= ]+(?:fab" + r"le|myth" + r"os)\b", re.IGNORECASE
-)
+# Model families a clone refuses, comma-separated, e.g. a tier the team never uses in scripts.
+FORBIDDEN_MODELS_ENV = "GUARD_FORBIDDEN_MODELS"
 ENV_FILE = r"(?<![\w.-])\.env(?!\.example)[\w.-]*"
 ATTRIBUTION = re.compile(r"co-authored-by|generated with|claude\.ai/code|\U0001F916", re.IGNORECASE)
+PUSH = re.compile(r"\bgit\s+push\b([^|;&]*)")
+# These push every local branch, main included, whatever branch is checked out.
+EVERY_BRANCH_OPTIONS = ("--all", "--branches", "--mirror")
 TAG_PUSH = re.compile(r"\bgit\s+push\b[^|;&]*(?:--tags\b|refs/tags/|\bv\d+\.\d+)")
 # A push to `main` deploys guardana.dev straight from the tree, before CI has run.
-SITE_CHECKS = ("generate_docs.py", "sync_site.py", "build_site.py", "generate_llms_txt.py")
+SITE_CHECKS = (
+    "generate_docs.py",
+    "sync_site.py",
+    "build_site.py",
+    "generate_llms_txt.py",
+    "generate_sitemap.py",
+    "generate_well_known.py",
+)
+# Programs that read or check a file named on their command line and never run it.
+FILE_READERS = frozenset(
+    {
+        "awk",
+        "bat",
+        "cat",
+        "cp",
+        "diff",
+        "echo",
+        "egrep",
+        "file",
+        "find",
+        "git",
+        "grep",
+        "head",
+        "less",
+        "ls",
+        "more",
+        "mv",
+        "mypy",
+        "printf",
+        "pytest",
+        "rg",
+        "ruff",
+        "sed",
+        "shasum",
+        "sha256sum",
+        "stat",
+        "tail",
+        "wc",
+    }
+)
+UV_OPTIONS_WITH_VALUE = frozenset(
+    {
+        "--directory",
+        "--env-file",
+        "--extra",
+        "--group",
+        "--package",
+        "--project",
+        "--python",
+        "--with",
+        "-p",
+    }
+)
+SAFE_RELEASE_FLAGS = frozenset({"--dry-run", "--help", "-h"})
+# git's own options, which sit between `git` and the subcommand and change nothing
+# about what the subcommand does to a remote or the index.
+GIT_PROGRAM = re.compile(r"(?<![\w.-])git(?=[ \t])")
+GIT_WORD = re.compile(r"""[ \t]+((?:'[^']*'|"(?:\\.|[^"\\])*"|\\.|[^\s'"\\;&|<>()])+)""")
+GIT_OPTIONS_WITH_VALUE = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix", "--config-env"}
+)
+# A here-document's body is input to a program, not a command; it is cut before parsing.
+HEREDOC = re.compile(r"<<-?\s*(['\"]?)(\w+)\1([^\n]*)\n.*?\n\2[ \t]*(?=\n|$)", re.DOTALL)
 SELF_EXEMPT = frozenset(
     {"scripts/guard_hook.py", "scripts/check_claude_setup.py", "scripts/tests/test_guard_hook.py"}
 )
@@ -70,12 +137,34 @@ def _site_in_sync() -> None:
             )
 
 
-def _pushes_main(command: str) -> bool:
-    push = re.search(r"\bgit\s+push\b([^|;&]*)", command)
-    if push is None:
-        return False
-    args = [arg for arg in push.group(1).split() if not arg.startswith("-")]
-    if any(arg == "main" or arg.endswith(":main") for arg in args):
+def _pushes(command: str) -> list[list[str]]:
+    """Return the words after each `git push` in a command, one list per push."""
+    return [push.group(1).split() for push in PUSH.finditer(command)]
+
+
+def _pushes_every_branch(words: list[str]) -> bool:
+    """Whether a push names `--all`, `--branches` or `--mirror`, or an abbreviation git accepts."""
+    return any(
+        len(word) > len("--") and option.startswith(word)
+        for word in words
+        if word.startswith("--")
+        for option in EVERY_BRANCH_OPTIONS
+    )
+
+
+def _refspec_dest(arg: str) -> str:
+    """Destination of a refspec, ignoring a leading force marker."""
+    spec = arg.removeprefix("+")
+    return spec.split(":", 1)[1] if ":" in spec else spec
+
+
+def _is_main_ref(ref: str) -> bool:
+    return ref in {"main", "refs/heads/main"}
+
+
+def _push_matches_main(words: list[str]) -> bool:
+    args = [arg for arg in words if not arg.startswith("-")]
+    if _pushes_every_branch(words) or any(_is_main_ref(_refspec_dest(arg)) for arg in args):
         return True
     if len(args) >= 2 and args[1] != "HEAD":  # noqa: PLR2004 — remote plus an explicit refspec
         return False
@@ -86,11 +175,19 @@ def _pushes_main(command: str) -> bool:
     return branch == "main"
 
 
+def _pushes_main(command: str) -> bool:
+    # A compound command can push more than once; check every push.
+    return any(_push_matches_main(words) for words in _pushes(command))
+
+
 def _guard_stage(command: str) -> None:
     if not re.search(r"\bgit\s+add\b", command):
         return
     if re.search(r"\bgit\s+add\s+(?:-A\b|--all\b|-u\b|--update\b|\.(?:\s|$))", command):
-        decide("deny", "Stage explicit paths. Other sessions leave work in this tree.")
+        decide(
+            "deny",
+            "Stage explicit paths: the tree may hold changes that are not part of this commit.",
+        )
     if re.search(rf"\bgit\s+add\b[^|;&]*{ENV_FILE}", command):
         decide("deny", "Env files hold credentials and are never staged.")
 
@@ -107,7 +204,9 @@ def _guard_commit(command: str) -> None:
 def _guard_push(command: str) -> None:
     if not re.search(r"\bgit\s+push\b", command):
         return
-    if re.search(r"--force\b|\s-f\b|--force-with-lease", command):
+    if re.search(r"--force\b|\s-f\b|--force-with-lease", command) or any(
+        word.startswith("+") for words in _pushes(command) for word in words
+    ):
         decide("ask", "Force push to a shared branch.")
     if TAG_PUSH.search(command):
         decide(
@@ -128,22 +227,106 @@ def _guard_tools(command: str) -> None:
             "`claude -p` boots a full session per call on the user's subscription. "
             "State the number of calls and the model first.",
         )
-    if re.search(r"\bcodex\s+exec\b|\bagy\s+(?:-p\b|--print\b|--prompt\b)", command):
-        decide(
-            "ask",
-            "Call GPT/Gemini through scripts/text_model.py, one call per batch; "
-            "each call boots a full agent session on the other side.",
-        )
-    if re.search(r"scripts/release\.py\b", command) and "--dry-run" not in command:
+    if _runs_release(command):
         decide("ask", "release.py commits, tags and pushes; the tag publishes to PyPI.")
     if re.search(r"\bgh\s+(?:release\s+(?:create|delete|edit)|run\s+cancel)\b", command):
         decide("ask", "This changes a public release or a running publish.")
 
 
+def _runs_release(command: str) -> bool:
+    """Whether some simple command in `command` runs scripts/release.py for real.
+
+    Reading, grepping or linting the file never asks, and neither do `--help` and
+    `--dry-run`. Quoting that cannot be parsed, or a program this cannot place, asks.
+    """
+    if "release.py" not in command:
+        return False
+    command = HEREDOC.sub(r"\3", command)
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        tokens = list(lexer)
+    except ValueError:
+        return not SAFE_RELEASE_FLAGS.intersection(command.split())
+    simple: list[list[str]] = [[]]
+    for token in tokens:
+        if token and set(token) <= set(";&|()<>\n"):
+            simple.append([])
+        else:
+            simple[-1].append(token)
+    return any(_runs_script(words) for words in simple if any("release.py" in w for w in words))
+
+
+def _runs_script(words: list[str]) -> bool:
+    """Whether one simple command executes scripts/release.py without a safe flag."""
+    while words and re.fullmatch(r"[A-Za-z_]\w*=.*", words[0]):
+        words = words[1:]
+    if words[:2] == ["uv", "run"]:
+        rest, words, skip = words[2:], [], False
+        for index, word in enumerate(rest):
+            if skip:
+                skip = False
+            elif word in UV_OPTIONS_WITH_VALUE:
+                skip = True
+            elif not word.startswith("-"):
+                words = rest[index:]
+                break
+    if not words or Path(words[0]).name in FILE_READERS:
+        return False
+    if re.fullmatch(r"python[\d.]*", Path(words[0]).name):
+        scripts = [w for w in words[1:] if not w.startswith("-")]
+        if not scripts or Path(scripts[0]).name != "release.py":
+            return False
+    return not SAFE_RELEASE_FLAGS.intersection(words)
+
+
+def without_git_options(command: str) -> str:
+    """Rewrite every `git <global options> <subcommand>` as `git <subcommand>`.
+
+    `git -C . push` and `git -c k=v add -A` are the same push and the same stage,
+    so every check below reads the command with those options cut out.
+    """
+    kept: list[str] = []
+    copied = 0
+    for git in GIT_PROGRAM.finditer(command):
+        if git.start() < copied:
+            continue
+        cursor = git.end()
+        while (word := GIT_WORD.match(command, cursor)) is not None:
+            option = word.group(1)
+            if option in GIT_OPTIONS_WITH_VALUE:
+                value = GIT_WORD.match(command, word.end())
+                if value is None:
+                    break
+                cursor = value.end()
+            elif option.startswith("-"):
+                cursor = word.end()
+            else:
+                break
+        kept.append(command[copied : git.end()])
+        copied = cursor
+    return "".join(kept) + command[copied:]
+
+
+def forbidden_models() -> re.Pattern[str] | None:
+    """Return a pattern for the families in `GUARD_FORBIDDEN_MODELS`, as ids or `--model` values."""
+    families = [
+        re.escape(name.strip())
+        for name in os.environ.get(FORBIDDEN_MODELS_ENV, "").split(",")
+        if name.strip()
+    ]
+    if not families:
+        return None
+    alternatives = "|".join(families)
+    return re.compile(rf"claude-(?:{alternatives})|--model[= ]+(?:{alternatives})\b", re.IGNORECASE)
+
+
 def guard_bash(command: str) -> None:
     """Decide on a Bash command; return silently when nothing applies."""
-    if FORBIDDEN_MODEL.search(command):
-        decide("deny", "Fable/Mythos models are never used from a command or script in this repo.")
+    forbidden = forbidden_models()
+    if forbidden is not None and forbidden.search(command):
+        decide("deny", f"This clone does not use that model family ({FORBIDDEN_MODELS_ENV}).")
+    command = without_git_options(command)
     _guard_stage(command)
     _guard_commit(command)
     _guard_push(command)
@@ -174,8 +357,9 @@ def guard_write(tool_input: dict[str, object]) -> None:
     """Decide on a Write, Edit, MultiEdit or NotebookEdit; return silently when nothing applies."""
     if _is_exempt(str(tool_input.get("file_path", tool_input.get("notebook_path", "")))):
         return
-    if FORBIDDEN_MODEL.search(" ".join(_strings(tool_input))):
-        decide("deny", "Fable/Mythos model ids are never written into this repo.")
+    forbidden = forbidden_models()
+    if forbidden is not None and forbidden.search(" ".join(_strings(tool_input))):
+        decide("deny", f"This clone does not write that model family ({FORBIDDEN_MODELS_ENV}).")
 
 
 def main() -> None:

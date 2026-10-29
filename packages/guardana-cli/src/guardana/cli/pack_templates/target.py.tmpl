@@ -4,8 +4,8 @@ from collections.abc import Iterator, Mapping
 from pathlib import Path
 from typing import Self
 
+from guardana.core import Capability, LocatorError, Target, TargetKind
 from guardana.core.source import PythonSource, UnreadSource, read_source
-from guardana.core.target import Capability, LocatorError, Target, TargetKind
 
 
 class __CLASS__Target(Target):
@@ -13,6 +13,12 @@ class __CLASS__Target(Target):
 
     Declares `READ_FILES` and implements every method that capability promises.
     A declaration the runner selects rules by must have a surface behind it.
+
+    It reads files and sends nothing, so it declares no secret. A target that
+    authenticates to what it tests, and is not built on `EndpointTarget`, also
+    implements `sent_secrets()` (`guardana.core.target.SendsSecrets`), returning every
+    value it sends; the run then withholds each from its findings, failures and kept
+    exchanges.
     """
 
     kind = TargetKind.ARTIFACT
@@ -58,13 +64,15 @@ class __CLASS__Target(Target):
                 UnreadSource(path=self._root, reason="the directory is not there to read")
             )
             return
+        # Suffixes compare in any case: a loader opens `model.PKL` like `model.pkl`.
+        wanted = None if suffixes is None else {suffix.lower() for suffix in suffixes}
         for path in sorted(p for p in self._root.rglob("*") if p.is_file()):
-            if suffixes is None or path.suffix in suffixes:
+            if wanted is None or path.suffix.lower() in wanted:
                 yield path
 
     def python_source(self, path: Path) -> PythonSource | None:
         """Read and index a Python file; record it when it cannot be read."""
-        if path.suffix != ".py":
+        if path.suffix.lower() != ".py":
             return None
         result = read_source(path)
         if isinstance(result, UnreadSource):

@@ -9,8 +9,6 @@ One place knows the difference, because two would drift — and the half that
 drifted would be writing a header that no longer matches the body it describes,
 which a conforming server answers with `HeaderMismatch` and an older one answers
 by doing something else entirely.
-
-See `docs/design/mcp-protocol-eras.md`.
 """
 
 import json
@@ -102,7 +100,7 @@ class Wire:
     era: Era
     version: str
 
-    def body(self, method: str, params: Mapping[str, object]) -> bytes:
+    def body(self, method: str, params: Mapping[str, object], *, request_id: int = 1) -> bytes:
         """Encode one JSON-RPC request for this revision."""
         sent: dict[str, object] = dict(params)
         if self.era is Era.MODERN:
@@ -111,9 +109,13 @@ class Wire:
                 META_CLIENT_INFO: _CLIENT,
                 META_CLIENT_CAPABILITIES: _NO_CAPABILITIES,
             }
-        return json.dumps({"jsonrpc": "2.0", "id": 1, "method": method, "params": sent}).encode(
-            "utf-8"
-        )
+        return json.dumps(
+            {"jsonrpc": "2.0", "id": request_id, "method": method, "params": sent}
+        ).encode("utf-8")
+
+    def notification(self, method: str) -> bytes:
+        """Encode one JSON-RPC notification: no id, so nothing answers it."""
+        return json.dumps({"jsonrpc": "2.0", "method": method}).encode("utf-8")
 
     def headers(
         self, method: str, *, credential: str | None = None, session: str | None = None
@@ -151,6 +153,36 @@ PROBE_WIRE = Wire(era=Era.MODERN, version=LATEST_VERSION)
 
 LEGACY_WIRE = Wire(era=Era.LEGACY, version=LEGACY_VERSION)
 """How a conversation with a server that never answered the probe is written."""
+
+INITIALIZED = "notifications/initialized"
+"""What a `2025-11-25` client sends after an accepted `initialize`, before its next request."""
+
+
+def handshake_refusal(answered: object) -> str | None:
+    """Say why an `initialize` answer opens no conversation, or None when it names `2025-11-25`.
+
+    A client SHOULD disconnect from a revision it does not support; speaking
+    `2025-11-25` at a server that answered another would record a conversation that
+    did not happen in the revision recorded.
+    """
+    if answered == LEGACY_VERSION:
+        return None
+    named = f"with {answered}" if isinstance(answered, str) and answered else "with no revision"
+    return (
+        f"the server answered initialize {named}; guardana speaks "
+        f"{' and '.join(SUPPORTED_VERSIONS)}"
+    )
+
+
+def error_member(payload: Mapping[str, object] | None) -> Mapping[str, object] | None:
+    """Return a reply's JSON-RPC error when it is an object with an integer code, else None."""
+    if payload is None:
+        return None
+    error = payload.get("error")
+    if not isinstance(error, Mapping):
+        return None
+    code = error.get("code")
+    return error if isinstance(code, int) and not isinstance(code, bool) else None
 
 
 def choose_version(offered: Sequence[str]) -> str | None:
@@ -229,6 +261,7 @@ def server_info_in(result: Mapping[str, object]) -> Mapping[str, object] | None:
 
 __all__ = [
     "COMPLETE",
+    "INITIALIZED",
     "INPUT_REQUIRED",
     "LATEST_VERSION",
     "LEGACY_VERSION",
@@ -242,6 +275,8 @@ __all__ = [
     "completed",
     "era_of",
     "error_from",
+    "error_member",
+    "handshake_refusal",
     "newest_legacy",
     "result_of",
     "server_info_in",

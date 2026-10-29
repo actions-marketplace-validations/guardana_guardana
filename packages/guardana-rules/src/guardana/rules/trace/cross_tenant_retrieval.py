@@ -1,11 +1,14 @@
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 
 from guardana.core.report import Finding
 from guardana.core.rule import RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.target import Capability, TargetKind
 from guardana.core.taxonomy import OWASP_LLM02_2026, OWASP_LLM09_2026
-from guardana.core.trace import Retrieval, Span, Trace
+from guardana.core.trace import Retrieval, RetrievedDocument, Span, SpanKind, Trace
+from guardana.rules.trace import _samples
 from guardana.rules.trace._base import TraceRule
 
 
@@ -29,9 +32,32 @@ class CrossTenantRetrievalRule(TraceRule):
         target_kind=TargetKind.TRACE,
         taxonomy=(OWASP_LLM09_2026, OWASP_LLM02_2026),
         required_capabilities=frozenset({Capability.READ_TRACE, Capability.READ_RETRIEVAL}),
+        detection=Detection.INVARIANT,
     )
 
     claim = "whether a retrieval crossed a tenant boundary is not established"
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a foreign document returned, own documents only, and a query naming no tenant."""
+        return materialise(
+            (
+                _samples.sample(
+                    "a search for tenant-a returning a document of tenant-b",
+                    FixtureOutcome.FINDING,
+                    lambda: _samples.target(_search("tenant-a", ("tenant-a", "tenant-b"))),
+                ),
+                _samples.sample(
+                    "a search for tenant-a returning only tenant-a's documents",
+                    FixtureOutcome.CLEAN,
+                    lambda: _samples.target(_search("tenant-a", ("tenant-a", "tenant-a"))),
+                ),
+                _samples.sample(
+                    "a search whose query records no tenant over labelled documents",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _samples.target(_search(None, ("tenant-a", "tenant-b"))),
+                ),
+            )
+        )
 
     def examine(self, trace: Trace) -> Iterator[Finding]:
         """Compare each retrieval's tenant against the tenant of every document it returned.
@@ -96,3 +122,21 @@ class CrossTenantRetrievalRule(TraceRule):
                 f"{document.id!r}, which belongs to tenant {document.tenant!r}",
                 span=span,
             )
+
+
+def _search(tenant: str | None, owners: tuple[str, ...]) -> Span:
+    """Build a retrieval for `tenant` returning one document owned by each of `owners`."""
+    return Span(
+        span_id="r1",
+        kind=SpanKind.RETRIEVAL,
+        name="search",
+        retrieval=Retrieval(
+            query="open invoices",
+            tenant=tenant,
+            source="shared-index",
+            documents=tuple(
+                RetrievedDocument(id=f"doc-{index}", tenant=owner)
+                for index, owner in enumerate(owners)
+            ),
+        ),
+    )

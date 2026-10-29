@@ -1,7 +1,6 @@
 """Translating a PydanticAI run into the trace model.
 
-Every double here is hand-written from the shapes the real library prints — the
-versions and the method are recorded in `docs/design/framework-adapters.md`. That is
+Every double here is hand-written from the shapes the real library prints. That is
 the property under test as much as the mapping is: `pydantic_ai` is never imported, so
 this suite runs in an environment that has never heard of it, which is also the
 environment `guardana-core` is installed into.

@@ -127,6 +127,7 @@ def test_required_dimensions_never_reach_a_target_that_is_not_a_trace(tmp_path: 
     closed on everything — as useless as one that fails open on everything.
     """
     runner = Runner(registry=Registry(), profile=_profile(Dimension.APPROVAL))
+    (tmp_path / "model.txt").write_text("x")
 
     result = runner.run(ArtifactTarget(tmp_path))
 

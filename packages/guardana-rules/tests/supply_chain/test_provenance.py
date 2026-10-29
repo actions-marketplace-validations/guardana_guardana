@@ -1,7 +1,10 @@
+import os
 from pathlib import Path
 
+import pytest
 from guardana.core.rule import RuleContext
 from guardana.core.target import ArtifactTarget
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES
 from guardana.rules.supply_chain.provenance import ProvenanceRule
 
 
@@ -60,3 +63,29 @@ def test_a_padded_file_does_not_evade_the_scan(tmp_path: Path) -> None:
     (tmp_path / "big.py").write_text(big, encoding="utf-8")
     findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
     assert any("revision" in f.evidence.summary for f in findings)
+
+
+def test_a_model_card_past_the_read_bound_is_unverified_not_clean(tmp_path: Path) -> None:
+    (tmp_path / "README.md").write_text("# Model\n" + " " * MAX_SCAN_BYTES + "\nlicense: other\n")
+
+    findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["Model card not scanned"]
+    assert findings[0].verdict is not None
+    assert findings[0].verdict.outcome == "inconclusive"
+
+
+@pytest.mark.skipif(not hasattr(os, "mkfifo"), reason="mkfifo is POSIX-only")
+def test_an_unreadable_model_card_is_unverified_not_clean(tmp_path: Path) -> None:
+    os.mkfifo(tmp_path / "README.md")
+
+    findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
+
+    assert [f.title for f in findings] == ["Model card not scanned"]
+
+
+def test_an_unparseable_loader_is_declined_as_not_scanned(tmp_path: Path) -> None:
+    (tmp_path / "load.py").write_text("def (:\n", encoding="utf-8")
+    findings = list(ProvenanceRule().run(ArtifactTarget(tmp_path), RuleContext()))
+    assert [f.title for f in findings] == ["Python file not scanned"]
+    assert [f.verdict.outcome if f.verdict else None for f in findings] == ["inconclusive"]

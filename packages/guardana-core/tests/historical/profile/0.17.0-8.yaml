@@ -1,0 +1,4 @@
+name: production
+contracts:
+  - ./contracts/checkout.yaml
+  - ./contracts/support.yaml

@@ -1,8 +1,8 @@
 """Rules over a recorded execution — the invariants a trace makes checkable.
 
-Eight checks, each existing because the domain model carries a distinction that would
-otherwise be unrepresentable, and each declaring the recorded dimension it needs as a
-capability so the runner skips it rather than reading an absence as a fact.
+Each check exists because the domain model carries a distinction that would otherwise
+be unrepresentable, and declares the recorded dimension it needs as a capability so the
+runner skips it rather than reading an absence as a fact.
 
 Two of them need only what the OpenTelemetry GenAI conventions carry, so they run on
 any instrumented framework's export: `secret_in_tool_argument`, and

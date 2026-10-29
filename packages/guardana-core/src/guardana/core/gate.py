@@ -10,6 +10,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # `manifest` records a GateOutcome, and `report` is downstream of both
+    from guardana.core.manifest.records import SuiteSummary
     from guardana.core.profile.model import FailOn, Policy
     from guardana.core.report.result import ScanResult
 
@@ -19,13 +20,42 @@ class StopReason(StrEnum):
 
     Recorded on the result rather than left to the exit code alone: a report
     written to disk outlives the process that wrote it, and one that does not say
-    it was cut short reads as a complete pass over the target. Both members mean
-    the same thing to a gate — the run is not entitled to a verdict — and differ
-    in who cut it short, which is what the operator needs to know to act.
+    it was cut short reads as a complete pass over the target. Every member means
+    the same thing to a gate — the run is not entitled to a verdict — and differs
+    in what cut it short, which is what the operator needs to know to act.
     """
 
     BUDGET_EXHAUSTED = "budget_exhausted"
     INTERRUPTED = "interrupted"
+    TARGET_UNAVAILABLE = "target_unavailable"
+    """The target stopped answering part-way: it refused the credentials, failed, or went away.
+
+    It outranks every other stop when pooled rules stop for several reasons, because
+    neither a larger budget nor a server that kept its revision would have let the run
+    finish.
+    """
+
+    TARGET_CHANGED = "target_changed"
+    """The target still answers but stopped accepting what the run agreed with it.
+
+    An MCP server that drops the protocol revision negotiated for the run is the case:
+    `TARGET_UNAVAILABLE` would name the wrong cause. It outranks `BUDGET_EXHAUSTED` and
+    `INTERRUPTED`, and `TARGET_UNAVAILABLE` outranks it.
+    """
+
+    @property
+    def by_target(self) -> bool:
+        """Whether the target under test cut the run short, so every later request would meet it."""
+        return self in _TARGET_STOPS
+
+    @property
+    def rank(self) -> int:
+        """How this stop ranks against another in the same run; equal ranks keep the first."""
+        return _STOP_RANKS.get(self, 0)
+
+
+_STOP_RANKS = {StopReason.TARGET_UNAVAILABLE: 2, StopReason.TARGET_CHANGED: 1}
+_TARGET_STOPS = frozenset(_STOP_RANKS)
 
 
 class GateOutcome(StrEnum):
@@ -42,6 +72,58 @@ class GateOutcome(StrEnum):
     INDETERMINATE = "indeterminate"
 
 
+class OpenQuestion(StrEnum):
+    """One fact in a result that leaves part of the run's question unanswered.
+
+    The single list the gate, every renderer and `plan` read, so an output cannot call
+    clean a run the gate refused. Ordered by how completely each one invalidates the
+    run, which is the order an output names them in.
+    """
+
+    STOPPED = "stopped"
+    NOTHING_VERIFIED = "nothing_verified"
+    COVERAGE_SHORTFALL = "coverage_shortfall"
+    NOTHING_MEASURED = "nothing_measured"
+    SUITE_DECLINED = "suite_declined"
+    ERRORS = "errors"
+    UNVERIFIED = "unverified"
+    SKIPPED = "skipped"
+
+
+def open_questions(result: "ScanResult") -> tuple[OpenQuestion, ...]:
+    """Every open question present in `result`, whatever the policy, in `OpenQuestion` order.
+
+    A skip counts only when it is a coverage gap: a contract about another system did
+    not apply, and nothing is missing.
+    """
+    present = {
+        OpenQuestion.STOPPED: result.stopped_by is not None,
+        OpenQuestion.NOTHING_VERIFIED: result.verified_nothing,
+        OpenQuestion.COVERAGE_SHORTFALL: bool(result.coverage_shortfall),
+        OpenQuestion.NOTHING_MEASURED: bool(result.assessments) and not result.measured,
+        OpenQuestion.SUITE_DECLINED: bool(declined_suites(result)),
+        OpenQuestion.ERRORS: bool(result.errors),
+        OpenQuestion.UNVERIFIED: bool(result.unverified),
+        OpenQuestion.SKIPPED: any(s.is_coverage_gap for s in result.rules_skipped),
+    }
+    return tuple(question for question, holds in present.items() if holds)
+
+
+def refused_by(
+    questions: tuple[OpenQuestion, ...], threshold: "FailOn"
+) -> tuple[OpenQuestion, ...]:
+    """Return the open questions this bar refuses: every unswitched one, and each switch on."""
+    switches = {
+        OpenQuestion.ERRORS: threshold.fail_on_error,
+        # Not filtered by severity, and that is the whole point of the switch. A
+        # severity answers "how bad is this problem"; an unverified result is the
+        # absence of an answer, so asking how bad it is has no meaning.
+        OpenQuestion.UNVERIFIED: threshold.fail_on_inconclusive,
+        OpenQuestion.SKIPPED: threshold.fail_on_skipped,
+    }
+    return tuple(q for q in questions if switches.get(q, True))
+
+
 def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     """Judge one result against a policy, in three states rather than two.
 
@@ -56,12 +138,21 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
     crashed check is `FAIL`: the finding is a fact somebody has to act on, and
     reporting the missing check instead would bury it.
 
-    **Anything else that leaves the question open is `INDETERMINATE`** — see
-    `_left_unanswered`, which owns that list. One branch here because they are one
-    answer: their order among themselves cannot change a verdict.
+    **A suite that failed its bar is `FAIL` whatever its severity.** The bar is a demand
+    its author wrote into the rule, and a suite that declined under the same demand is
+    `INDETERMINATE` with no switch in front; filtering the failure by severity would
+    give a worse measurement a greener exit than no measurement.
+
+    **Anything else that leaves the question open is `INDETERMINATE`**: every
+    `OpenQuestion` the failure bar refuses (`refused_by`). Demanded coverage, a run that
+    concluded or measured nothing and a declined suite are demands, so no switch stands
+    in front of them; errors, unverified checks and skips are preferences behind their
+    `fail_on_*` switches.
     """
     if result.stopped_by is not None:
         return GateOutcome.INDETERMINATE
+    if any(summary.outcome == "fail" for summary in _demanded_suites(result)):
+        return GateOutcome.FAIL
     threshold = policy.fail_on
     for f in result.findings:
         if f.severity < threshold.severity:
@@ -70,41 +161,33 @@ def gate_outcome(result: "ScanResult", policy: "Policy") -> GateOutcome:
         # that threshold is what keeps a noisy heuristic from breaking CI.
         if f.verdict is None or f.verdict.confidence >= threshold.min_confidence:
             return GateOutcome.FAIL
-    if _left_unanswered(result, threshold):
+    if refused_by(open_questions(result), threshold):
         return GateOutcome.INDETERMINATE
     return GateOutcome.PASS
 
 
-def _left_unanswered(result: "ScanResult", threshold: "FailOn") -> bool:
-    """Whether this run failed to answer its own question, for any reason.
+def declined_suites(result: "ScanResult") -> dict[str, "SuiteSummary"]:
+    """Return every suite no baseline accepted that declined to conclude, by rule id.
 
-    Three have no toggle in front of them, because each is a demand rather than a
-    preference:
-
-    - **coverage the operator demanded and did not get** — every `fail_on_*` switch
-      covers checks nobody specifically asked for, and this one was asked for;
-    - **a run that reached no conclusion at all** — `verified_nothing` counts
-      conclusions, not executions, so an endpoint answering everything with an
-      empty message cannot pass with a full rule count;
-    - **a run that measured cases and measured none of them** — the same fact for
-      the measurement channel, which is carried separately and would otherwise
-      satisfy every test above on a sample of zero.
-
-    The rest are preferences and stay behind their switches.
+    What `OpenQuestion.SUITE_DECLINED` stands for, so an output counting or naming the
+    declined suites counts the ones the gate read.
     """
-    return bool(
-        result.coverage_shortfall
-        or result.verified_nothing
-        or (result.assessments and not result.measured)
-        or (result.errors and threshold.fail_on_error)
-        # Not filtered by severity, and that is the whole point of the switch. A
-        # severity answers "how bad is this problem"; an unverified result is the
-        # absence of an answer, so asking how bad it is has no meaning. Filtering
-        # it let a profile failing on `medium` promote a model store holding a
-        # hundred members nobody could parse, because each was graded LOW.
-        or (threshold.fail_on_inconclusive and bool(result.unverified))
-        or (threshold.fail_on_skipped and any(s.is_coverage_gap for s in result.rules_skipped))
-    )
+    waived = {f.rule_id for f in result.waived}
+    return {
+        rule_id: summary
+        for rule_id, summary in sorted(result.suites.items())
+        if rule_id not in waived and summary.outcome == "inconclusive"
+    }
+
+
+def _demanded_suites(result: "ScanResult") -> list["SuiteSummary"]:
+    """Return the suite conclusions the gate reads: every one no baseline accepted.
+
+    A waiver on a suite's finding is an explicit, expiring acceptance of that suite's
+    result, and it stays visible in `waived`.
+    """
+    waived = {f.rule_id for f in result.waived}
+    return [summary for rule_id, summary in result.suites.items() if rule_id not in waived]
 
 
 def gate(result: "ScanResult", policy: "Policy") -> bool:
@@ -122,16 +205,22 @@ _OUTCOME_EXIT_CODES = {
     GateOutcome.FAIL: 1,
     GateOutcome.INDETERMINATE: 2,
 }
-_STOP_EXIT_CODES = {StopReason.BUDGET_EXHAUSTED: 6, StopReason.INTERRUPTED: 7}
+_STOP_EXIT_CODES = {
+    StopReason.TARGET_UNAVAILABLE: 4,
+    StopReason.TARGET_CHANGED: 4,
+    StopReason.BUDGET_EXHAUSTED: 6,
+    StopReason.INTERRUPTED: 7,
+}
 
 
 def exit_code_for(outcome: GateOutcome, stopped_by: StopReason | None = None) -> int:
     """Return the exit code that describes this result. Defined here so it is defined once.
 
     The engine owns the codes that describe a *result* — `0` passed, `1` failed,
-    `2` could not tell, `6` the budget ran out, `7` the run was interrupted. The
-    CLI owns the codes for situations where there is no result at all (`3`
-    invalid configuration, `4` target unavailable, `5` internal error).
+    `2` could not tell, `4` the target stopped or changed under the run, `6` the
+    budget ran out, `7` the run was interrupted. The CLI owns the codes for situations
+    where there is no result at all (`3` invalid configuration, `5` internal error), and
+    raises `4` itself when the target fails before a run has a result to save.
 
     A stop outranks the verdict: a run cut short is reported as cut short, not as
     the verdict its partial counts happen to produce. That ordering is why
@@ -139,5 +228,10 @@ def exit_code_for(outcome: GateOutcome, stopped_by: StopReason | None = None) ->
     turns it into a differently-red one.
     """
     if stopped_by is not None:
-        return _STOP_EXIT_CODES[stopped_by]
+        return stop_exit_code(stopped_by)
     return _OUTCOME_EXIT_CODES[outcome]
+
+
+def stop_exit_code(stopped_by: StopReason) -> int:
+    """Return the exit code of a run that stopped, which outranks any other outcome it has."""
+    return _STOP_EXIT_CODES[stopped_by]

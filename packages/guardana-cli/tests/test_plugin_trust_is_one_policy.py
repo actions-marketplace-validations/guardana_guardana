@@ -10,7 +10,9 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from _fake_distribution import MARKING_MODULE, FakeSite
 from guardana.cli.main import app
+from guardana.core.entrypoints import TAXONOMY_GROUP
 from guardana.core.trace import Provenance, Trace, serialize_trace
 from typer.testing import CliRunner
 
@@ -136,17 +138,25 @@ source contains any of the three phrases below, confirmed by grep across
     ("label", "build_argv"), _REFUSAL_COMMANDS, ids=[c[0] for c in _REFUSAL_COMMANDS]
 )
 def test_a_refusal_never_reads_as_a_proven_fact(
-    label: str, build_argv: Callable[[Path], list[str]], tmp_path: Path
+    label: str,
+    build_argv: Callable[[Path], list[str]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The one test that would have caught all three defects at once.
 
-    `--plugins disabled` refuses every entry point, this build's own built-ins
-    included, so nothing any of these commands prints can honestly claim a
-    manifest does not register something, that a locked extension is gone, or
-    that no installed catalogue defines a reference — every one of those is a
-    claim about a registry this run did not fully load.
+    `--plugins disabled` refuses every entry point, this build's own built-ins and
+    an installed taxonomy provider included, so nothing any of these commands prints
+    can honestly claim a manifest does not register something, that a locked
+    extension is gone, or that no installed catalogue defines a reference — every
+    one of those is a claim about a registry this run did not fully load.
     """
+    (tmp_path / "site").mkdir()
+    site = FakeSite(tmp_path / "site", monkeypatch)
+    site.distribution("acme-controls", (TAXONOMY_GROUP, "acme", site.module(MARKING_MODULE).name))
+
     result = CliRunner().invoke(app, build_argv(tmp_path))
+    site.forget_imports()
 
     for phrase in _REFUSAL_LEAK_PHRASES:
         assert phrase not in plain(result.output), f"{label}: {phrase!r} leaked — {result.output}"

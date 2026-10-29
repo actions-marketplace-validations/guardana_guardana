@@ -22,6 +22,7 @@ and did not see the reply. When it can replay the attack under its own contract,
 result of *that* is a finding.
 """
 
+import io
 import json
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
@@ -29,7 +30,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from guardana.core.fingerprint import digest_of
+from guardana.core.fingerprint import DigestKind, DocumentDigest
+from guardana.core.formats._stream import read_regular
 from guardana.core.severity import Severity
 from guardana.core.trace._parse import TraceLoadError
 from guardana.core.trace.limits import MAX_TRACE_BYTES
@@ -131,11 +133,16 @@ def detect_observation_dialect(path: Path) -> ObservationDialect:
 
 
 def read_observations(path: Path, dialect: ObservationDialect | None = None) -> ObservationRead:
-    """Read a producer's results, keeping the provenance and counting what was not imported."""
+    """Read a producer's results, keeping the provenance and counting what was not imported.
+
+    The provenance's `document` digests the file's bytes as they are on disk, before
+    any newline is translated, so it matches `sha256sum` of the file.
+    """
     from guardana.core.trace import _foreign  # noqa: PLC0415 — one import cycle, broken here
 
     chosen = dialect if dialect is not None else detect_observation_dialect(path)
-    text = _read(path)
+    data = _read_bytes(path)
+    text = _decoded(data, path)
     if chosen is ObservationDialect.GARAK:
         read = _foreign.read_garak(text, path)
     elif chosen is ObservationDialect.PROMPTFOO:
@@ -144,19 +151,37 @@ def read_observations(path: Path, dialect: ObservationDialect | None = None) -> 
         read = _foreign.read_generic(text, path)
     # Digested here rather than in each reader, so every dialect gets it and none can
     # forget: a claim nobody can trace back to a document has no weight in an audit.
-    return replace(read, provenance=replace(read.provenance, document_digest=digest_of(text)))
+    document = DocumentDigest.of(data, DigestKind.CONTENT)
+    return replace(read, provenance=replace(read.provenance, document=document))
 
 
 def _read(path: Path) -> str:
-    """Read the whole document, bounded the same way a trace is."""
+    """Read the whole document as text, bounded the same way a trace is."""
+    return _decoded(_read_bytes(path), path)
+
+
+def _read_bytes(path: Path) -> bytes:
+    """Read the whole document's bytes, refusing one over the ceiling.
+
+    Bounded by the read itself rather than by the size on disk, which a file still being
+    written can outgrow between the check and the read. Only a regular file is read, opened
+    without waiting on a writer.
+    """
     try:
-        if path.stat().st_size > MAX_TRACE_BYTES:
-            raise TraceLoadError(
-                f"{path} is larger than the {MAX_TRACE_BYTES}-byte ceiling for one document"
-            )
-        return path.read_text(encoding="utf-8")
+        data = read_regular(path, MAX_TRACE_BYTES)
     except OSError as exc:
         raise TraceLoadError(f"{path} could not be read: {exc}") from exc
+    if len(data) > MAX_TRACE_BYTES:
+        raise TraceLoadError(
+            f"{path} is larger than the {MAX_TRACE_BYTES}-byte ceiling for one document"
+        )
+    return data
+
+
+def _decoded(data: bytes, path: Path) -> str:
+    """Decode the bytes exactly as `Path.read_text(encoding="utf-8")` would, newlines included."""
+    try:
+        return io.TextIOWrapper(io.BytesIO(data), encoding="utf-8").read()
     except UnicodeDecodeError as exc:
         raise TraceLoadError(f"{path} is not UTF-8 text: {exc}") from exc
 

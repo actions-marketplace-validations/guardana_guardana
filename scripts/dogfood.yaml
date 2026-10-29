@@ -1,0 +1,11 @@
+# The dogfood gate: `uv run guardana scan packages --profile scripts/dogfood.yaml`.
+# Any finding, unverified check, error or skipped rule fails it.
+schema_version: 1
+name: dogfood
+
+fail_on:
+  severity: info
+  min_confidence: 0.0
+  fail_on_inconclusive: true
+  fail_on_error: true
+  fail_on_skipped: true

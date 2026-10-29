@@ -6,58 +6,78 @@
 <title>Product status — Guardana documentation</title>
 <meta name="description" content="read first: maturity per component, and the limitations you should know before adopting">
 <link rel="canonical" href="https://guardana.dev/docs/product-status">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
 <link rel="stylesheet" href="docs.css">
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="top"><div class="bar">
-<a class="mark" href="../">guard<span>ana</span></a>
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
 <nav>
 <a href="index.html">Documentation</a>
 <a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
 <a href="https://github.com/guardana/guardana">GitHub</a>
 </nav>
 </div></header>
 <div class="shell">
-<nav class="side">
+<nav class="side" aria-label="Documentation">
 <ul class="home"><li><a href="index.html">Overview</a></li></ul>
-<h2>First run</h2><ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
 <li><a href="how-it-works.html">How Guardana works</a></li>
 <li><a href="install.html">Installing</a></li>
 <li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
 <li><a href="usage-scan.html">guardana scan</a></li>
-<li><a href="usage-probe.html">guardana probe</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
 </ul>
 <h2>Run and policy</h2><ul>
 <li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
 <li><a href="usage-doctor.html">guardana doctor</a></li>
 <li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
 <li><a href="usage-plan.html">guardana plan</a></li>
 <li><a href="exit-codes.html">Exit codes</a></li>
 <li><a href="profiles.html">Profiles — guardana.yaml</a></li>
 </ul>
 <h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
 <li><a href="usage-baseline.html">guardana baseline</a></li>
 <li><a href="usage-diff.html">guardana diff</a></li>
-<li><a href="usage-monitor.html">guardana monitor</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
 <li><a href="usage-run.html">guardana run</a></li>
 <li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
 <li><a href="privacy.html">Evidence and redaction</a></li>
 </ul>
 <h2>Recorded applications</h2><ul>
-<li><a href="usage-analyze-trace.html">guardana analyze-trace</a></li>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
 <li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
 <li><a href="usage-contracts.html">Security contracts</a></li>
 <li><a href="usage-import-observations.html">guardana import-observations</a></li>
 <li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
 </ul>
 <h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
 <li><a href="usage-rules.html">guardana rules</a></li>
 <li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
 <li><a href="writing-rules.html">Writing rules</a></li>
 <li><a href="usage-rule-test.html">guardana rule test</a></li>
 <li><a href="usage-new-pack.html">guardana new-pack</a></li>
 <li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
 <li><a href="extending.html">Extending Guardana</a></li>
 <li><a href="model-formats.html">Reading model formats</a></li>
 </ul>
@@ -69,6 +89,7 @@
 <h2>Architecture and security</h2><ul>
 <li><a href="product-status.html" aria-current="page">Product status</a></li>
 <li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
 <li><a href="architecture.html">Architecture</a></li>
 </ul>
 <h2>Reference</h2><ul>
@@ -77,61 +98,112 @@
 <li><a href="generated/rule-catalog.html">Rule catalog</a></li>
 <li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
 <li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
-</ul>
-<h2>Design documents</h2><ul>
-<li><a href="design/README.html">How these are written</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
 </ul>
 <h2>Project direction</h2><ul>
-<li><a href="design/audit-0.23-market.html">The 0.23 repository and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.25-market.html">The 0.25 roadmap and market audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.26-measurement.html">The 0.26 measurement audit<span class="tag">accepted</span></a></li>
+<li><a href="community.html">Community</a></li>
 </ul>
-<h2>Maintainers</h2><ul>
-<li><a href="maintainers/github-setup.html">GitHub repository setup</a></li>
-<li><a href="maintainers/ops-catalogue.html">Operations catalogue</a></li>
-<li><a href="maintainers/lessons.html">Lessons</a></li>
-</ul>
-<h2>Also here</h2><ul>
-<li><a href="design/trace-domain-model.html">The Trace domain model<span class="tag">implemented</span></a></li>
-<li><a href="design/trace-producer.html">Producing a trace<span class="tag">implemented</span></a></li>
-<li><a href="design/framework-adapters.html">Framework adapters<span class="tag">implemented</span></a></li>
-<li><a href="design/assessment-channel.html">The assessment channel<span class="tag">accepted</span></a></li>
-<li><a href="design/capability-protocols.html">Capability protocols<span class="tag">accepted</span></a></li>
-<li><a href="design/production-intake.html">Production intake<span class="tag">proposed</span></a></li>
-<li><a href="design/audit-0.21.html">The 0.21 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-0.22.html">The 0.22 audit<span class="tag">accepted</span></a></li>
-<li><a href="design/security-contracts.html">Security contracts<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-protocol-eras.html">MCP has two eras<span class="tag">implemented</span></a></li>
-<li><a href="design/mcp-authorization-depth.html">MCP authorization depth<span class="tag">implemented</span></a></li>
-<li><a href="design/taxonomy-editions.html">Taxonomy editions<span class="tag">implemented</span></a></li>
-<li><a href="design/extension-author-tooling.html">Extension author tooling<span class="tag">accepted</span></a></li>
-<li><a href="design/target-locators.html">Target locators<span class="tag">implemented</span></a></li>
-<li><a href="design/output-plugins.html">Output plugins<span class="tag">proposed</span></a></li>
-<li><a href="design/quality-suites.html">Quality suites<span class="tag">proposed</span></a></li>
-<li><a href="design/paired-regression-statistics.html">Paired regression statistics<span class="tag">proposed</span></a></li>
-<li><a href="design/attack-techniques.html">Attack techniques<span class="tag">proposed</span></a></li>
-<li><a href="design/namespaced-extension-ids.html">Namespaced extension ids<span class="tag">proposed</span></a></li>
-<li><a href="design/declarative-fixtures.html">Declarative fixtures for scenarios and agent runs<span class="tag">implemented</span></a></li>
-<li><a href="design/pack-scaffolding.html">Scaffolding a pack<span class="tag">accepted</span></a></li>
-<li><a href="design/repeated-trials.html">Repeated trials<span class="tag">implemented</span></a></li>
-<li><a href="design/documentation-site.html">A documentation site<span class="tag">implemented</span></a></li>
-<li><a href="design/judge-error-correction.html">Judge error in a measured rate<span class="tag">proposed</span></a></li>
-<li><a href="design/regrading-stored-exchanges.html">Re-grading stored exchanges<span class="tag">proposed</span></a></li>
-<li><a href="design/anytime-valid-monitoring.html">Anytime-valid monitoring<span class="tag">proposed</span></a></li>
-<li><a href="design/run-manifest-v2.html">Run manifest v2<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-domain-model.html">Collector domain model<span class="tag">superseded</span></a></li>
-<li><a href="design/privacy-and-redaction.html">Privacy and redaction<span class="tag">implemented</span></a></li>
-<li><a href="design/exit-codes.html">Exit codes and gate semantics<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-persistence.html">Collector persistence<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-tenancy.html">Collector tenancy<span class="tag">implemented</span></a></li>
-<li><a href="design/ai-systems-and-deployments.html">AI systems and deployments<span class="tag">implemented</span></a></li>
-<li><a href="design/collector-runs-and-findings.html">Runs and findings<span class="tag">accepted</span></a></li>
-<li><a href="design/finding-lifecycle-and-waivers.html">Finding lifecycle and waivers<span class="tag">accepted</span></a></li>
-<li><a href="design/audit-retention-and-deletion.html">Audit, retention and deletion<span class="tag">accepted</span></a></li>
-<li><a href="design/panel-sessions.html">Panel sessions<span class="tag">accepted</span></a></li>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
 </ul>
 </nav>
-<main>
+<details class="mnav">
+<summary>Menu · <b>Product status</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html" aria-current="page">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
 <h1>Product status and known limitations</h1><p class="lede"><strong>read first</strong>: maturity per component, and the limitations you should know before adopting</p><p>What is ready, what is not, and what Guardana deliberately does not do. Read this
 before adopting it for anything that matters.</p>
 <p>A security tool that overstates its own readiness has already failed at its job,
@@ -148,18 +220,23 @@ so this page is maintained as carefully as the code.</p>
 <tbody>
 <tr>
 <td>Engine + built-in rules</td>
-<td><strong>beta</strong></td>
-<td>Stable enough to gate a build on. The public Python API still moves between minor releases.</td>
+<td><strong>stable</strong></td>
+<td>Covered by the compatibility promise and suitable to gate a build on. <a href="compatibility.html">Compatibility</a> lists the supported surface. Everything else, including <code>Runner</code> and <code>guardana.cli.*</code>, is internal and may change in any release.</td>
+</tr>
+<tr>
+<td>Python API (<code>guardana.core.verify</code>)</td>
+<td><strong>stable</strong></td>
+<td>Runs what <code>guardana scan</code> and <code>guardana probe</code> run and returns every outcome as typed data, failed and stopped runs included. Its supported surface is <code>guardana.core.verify.__all__</code>; a change to it is announced as breaking with what to write instead. Trace analysis, <code>monitor</code> and baselines run from the command line only.</td>
 </tr>
 <tr>
 <td><code>guardana scan</code></td>
-<td><strong>beta</strong></td>
-<td>Deterministic, offline, no false-positive theatre. The most mature part of the product.</td>
+<td><strong>stable</strong></td>
+<td>Deterministic, offline, no false-positive theatre.</td>
 </tr>
 <tr>
 <td><code>guardana probe</code></td>
 <td><strong>beta</strong></td>
-<td>Works against OpenAI-compatible, Ollama, TGI, guarded endpoints and live MCP servers — the last of those on both its tool manifest and its authorization surface, and never by calling a tool. Verdict quality depends on the evaluator you configure.</td>
+<td>Works against OpenAI-compatible, Ollama, TGI, guarded endpoints, live MCP servers — on both their tool manifest and their authorization surface, and never by calling a tool — and A2A v1 agents, on their card and whom they answer, with reads only. Verdict quality depends on the evaluator you configure.</td>
 </tr>
 <tr>
 <td><code>guardana monitor</code></td>
@@ -168,7 +245,7 @@ so this page is maintained as carefully as the code.</p>
 </tr>
 <tr>
 <td><code>guardana diff</code></td>
-<td><strong>beta</strong></td>
+<td><strong>stable</strong></td>
 <td>Compares two saved runs. The saved-run format is versioned and migratable — <code>guardana run migrate</code> reads every earlier schema.</td>
 </tr>
 <tr>
@@ -177,12 +254,83 @@ so this page is maintained as carefully as the code.</p>
 <td>PostgreSQL with reversible migrations, a scoped API key on every route carrying a finding, project isolation on every query, and a record of what each run verified and where. Findings have a lifecycle and expiring waivers; actions are audited; retention and deletion are commands. What it does not yet hold is a quality trend — it aggregates findings, not measurements.</td>
 </tr>
 <tr>
+<td><code>guardana grade</code></td>
+<td><strong>beta</strong></td>
+<td>Grades a recording — answers you supplied, or the exchanges <code>probe --keep-exchanges</code> kept — with your rules and no target request. MCP and A2A rules are <code>not_applicable</code> on a chat recording; canary and tool rules still skip for a missing capability, and a rule the recording does not answer is skipped as <code>not_recorded</code>.</td>
+</tr>
+<tr>
+<td><code>guardana analyze-trace</code></td>
+<td><strong>beta</strong></td>
+<td>Grades an execution your agent already performed, offline, from OpenTelemetry GenAI spans (OTLP/JSON or an SDK file exporter) or Guardana's native dialect, versioned by its own JSON schema. It checks trace rules and, with <code>--contract</code>, security contracts. A dimension the profile requires but the trace lacks is reported as missing coverage, never as a pass.</td>
+</tr>
+<tr>
+<td>Quality suites</td>
+<td><strong>beta</strong></td>
+<td>Gates pass rates on team-supplied versioned datasets, with repeated trials. Judge-graded suites and judge-error correction are <a href="#released-and-experimental">experimental</a>. No numeric aggregate gate or statistical comparison between suite runs.</td>
+</tr>
+<tr>
 <td>Extension API</td>
-<td><strong>unstable by design</strong></td>
-<td>Frozen at 1.0, and deliberately not before — see below.</td>
+<td><strong>stable</strong></td>
+<td>Covered by the <a href="compatibility.html">compatibility policy</a>: rules, evaluators, targets, taxonomies, renderers and reporters, including installed outputs for <code>--format</code> and <code>--reporter</code>.</td>
 </tr>
 </tbody>
 </table></div>
+<p>The Python verification facade also supports grading saved recordings through
+<code>Verifier.grade</code>, alongside <code>Verifier.scan</code> and <code>Verifier.run</code>. See the
+<a href="python-api.html#run-a-target">Python API</a> for all three entry points.</p>
+<h2 id="released-and-experimental">Released and experimental</h2>
+<p><strong>Released (beta):</strong> Quality suites use the deterministic assessors <code>exact_match</code>, <code>contains</code>, <code>regex</code>, <code>json_valid</code>, and <code>length</code>. They support versioned JSONL datasets (<code>name@version</code>), deterministic sampling (<code>sample: {size, seed}</code>), repeated trials per case, and a suite gate that passes, fails, or declines with <code>min_sample</code>. Runs save a suite summary in the run document and show a Measured block in the human report. JUnit output is available.</p>
+<p><strong>Experimental:</strong> Judge-graded suites use <code>answered</code> and <code>reference_judge</code>. Judge-error correction adjusts trial and suite rates using Rogan–Gladen and a calibration recorded on the team's own corpus with <code>guardana calibrate --record</code>. Without a usable calibration, the suite declines; it never passes on an uncorrected judge rate. Experimental behaviour and thresholds are outside the compatibility promise, but saved documents remain versioned and readers continue to support older versions under the persisted-document policy.</p>
+<p><strong>Released (beta):</strong> <a href="usage-recipe.html">repository recipes</a> that pin a team's checks and refuse a run whose pins moved, one set of connection settings across <code>probe</code>, <code>plan probe</code>, <code>target inspect</code>, <code>monitor</code> and every judge, and a tested <a href="providers.html">provider table</a>.</p>
+<p><strong>Released (beta):</strong> MCP checks proven against servers built on the <code>mcp</code> SDK in both revisions, and the A2A checks against agents built on <code>a2a-sdk</code>; a capability a server does not offer is recorded as skipped <code>not_offered</code>, a coverage gap.</p>
+<p><strong>Released (stable):</strong> an installed package adds a format for <code>--format</code> and a reporter for <code>--reporter</code> (<a href="outputs.html">installed outputs</a>), imported only when named, behind the redaction the saved run went through, with a delivery line on every path and exit <code>8</code> when an installed output fails. <code>examples/output_pack</code> is the reference: a CSV export and a Standard Webhooks sender. It is an example to copy, not a published package, and the output contract is versioned by its own <code>output_api</code>. Not supported: diff renderers, binary formats, more than one reporter per run, and installed outputs on <code>monitor</code>, <code>import-observations</code> and <code>recipe run</code>.</p>
+<p><strong>Not released:</strong> The five-user first-run study, the team regression loop and the live retrieval pilot remain open <a href="#adoption-measures">adoption measures</a>; the maintainer-run proofs in the stable-release criteria cover the first run, the regression loop and the retrieval pilot on the reference application.</p>
+<h2 id="stable-release-criteria">Stable-release criteria</h2>
+<p>From 1.0, the supported Python facade, rule, evaluator and target contracts,
+output contracts, CLI flags and exit codes, profile schema and collector
+envelope are a compatibility promise.
+<a href="compatibility.html">Compatibility</a> defines the full surface.</p>
+<p>The first stable release required every criterion below.</p>
+<ul>
+<li>Each of <code>1.0.0rc2</code>, <code>1.0.0rc3</code>, <code>1.0.0rc4</code> and <code>1.0.0rc5</code> shipped after its own full green release gate and green CI on the exact commit. <code>1.0.0rc5</code> was published and verified on 2026-10-20 at 11:49 UTC. Its seven-day period ended on 2026-10-27 at 11:49 UTC and was not restarted. Two outside reports named supported-surface defects: quadratic processing in a built-in rule let a crafted scanned file cause denial of service without changing a verdict, fixed with two more of that class in <code>1.0.0</code> rather than another candidate (<a href="https://github.com/guardana/guardana/security/advisories/GHSA-42p6-v3q4-959q">advisory</a>); on Windows, a refused <code>--write-baseline</code> left a staging file beside the destination with correct exit code and verdict, fixed in the first patch release after <code>1.0.0</code> (<a href="https://github.com/guardana/guardana/issues/209">#209</a>). Package code in <code>1.0.0</code> differs from <code>1.0.0rc5</code> only by the fixes listed in the changelog; <a href="https://github.com/guardana/guardana/issues/145">#145</a> records every report and its disposition.</li>
+<li>Maintainer-run proofs are published with commands and results, each labelled as run by the maintainer: a clean-install first run from published packages, offline, with a failing result, a fix and one custom check; the retrieval pilot against the reference application in <code>examples/retrieval_pilot/</code>, catching a poisoned document and a tenant-filter failure; the regression loop on the same reference application, with a failed and an incomplete result saved and a redacted regression regraded and gated in CI with a reviewable artifact; customization through published extension points only, installing the reference pack from PyPI outside the repository and passing the conformance kit; the security runbook drill, reporting completion and lessons safe to share; recovery runbooks exercised.</li>
+<li>The engineering criteria hold:
+<ul>
+<li>Python consumers receive failed, incomplete and stopped outcomes as typed data; case outcomes and missing evidence survive serialization, redaction and export.</li>
+<li>Every built-in rule that can decline has finding, clean and inconclusive fixtures.</li>
+<li>Provider and adapter conformance covers system messages, tools, failure paths, budgets, usage and adapter limits.</li>
+<li>The collector envelope is versioned independently from the run schema; clients and storage migrate together.</li>
+<li>Older persisted documents and extension conformance pass the release gate, with migrations exercised on older run, dataset, profile, pack and collector documents.</li>
+<li>The supported surface, compatibility matrix, deprecation policy and conformance kit are published.</li>
+</ul>
+</li>
+</ul>
+<p>The <a href="https://guardana.dev/notes/release-gate-evidence-1-0-0">release gate evidence note</a> records the evidence on the <code>1.0.0</code> commit; <a href="https://github.com/guardana/guardana/issues/215">#215</a> tracks the items no single test guards.</p>
+<p>The compatibility promise lets a team adopt Guardana, so it cannot wait for adoption; maintainer-run proofs show the paths work, and adoption measures report separately who has used them.</p>
+<p>Six maintainer-run proofs are published as notes. The <a href="https://guardana.dev/notes/clean-install-offline-first-run">clean-install offline first run</a> and <a href="https://guardana.dev/notes/customization-through-published-extension-points">customization through published extension points</a> ran against 1.0.0rc5 from PyPI by the proofs workflow (<a href="https://github.com/guardana/guardana/actions/runs/39424046832">run</a>). First-run Linux and macOS cells passed; all Windows cells passed and are required: there <code>guardana diff</code> displays the Windows path <code>model\weights.pkl</code> as a recorded known difference (<a href="https://github.com/guardana/guardana/issues/167">#167</a>). For customization, the reference pack 0.1.3 installed from PyPI outside the repository passed the conformance kit. The reference pack is published on PyPI, with its wheel and sdist also attached to each GitHub Release. The <a href="https://guardana.dev/notes/retrieval-pilot-poisoned-document-and-tenant-filter">retrieval pilot</a>, <a href="https://guardana.dev/notes/regression-loop-with-a-redacted-regression">regression loop</a> and <a href="https://guardana.dev/notes/collector-recovery-runbooks">collector recovery runbooks</a> passed against 1.0.0rc5 in a later <a href="https://github.com/guardana/guardana/actions/runs/40005613709">workflow run</a>. The pilot distinguished the fixed control from the broken tenant filter and document-obeying model. The regression loop retained a redacted failure through regrading, comparison and promotion with a rewritten question. Recovery covered a database upgrade from 0.41.0, rollback checks and Compose restores in place and onto a new volume, with data read back per tenant. The maintainer recorded the <a href="https://guardana.dev/notes/security-runbook-drill">security runbook drill</a>, covering a made-up report, TestPyPI release and withdrawal, disclosure on paper, and lessons; no real Guardana release was touched.</p>
+<p><a href="https://github.com/guardana/guardana/issues">Issues</a> track work; <a href="https://github.com/guardana/guardana/milestones">milestones</a> group scope. The <code>1.0.1</code> milestone holds compatible corrections to package code that a patch can carry, <code>1.1.0</code> holds behaviour, report-shape and supported-surface changes for the next minor release that a patch cannot carry, and <code>next</code> holds documentation, evidence and process work that ships without a package release.</p>
+<p>The owner decides changes to release criteria and records each one here and in the changelog.</p>
+<h3 id="adoption-measures">Adoption measures</h3>
+<p>These adoption measures are not release criteria: five consented first-run sessions with people new to Guardana (the first-run study; target: at least four of five complete a failure, a fix and one custom check in ten minutes without help); two independent teams running locked checks on their own application (the adopter study); a live retrieval pilot on a team's own target; an independent third-party customization and its reproduction.</p>
+<p>Each is published only as a generated aggregate with consent. The generated <a href="generated/first-run.html">first-run</a> and <a href="generated/application-measures.html">application</a> measures read &quot;not measured&quot;: 0 of 5 sessions and 0 of 2 teams. First-run and pilot invitations remain open.</p>
+<h3 id="after-10">After 1.0</h3>
+<p>Paired statistical diff (M1) starts when two independent pilot teams use local
+<code>diff</code> on comparable saved before/after application runs for a documented ship
+decision, and one needs uncertainty beyond descriptive counts. Collector
+measurements (M3) start when two independent teams submit and read their own
+locked application runs in the optional collector and each asks the same
+cross-run question local files cannot answer. The <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">roadmap</a>
+preserves their full done conditions. Neither these items nor the Later
+possibilities block 1.0.</p>
+<h2 id="product-boundaries-for-future-proposals">Product boundaries for future proposals</h2>
+<p>The roadmap's eight <a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">product constraints</a>
+govern proposals as well as releases.</p>
+<p>Ideas without a reproducible problem or acceptance test start in
+<a href="https://github.com/guardana/guardana/discussions/categories/ideas">Discussions Ideas</a>.
+Promotion to active work requires pilot pain, a reproducible failing case,
+an acceptance criterion and a review of the versioned contract it touches.
+The <a href="https://github.com/guardana/guardana/blob/main/CONTRIBUTING.md">contribution principles</a> and
+<a href="threat-model.html">threat model</a> explain these boundaries in more detail.</p>
 <h2 id="known-limitations">Known limitations</h2>
 <p>Stated plainly, because finding these out after adoption is worse than reading
 them now.</p>
@@ -192,14 +340,41 @@ it: Guardana offers the tools, hands back the results, and never executes
 anything. That is a genuine test of the model's judgement — and it is <strong>not</strong> a
 test of <em>your</em> agent, with your framework, your prompts and your tool
 implementations.</p>
-<p>Grading a trace exported from your running agent is a different input, which
-<code>Trajectory</code> was shaped to accept. It is designed for, not built. <strong>Application-awareness milestone.</strong></p>
+<p><code>guardana analyze-trace</code> grades a recorded trace exported from a running agent.</p>
+<h3 id="recorded-answers-are-matched-exactly-and-only-chat-is-recorded">Recorded answers are matched exactly, and only chat is recorded</h3>
+<p><code>guardana grade</code> answers a rule's question from a recording only when the recording holds
+exactly the messages the rule sends; whitespace or a reworded question is an unanswered
+question, which errors rather than passes. A probe keeps the chat exchanges of its plain pass
+and nothing else, so canary passes and tool offers cannot be graded again, while MCP and A2A rules are <code>not_applicable</code> on the chat recording. A
+pack's own endpoint target cannot keep exchanges. A reply redaction changed is never graded
+again. <code>grade</code> sends nothing to the collector.</p>
+<h3 id="a-release-gate-cannot-see-a-target-that-holds-the-wrong-files">A release gate cannot see a target that holds the wrong files</h3>
+<p><code>--preset release</code> fails when a selected check has a coverage gap or reaches no verdict. MCP and A2A rules on a chat endpoint are <code>not_applicable</code>, not coverage gaps; a chat rule missing tools or seeded fixtures can still leave <code>probe --preset release</code> <code>indeterminate</code>. A rule demanded by id remains a <code>demanded_check</code> shortfall even when its protocol is inapplicable. A profile can select rules the endpoint serves (<a href="profiles.html#release-complete-coverage-or-no-pass">profiles</a>). A <code>scan</code> of a path that holds no file other than <code>.guardanaignore</code> files is <code>indeterminate</code> (exit <code>2</code>) under every preset, and <code>plan scan</code> refuses it. A scan cannot tell a directory holding the wrong files from the one the build meant to produce.</p>
+<h3 id="some-unreadable-files-stay-unverified">Some unreadable files stay unverified</h3>
+<p>The secret scan and the MCP manifest scan report a text or JSON file over the 16 MiB read bound as unverified, not as a coverage gap.</p>
+<h3 id="collector-retries-keep-the-first-submission">Collector retries keep the first submission</h3>
+<p>The collector treats a second submission with the same run id in the same project and environment as a duplicate and keeps the first, whatever the second holds.</p>
+<h3 id="protocol-coverage-is-narrow-on-purpose">Protocol coverage is narrow on purpose</h3>
+<p>MCP is spoken in <code>2026-07-28</code> and <code>2025-11-25</code>; a server answering in an older revision is
+reported as sharing no revision, never graded in one Guardana does not speak. Task ids are
+graded only as a caller without a credential sees them, because creating a task would take
+a <code>tools/call</code> or a <code>SendMessage</code> on somebody's system. A registry entry is the file you
+supply, never fetched, and what a server reports about its version is its own claim; Server
+Cards (<code>.well-known/mcp.json</code>) are not read. An A2A agent is spoken to over the JSON-RPC
+binding of version <code>1.0</code> only, on the origin you named: HTTP+JSON, gRPC and an interface
+on another origin are not examined, and agent-card signatures are not verified.</p>
+<h3 id="an-archive-with-more-than-100000-entries-is-not-scanned">An archive with more than 100,000 entries is not scanned</h3>
+<p><code>pickle_opcode</code> and <code>keras_lambda</code> refuse a <code>.zip</code>, <code>.tar</code> or <code>.keras</code> before opening it
+when listing it would cost more than listing a model. An archive of more than 100,000 entries
+is reported not scanned (exit <code>2</code>) even when it holds no model, such as an image dataset.
+Exclude it with <code>rules.paths_exclude</code> (the target's <code>.guardanaignore</code> cannot exclude an
+archive), or scan the model's directory instead. <a href="usage-scan.html"><code>guardana scan</code></a> lists every bound.</p>
 <h3 id="monitor-is-scheduled-not-passive"><code>monitor</code> is scheduled, not passive</h3>
 <p>It re-runs checks on an interval. It does not observe production traffic, cannot
-see what your real users are doing, and is not an inline control. A passive
-out-of-band tap is researched and deferred — the hard constraint is zero impact on
-model latency.</p>
-<h3 id="the-collector-stores-and-triages-findings--it-does-not-trend-quality">The collector stores and triages findings — it does not trend quality</h3>
+see what your real users are doing, and is not an inline control. Watching live
+agent traffic is not planned here: it belongs to Guardana Control, a separate
+project.</p>
+<figure class="dg" id="dg1db3e30"><style>.dg{margin:28px 0 32px;container-type:inline-size;overflow-x:auto}.dg svg{display:block;height:auto;margin:0 auto}.dg .dg-n{display:none}.dg text{text-anchor:middle;dominant-baseline:central}.dg .n rect,.dg .n path{fill:var(--panel,#fff);stroke:var(--line,#E6E8EF);stroke-width:1.2}.dg .n .lip{fill:none}.dg .n text{fill:var(--ink,#0F1115);font:500 13px var(--sans,system-ui,sans-serif)}.dg .accent rect,.dg .accent path{fill:var(--brand-soft,#F0ECFF);stroke:var(--brand,#5B3DF5)}.dg .accent .lip{fill:none}.dg .accent text{fill:var(--brand-ink,#4A2FE0)}.dg .cmd text{font:400 12.5px var(--mono,ui-monospace,monospace)}.dg .muted rect,.dg .muted path{stroke-dasharray:4 3}.dg .muted text{fill:var(--muted,#566070)}.dg .e{fill:none;stroke:var(--faint,#8A92A0);stroke-width:1.4}.dg .e.dot{stroke-dasharray:3 4}.dg .e.main{stroke:var(--brand,#5B3DF5);stroke-width:1.8;stroke-dasharray:7 5;animation:dg-flow 1.4s linear infinite}.dg .h{fill:var(--faint,#8A92A0)}.dg .h.main{fill:var(--brand,#5B3DF5)}.dg .g rect{fill:color-mix(in srgb,var(--brand-soft,#F0ECFF) 45%,transparent);stroke:var(--line,#E6E8EF)}.dg .g text{text-anchor:start;font:500 11px var(--mono,ui-monospace,monospace);letter-spacing:.08em;text-transform:uppercase;fill:var(--muted,#566070)}.dg .l rect{fill:var(--bg,#FBFBFD)}.dg .l text{font:400 11.5px var(--mono,ui-monospace,monospace);fill:var(--muted,#566070)}@keyframes dg-flow{to{stroke-dashoffset:-24}}@media (prefers-reduced-motion:reduce){.dg .e.main{animation:none}}</style><style>@container (max-width:758.8px){#dg1db3e30 .dg-w{display:none}#dg1db3e30 .dg-n{display:block}}</style><svg class="dg-w" style="width:100%;max-width:948.5px" viewBox="0 0 948.5 126" width="948.5" height="126" role="img" aria-labelledby="dg1db3e30w-t dg1db3e30w-d" xmlns="http://www.w3.org/2000/svg"><title id="dg1db3e30w-t">Guardana and Guardana Control</title><desc id="dg1db3e30w-d">Guardana checks models, RAG pipelines, agents and MCP servers before release, and its verdict gates the release. While the agent runs, Guardana Control sits between the agent and its tools, decides each tool call and records evidence. Neither product needs the other.</desc><defs><marker id="dg1db3e30w-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h solid" d="M0 0L10 5L0 10z"/></marker><marker id="dg1db3e30w-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h main" d="M0 0L10 5L0 10z"/></marker></defs><path class="e solid" d="M172 63C200 63 200 63 228 63" marker-end="url(#dg1db3e30w-solid)"/><path class="e main" d="M372 63C412.2 63 412.2 63 452.5 63" marker-end="url(#dg1db3e30w-main)"/><path class="e main" d="M552.5 63C580.5 63 580.5 63 608.5 63" marker-end="url(#dg1db3e30w-main)"/><path class="e main" d="M774.5 63C802.5 63 802.5 32 830.5 32" marker-end="url(#dg1db3e30w-main)"/><path class="e solid" d="M774.5 63C809.2 63 809.2 100 844 100" marker-end="url(#dg1db3e30w-solid)"/><g class="l"><rect x="380" y="54" width="64.5" height="18" rx="5"/><text x="412.2" y="63">release</text></g><g class="n"><rect x="4" y="35" width="168" height="56" rx="10"/><text x="88" y="54">Models · RAG</text><text x="88" y="72">agents · MCP servers</text></g><g class="n accent"><rect x="228" y="35" width="144" height="56" rx="10"/><text x="300" y="54">Guardana</text><text x="300" y="72">scan · probe · diff</text></g><g class="n"><rect x="452.5" y="35" width="100" height="56" rx="10"/><text x="502.5" y="54">Agent in</text><text x="502.5" y="72">production</text></g><g class="n accent"><rect x="608.5" y="35" width="166" height="56" rx="10"/><text x="691.5" y="54">Guardana Control</text><text x="691.5" y="72">decides each tool call</text></g><g class="n"><rect x="830.5" y="4" width="114" height="56" rx="10"/><text x="887.5" y="23">Tools and</text><text x="887.5" y="41">MCP servers</text></g><g class="n"><path d="M844 84C844 76 931 76 931 84V116C931 124 844 124 844 116Z"/><path class="lip" d="M844 84C844 91.2 931 91.2 931 84"/><text x="887.5" y="103">Evidence</text></g></svg><svg class="dg-n" style="width:100%;max-width:198.7px;min-width:149px" viewBox="0 0 198.7 512" width="198.7" height="512" role="img" aria-labelledby="dg1db3e30n-t dg1db3e30n-d" xmlns="http://www.w3.org/2000/svg"><title id="dg1db3e30n-t">Guardana and Guardana Control</title><desc id="dg1db3e30n-d">Guardana checks models, RAG pipelines, agents and MCP servers before release, and its verdict gates the release. While the agent runs, Guardana Control sits between the agent and its tools, decides each tool call and records evidence. Neither product needs the other.</desc><defs><marker id="dg1db3e30n-solid" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h solid" d="M0 0L10 5L0 10z"/></marker><marker id="dg1db3e30n-main" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="h main" d="M0 0L10 5L0 10z"/></marker></defs><path class="e solid" d="M99.4 60C99.4 88 99.4 88 99.4 116" marker-end="url(#dg1db3e30n-solid)"/><path class="e main" d="M99.4 172C99.4 200 99.4 200 99.4 228" marker-end="url(#dg1db3e30n-main)"/><path class="e main" d="M99.4 284C99.4 312 99.4 312 99.4 340" marker-end="url(#dg1db3e30n-main)"/><path class="e main" d="M99.4 396C99.4 424 55.5 424 55.5 452" marker-end="url(#dg1db3e30n-main)"/><path class="e solid" d="M99.4 396C99.4 427 156.7 427 156.7 458" marker-end="url(#dg1db3e30n-solid)"/><g class="l"><rect x="67.1" y="191" width="64.5" height="18" rx="5"/><text x="99.4" y="200">release</text></g><g class="n"><rect x="20.9" y="4" width="157" height="56" rx="10"/><text x="99.4" y="23">Models · RAG</text><text x="99.4" y="41">agents · MCP servers</text></g><g class="n accent"><rect x="32.9" y="116" width="133" height="56" rx="10"/><text x="99.4" y="135">Guardana</text><text x="99.4" y="153">scan · probe · diff</text></g><g class="n"><rect x="54.9" y="228" width="89" height="56" rx="10"/><text x="99.4" y="247">Agent in</text><text x="99.4" y="265">production</text></g><g class="n accent"><rect x="21.9" y="340" width="155" height="56" rx="10"/><text x="99.4" y="359">Guardana Control</text><text x="99.4" y="377">decides each tool call</text></g><g class="n"><rect x="4" y="452" width="103" height="56" rx="10"/><text x="55.5" y="471">Tools and</text><text x="55.5" y="489">MCP servers</text></g><g class="n"><path d="M118.7 464C118.7 456 194.7 456 194.7 464V496C194.7 504 118.7 504 118.7 496Z"/><path class="lip" d="M118.7 464C118.7 471.2 194.7 471.2 194.7 464"/><text x="156.7" y="483">Evidence</text></g></svg></figure><h3 id="the-collector-stores-and-triages-findings--it-does-not-trend-quality">The collector stores and triages findings — it does not trend quality</h3>
 <p>It persists, authenticates, and isolates one project from another — and one
 environment from another when a key is created with <code>--environment</code>. Everything
 that happens <em>after</em> a finding arrives is there too: a lifecycle (open,
@@ -208,51 +383,80 @@ expiry is evaluated at read time, an audit log that records whether the actor wa
 a verified key or an unverified CLI claim, retention and deletion as commands, and
 a restore-tested backup procedure. The dashboard signs in with a read-scoped key
 held in an <code>HttpOnly</code>, <code>SameSite=Strict</code> cookie.</p>
-<p>What it does <strong>not</strong> hold is a measurement trend. It aggregates findings,
+<p>What it does <strong>not</strong> hold is a measurement trend. The generated application coverage and supported-verdict share remain &quot;not measured&quot; until two independent teams have rows in <a href="generated/application-measures.html"><code>docs/generated/application-measures.md</code></a>. It aggregates findings,
 <code>unverified</code> and errors — so it can answer &quot;is this system accumulating security
-problems&quot;, and cannot yet answer &quot;did quality improve&quot;. Assessments are recorded in
-the run document from 0.22.0; carrying them into the collector, with the sample
-sizes and confidence bounds a trend needs to be honest, is the next horizon.</p>
+problems&quot;, and cannot answer &quot;did quality improve&quot;. Assessments are recorded in
+the run document from 0.22.0. The collector carries neither assessments nor the
+sample sizes and confidence bounds an honest trend needs.</p>
 <h3 id="rag-coverage-is-a-slice-not-a-story">RAG coverage is a slice, not a story</h3>
 <p><code>scenario.indirect_injection</code> tests the shape of retrieval-time injection through
-a scripted context. There is no live retriever target, so cross-tenant retrieval,
-document poisoning and tenant-filter bypass are <strong>not</strong> tested against your actual
-vector store. <strong>Application-awareness milestone.</strong></p>
+a scripted context. <code>guardana.trace.cross_tenant_retrieval</code> grades cross-tenant
+retrieval from a recorded trace. With <a href="usage-fixtures.html"><code>--fixtures</code></a>,
+<code>guardana.tenancy.cross_tenant_answer</code> and <code>guardana.retrieval.poisoned_document</code> ask
+through the application's own index as each tenant; they see what reached a reply, not
+what was retrieved, and Guardana never queries a vector store itself.</p>
+<p>Both checks are verified against a reference application,
+<a href="https://github.com/guardana/guardana/tree/main/examples/retrieval_pilot"><code>examples/retrieval_pilot/</code></a>, whose tests run them with a
+broken tenant filter, an obeying model, a partly seeded index and the fixed application
+on every CI run. It is a reference, not a team's own retrieval target: until a team has run
+them on its own target, the team retrieval pilot remains an open
+<a href="#adoption-measures">adoption measure</a>; the reference run is a maintainer-run proof.</p>
 <h3 id="text-only">Text only</h3>
 <p>No image, PDF, audio or document carriers. Injection through an image or a PDF an
-agent reads is a real attack class and is <strong>not covered</strong>. <strong>v1.3.</strong></p>
+agent reads is a real attack class and is <strong>not covered</strong>. A proposal for a
+multimodal carrier needs a pilot's concrete input, expected result and bound
+before it becomes an implementation issue.</p>
 <h3 id="openai-compatible-is-not-a-guarantee">&quot;OpenAI-compatible&quot; is not a guarantee</h3>
 <p>Providers differ in system-message handling, tool-call formats, streaming, finish
 reasons and usage metadata. A rule that needs a capability a provider does not
 support is skipped and reported as skipped — never as a pass, and <code>guardana target</code>
 tells you which capabilities an endpoint answered for <em>before</em> you trust a run
 against it.</p>
-<p>What is still missing is a <strong>tested conformance matrix</strong>: the capability handshake
-reports what one endpoint answered, not which of vLLM, Ollama, SGLang, llama.cpp
-and TGI agree on streaming, finish reasons or usage metadata. Until that exists,
-treat &quot;OpenAI-compatible&quot; as a claim to check per deployment, not a guarantee.</p>
+<p>The <a href="providers.html">provider table</a> is tested: one suite holds every built-in transport, the
+adapter and LangChain to it against a local double that speaks each wire shape and fails on
+cue. It describes Guardana's transports, not the servers behind them: whether vLLM, Ollama,
+SGLang, llama.cpp and TGI agree on streaming, finish reasons or usage metadata is still a
+claim to check per deployment, not a guarantee.</p>
+<h3 id="a-recipe-records-what-you-declare-about-the-subject">A recipe records what you declare about the subject</h3>
+<p><code>subject.kind</code> says whether an application or a model harness answered, and Guardana
+records it in every output without being able to check it: a URL does not say what is
+behind it. Guardana neither starts nor verifies the fixtures or test doubles your
+application runs with in CI; a recording subject is the one way a recipe runs with no live
+call at all. A check from a distribution installed from a directory or a URL is listed as
+unpinned, because its code can change under one version.</p>
 <h3 id="probabilistic-verdicts-have-probabilistic-limits">Probabilistic verdicts have probabilistic limits</h3>
 <p>A judge-graded verdict is a measurement with error. <code>guardana calibrate</code> reports
 Brier score and expected calibration error so you can see how much to trust it,
-and a policy can gate on confidence. A recorded calibration can go stale without
-anything noticing — re-measure after changing judge models.</p>
+and a policy can gate on confidence. It also reports per-class <code>sensitivity</code> and
+<code>specificity</code>. A class with fewer than 30 graded samples or abstentions on at
+least half its samples gets a <code>RATE CAVEAT:</code> line. A qualifying calibration
+corrects a trials rate with the Rogan–Gladen method. When a condition is not met,
+such as fewer than 30 graded samples in a class or use of the starter corpus, the
+line states <code>uncorrected — judge error not measured</code> and names the reason. A
+recorded calibration can go stale without anything noticing — re-measure after
+changing judge models.</p>
 <h3 id="plugins-are-code-you-install">Plugins are code you install</h3>
 <p>Entry-point discovery imports installed packages. A malicious Guardana pack is a
-malicious Python package, with everything that implies. <code>--no-plugins</code> disables
-discovery — but also the built-ins, which makes safe mode expensive. A plugin
-allowlist (<code>--plugins builtins|allowlist|disabled</code>) is what fixes that, and a
-locked pack (<code>guardana pack lock</code>) pins the digest of every rule a pack provides.
-<code>--no-plugins</code> is a deprecated alias for <code>--plugins disabled</code>, understood only by
-<code>scan</code> and <code>plan scan</code>; every other command that loads plugins takes <code>--plugins</code>
-directly.
-Two limits remain: <code>--plugins all</code> is still the default, and a declarative pack
-format that executes no Python is <strong>v1.0</strong>. See the
-<a href="threat-model.html">threat model</a>.</p>
+malicious Python package, with everything that implies. Every command therefore starts
+with <code>--plugins builtins</code>: Guardana's own distributions load, every other installed pack
+is refused before it is imported, and the refusal is recorded so the run says what it
+declined. A pack is admitted by name (<code>--plugins allowlist --allow-plugin</code>, or
+<code>plugins:</code> in a profile), <code>guardana doctor</code> lists what it would execute, and a locked
+pack (<code>guardana pack lock</code>) pins the digest of every rule it provides. A lock pins an evaluator or target only when that pack's own distribution registers it; <code>pack lock --check</code> reports another distribution's registration as <code>removed</code> with exit <code>1</code>. <code>--no-plugins</code> is
+a deprecated alias for <code>--plugins disabled</code>, understood only by <code>scan</code> and <code>plan scan</code>.
+Two limits remain: an admitted pack runs with your privileges, and a declarative pack
+format that executes no Python is decided but not built. See the <a href="threat-model.html">threat
+model</a>.</p>
+<h3 id="quality-suites">Quality suites</h3>
+<p>Numeric values are recorded and rendered, but suites do not gate on their aggregate.
+The collector receives the target's request count, not what the judge spent; the saved run carries both.
+<code>guardana diff</code> pairs suite cases but does not statistically test the pass rate between runs.
+A calibration file holds one calibration per evaluator id.</p>
 <h3 id="cost-is-bounded-not-predicted">Cost is bounded, not predicted</h3>
 <p><code>guardana plan</code> prices a run before it sends anything, and
-<code>--max-requests</code>/<code>--max-cost</code>/<code>--max-duration</code> are hard ceilings that stop the run
-and mark it <code>indeterminate</code> rather than letting it report partial coverage as a
-pass. What a plan cannot do is predict a <em>reply's</em> token count, so a cost estimate
+<code>--max-requests</code>, <code>--max-input-tokens</code>, <code>--max-output-tokens</code> and <code>--max-duration</code> are
+hard ceilings that stop the run with exit <code>6</code> and an <code>indeterminate</code> gate rather than
+letting it report partial coverage as a pass. What a plan cannot do is predict a <em>reply's</em> token count, so a cost estimate
 is a bound on requests and a projection on tokens — a rule with unknown cost is
 counted as unknown and says so.</p>
 <h2 id="what-guardana-deliberately-does-not-do">What Guardana deliberately does not do</h2>
@@ -287,7 +491,7 @@ asked for, bounded by a policy you wrote.</li>
 <tr>
 <td><code>unverified</code></td>
 <td>A check ran and honestly could not reach a verdict</td>
-<td>Investigate why — a judge outage, an empty reply, a capability gap</td>
+<td>Investigate why — an empty reply, a judge reply that could not be read, a capability gap</td>
 </tr>
 <tr>
 <td><code>errors</code></td>
@@ -296,8 +500,8 @@ asked for, bounded by a policy you wrote.</li>
 </tr>
 <tr>
 <td><code>coverage shortfall</code></td>
-<td>Evidence you <strong>demanded</strong> was not available — a dimension your policy requires, or one your security contract needs</td>
-<td>Instrument the producer, or stop demanding it. No <code>fail_on_*</code> setting makes this a pass</td>
+<td>Coverage the run needed was missing: evidence you <strong>demanded</strong> (a dimension your policy requires, or one your security contract needs), a model file the scan observed that no running rule read, a model or notebook a rule could not read, a target that held no file, or a rule that graded none of its cases (or fewer than <code>fail_on.min_graded_share</code>)</td>
+<td>Instrument the producer, stop demanding it, run the rule that reads the file or exclude it, check the scanned path, or find out why the cases went ungraded. No <code>fail_on_*</code> setting makes this a pass</td>
 </tr>
 </tbody>
 </table></div>
@@ -305,7 +509,7 @@ asked for, bounded by a policy you wrote.</li>
 clean. It has told you it could not look.</p>
 <h2 id="where-to-go-next">Where to go next</h2>
 <ul>
-<li><a href="https://github.com/guardana/guardana/blob/main/ROADMAP.md">Roadmap</a> — what is coming, in what order, with exit criteria</li>
+<li><a href="https://github.com/guardana/guardana/issues">Current work</a> — issues, ownership and release scope</li>
 <li><a href="threat-model.html">Threat model</a> — what Guardana defends against and what it does not</li>
 <li><a href="safe-testing.html">Safe testing</a> — before you point it at anything that matters</li>
 <li><a href="https://github.com/guardana/guardana/blob/main/FEATURES.md">Features</a> — everything that ships today</li>
@@ -314,8 +518,10 @@ clean. It has told you it could not look.</p>
 </main>
 </div>
 <footer class="foot"><div class="bar">
-<span>Guardana 0.27.0 · Apache-2.0</span>
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
 <a href="https://github.com/guardana/guardana/blob/main/docs/product-status.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
 <a href="../llms.txt">llms.txt</a>
 </div></footer>
 </body>

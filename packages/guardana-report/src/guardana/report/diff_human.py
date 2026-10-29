@@ -7,6 +7,7 @@ qualifies is a caveat nobody reads.
 """
 
 from guardana.core.diff import Change, ChangeKind, RunDiff
+from guardana.report._text import printable
 
 _MARK = {True: "✖", False: "✓"}
 
@@ -28,7 +29,7 @@ class DiffHumanRenderer:
             # must not walk away with a verdict this comparison cannot give.
             blocks.append(
                 "⚠ This comparison is incomplete\n"
-                + "\n".join(f"  • {reason}" for reason in diff.incomplete)
+                + "\n".join(f"  • {printable(reason)}" for reason in diff.incomplete)
             )
         if regressions:
             blocks.append(_section("Worse than the previous run", regressions, worse=True))
@@ -40,7 +41,9 @@ class DiffHumanRenderer:
         if measured:
             blocks.append(measured)
         if diff.notes:
-            blocks.append("Worth knowing\n" + "\n".join(f"  • {note}" for note in diff.notes))
+            blocks.append(
+                "Worth knowing\n" + "\n".join(f"  • {printable(note)}" for note in diff.notes)
+            )
         if not regressions and not diff.incomplete:
             blocks.append("✓ No regression against the previous run.")
         blocks.append(
@@ -82,9 +85,11 @@ def _section(title: str, changes: tuple[Change, ...], *, worse: bool) -> str:
     lines = [f"{title} ({len(changes)})"]
     previous_detail = ""
     for change in changes:
-        lines.append(f"  {_MARK[worse]} [{_label(change)}] {change.rule_id}{_where(change)}")
+        lines.append(
+            f"  {_MARK[worse]} [{_label(change)}] {printable(change.rule_id)}{_where(change)}"
+        )
         if change.detail != previous_detail:
-            lines.append(f"      {change.detail}")
+            lines.append(f"      {printable(change.detail)}")
             previous_detail = change.detail
         if change.rule_changed:
             lines.append("      note: this rule's own definition changed between the two runs")
@@ -102,8 +107,12 @@ def _label(change: Change) -> str:
         return "NOT RUN"
     state = change.after or change.before
     severity = state.severity.name if state is not None else "?"
-    return f"{change.kind.value.replace('_', ' ').upper()} · {severity}"
+    name = _NAMES.get(change.kind, change.kind.value.replace("_", " ").upper())
+    return f"{name} · {severity}"
+
+
+_NAMES = {ChangeKind.LEFT_SCAN: "LEFT THE SCAN"}
 
 
 def _where(change: Change) -> str:
-    return f" — {change.location}" if change.location else ""
+    return f" — {printable(change.location)}" if change.location else ""

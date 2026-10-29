@@ -19,6 +19,7 @@ because the artifact is what ships — an SBOM that was correct in memory and
 truncated on disk is worse than none.
 """
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -113,9 +114,21 @@ def _verify(package: str, version: str, path: Path) -> list[str]:
     return problems
 
 
-def main() -> int:
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="write to a temporary directory, verify, and remove it",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
     """Write one SBOM per distribution into `sbom/`, verifying each written file."""
-    check_only = "--check" in sys.argv[1:]
+    check_only: bool = _parser().parse_args(argv).check
     version = _version()
     output = Path(tempfile.mkdtemp(prefix="guardana-sbom-")) if check_only else _ROOT / "sbom"
     output.mkdir(parents=True, exist_ok=True)

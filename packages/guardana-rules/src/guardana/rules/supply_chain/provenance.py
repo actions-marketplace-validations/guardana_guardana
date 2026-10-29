@@ -4,13 +4,17 @@ from pathlib import Path
 
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import RuleContext, RuleMeta
+from guardana.core.rule.fixture import FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection
 from guardana.core.severity import Severity
 from guardana.core.source import PythonSource
 from guardana.core.target import Capability, FileReader, Target, TargetKind
 from guardana.core.taxonomy import NIST_SUPPLY_CHAIN, OWASP_LLM03_2025, OWASP_LLM04_2026
 from guardana.rules._base import ArtifactRule
-from guardana.rules.supply_chain._leads import lead_verdict
-from guardana.rules.supply_chain._reading import read_text_bounded
+from guardana.rules.supply_chain import _samples
+from guardana.rules.supply_chain._leads import lead_verdict, unread_component, unscanned_verdict
+from guardana.rules.supply_chain._reading import MAX_SCAN_BYTES, read_text_prefix
+from guardana.rules.supply_chain._unread_python import unread_python
 
 _RULE_ID = "guardana.supply_chain.provenance"
 _DOWNLOAD_CALLS = frozenset({"from_pretrained", "hf_hub_download"})
@@ -45,6 +49,9 @@ def _license_lead(text: str) -> str | None:
     return None
 
 
+_PINNED = "from transformers import AutoModel\n\nmodel = AutoModel.from_pretrained('org/model'{})\n"
+
+
 class ProvenanceRule(ArtifactRule):
     """Flags an unpinned model download, or a licence in the model card worth a second look."""
 
@@ -59,7 +66,34 @@ class ProvenanceRule(ArtifactRule):
             NIST_SUPPLY_CHAIN,
         ),
         required_capabilities=frozenset({Capability.READ_FILES}),
+        detection=Detection.HEURISTIC,
     )
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample an unpinned download, a pinned one and a model card past the read bound."""
+        return materialise(
+            (
+                _samples.sample(
+                    "from_pretrained with no revision",
+                    FixtureOutcome.FINDING,
+                    {"load.py": _PINNED.format("")},
+                ),
+                _samples.sample(
+                    "from_pretrained pinned to a commit",
+                    FixtureOutcome.CLEAN,
+                    {
+                        "load.py": _PINNED.format(
+                            ", revision='6c0e6080953db56375760c0471a8c5f2929baf11'"
+                        )
+                    },
+                ),
+                _samples.sample(
+                    "a model card padded past the read bound, its licence after the padding",
+                    FixtureOutcome.INCONCLUSIVE,
+                    {"README.md": _samples.past_the_scan_bound("license: AGPL-3.0\n")},
+                ),
+            )
+        )
 
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Scan `.py` files for downloads, and model cards for licence markers."""
@@ -67,11 +101,13 @@ class ProvenanceRule(ArtifactRule):
             return
         for path in target.iter_files((".py",)):
             source = target.python_source(path)
-            if source is not None:
+            if source is None:
+                yield from unread_python(self.meta, target, path, ctx)
+            else:
                 yield from self._scan_downloads(source)
         for path in target.iter_files((".md",)):
             if path.name.lower() in _CARD_NAMES:
-                yield from self._scan_license(path)
+                yield from self._scan_license(path, ctx)
 
     def _scan_downloads(self, source: PythonSource) -> Iterator[Finding]:
         path = source.path
@@ -89,24 +125,41 @@ class ProvenanceRule(ArtifactRule):
                 verdict=lead_verdict("unpinned model download; a provenance lead, not a certainty"),
             )
 
-    def _scan_license(self, path: Path) -> Iterator[Finding]:
-        text = read_text_bounded(path, errors="ignore")
-        if text is None:
+    def _scan_license(self, path: Path, ctx: RuleContext) -> Iterator[Finding]:
+        prefix = read_text_prefix(path, errors="ignore")
+        if prefix is None:
+            yield self._unscanned(path, "the file could not be read", ctx)
             return
+        text, truncated = prefix
         marker = _license_lead(text)
-        if marker is None:
-            return
-        yield Finding(
+        if marker is not None:
+            yield Finding(
+                rule_id=self.meta.id,
+                severity=Severity.LOW,
+                title="Risky license marker in model card",
+                taxonomy=self.meta.taxonomy,
+                target_ref=str(path),
+                evidence=Evidence(
+                    summary=f"risky license marker in model card ({marker})",
+                    detail=f"file={path.name}",
+                ),
+                verdict=lead_verdict(
+                    f"risky license marker ({marker}); worth a second look, not a verdict"
+                ),
+            )
+        if truncated:
+            yield self._unscanned(path, f"only the first {MAX_SCAN_BYTES} bytes were read", ctx)
+
+    def _unscanned(self, path: Path, reason: str, ctx: RuleContext) -> Finding:
+        ctx.shortfall(unread_component(self.meta.id, path, reason))
+        return Finding(
             rule_id=self.meta.id,
             severity=Severity.LOW,
-            title="Risky license marker in model card",
+            title="Model card not scanned",
             taxonomy=self.meta.taxonomy,
             target_ref=str(path),
             evidence=Evidence(
-                summary=f"risky license marker in model card ({marker})",
-                detail=f"file={path.name}",
+                summary=f"model card not scanned: {reason}", detail=f"file={path.name}"
             ),
-            verdict=lead_verdict(
-                f"risky license marker ({marker}); worth a second look, not a verdict"
-            ),
+            verdict=unscanned_verdict("the model card was not read whole, so nothing was cleared"),
         )

@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>guardana recipe — Guardana documentation</title>
+<meta name="description" content="guardana recipe lock|run: a repository recipe that pins what a team&#x27;s checks are, refuses a run whose pins moved, and leaves one reviewable directory">
+<link rel="canonical" href="https://guardana.dev/docs/usage-recipe">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/brand/v1/tokens.css">
+<link rel="stylesheet" href="docs.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top"><div class="bar">
+<a class="mark" href="../"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.8 4.5 5.6v6.1c0 4.6 3.2 8.2 7.5 9.5 4.3-1.3 7.5-4.9 7.5-9.5V5.6z" style="color:var(--brand)"/><path d="m8.6 12.1 2.4 2.4 4.5-4.8"/></svg><span class="w">guard<b>ana</b></span></a>
+<nav>
+<a href="index.html">Documentation</a>
+<a href="rules/index.html">Rules</a>
+<a href="../notes/index.html">Notes</a>
+<a href="https://github.com/guardana/guardana">GitHub</a>
+</nav>
+</div></header>
+<div class="shell">
+<nav class="side" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html" aria-current="page">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+<details class="mnav">
+<summary>Menu · <b>guardana recipe</b></summary>
+<nav class="inner" aria-label="Documentation">
+<ul class="home"><li><a href="index.html">Overview</a></li></ul>
+<h2>Guides for a first run</h2><ul>
+<li><a href="usage-init.html">guardana init</a></li>
+<li><a href="recipe-local-scan.html">Recipe: scan your own project</a></li>
+<li><a href="recipe-recorded-answers.html">Recipe: check a run your application recorded</a></li>
+<li><a href="recipe-real-application.html">Recipe: probe your real application</a></li>
+<li><a href="adopt-guardana.html">Adopt Guardana in your project</a></li>
+<li><a href="how-it-works.html">How Guardana works</a></li>
+<li><a href="install.html">Installing</a></li>
+<li><a href="usage-testing.html">In your test suite</a></li>
+<li><a href="python-api.html">Python API</a></li>
+<li><a href="usage-scan.html">guardana scan</a></li>
+<li><a href="usage-probe.html">guardana probe<span class="tag">beta</span></a></li>
+</ul>
+<h2>Run and policy</h2><ul>
+<li><a href="safe-testing.html">Safe active testing</a></li>
+<li><a href="usage-doubles.html">Stateful tool doubles<span class="tag">beta</span></a></li>
+<li><a href="usage-fixtures.html">guardana fixtures<span class="tag">beta</span></a></li>
+<li><a href="usage-recipe.html" aria-current="page">guardana recipe<span class="tag">beta</span></a></li>
+<li><a href="usage-doctor.html">guardana doctor</a></li>
+<li><a href="usage-target.html">guardana target inspect</a></li>
+<li><a href="providers.html">Providers</a></li>
+<li><a href="usage-plan.html">guardana plan</a></li>
+<li><a href="exit-codes.html">Exit codes</a></li>
+<li><a href="profiles.html">Profiles — guardana.yaml</a></li>
+</ul>
+<h2>Evidence and regression</h2><ul>
+<li><a href="reading-results.html">Read results from your own tool</a></li>
+<li><a href="usage-case.html">guardana case<span class="tag">beta</span></a></li>
+<li><a href="usage-baseline.html">guardana baseline</a></li>
+<li><a href="usage-diff.html">guardana diff</a></li>
+<li><a href="usage-monitor.html">guardana monitor<span class="tag">beta</span></a></li>
+<li><a href="usage-run.html">guardana run</a></li>
+<li><a href="usage-calibrate.html">guardana calibrate</a></li>
+<li><a href="usage-suites.html">Quality suites<span class="tag">beta</span></a></li>
+<li><a href="privacy.html">Evidence and redaction</a></li>
+</ul>
+<h2>Recorded applications</h2><ul>
+<li><a href="usage-analyze-trace.html">guardana analyze-trace<span class="tag">beta</span></a></li>
+<li><a href="usage-grade.html">guardana grade<span class="tag">beta</span></a></li>
+<li><a href="usage-trace-inspect.html">guardana trace inspect</a></li>
+<li><a href="usage-contracts.html">Security contracts</a></li>
+<li><a href="usage-import-observations.html">guardana import-observations</a></li>
+<li><a href="writing-an-integrator.html">Writing an integrator<span class="tag">beta</span></a></li>
+</ul>
+<h2>Rules and extensions</h2><ul>
+<li><a href="compatibility.html">Compatibility</a></li>
+<li><a href="conformance-kit.html">Conformance kit</a></li>
+<li><a href="usage-rules.html">guardana rules</a></li>
+<li><a href="usage-taxonomy.html">guardana taxonomy</a></li>
+<li><a href="writing-rules.html">Writing rules</a></li>
+<li><a href="usage-rule-test.html">guardana rule test</a></li>
+<li><a href="usage-new-pack.html">guardana new-pack</a></li>
+<li><a href="usage-pack.html">guardana pack</a></li>
+<li><a href="outputs.html">Installed outputs</a></li>
+<li><a href="extending.html">Extending Guardana</a></li>
+<li><a href="model-formats.html">Reading model formats</a></li>
+</ul>
+<h2>Collector and deployment</h2><ul>
+<li><a href="integrations.html">CI and pre-commit</a></li>
+<li><a href="deployment.html">Deploying the collector<span class="tag">beta</span></a></li>
+<li><a href="usage-collector.html">The collector<span class="tag">beta</span></a></li>
+</ul>
+<h2>Architecture and security</h2><ul>
+<li><a href="product-status.html">Product status</a></li>
+<li><a href="threat-model.html">Threat model</a></li>
+<li><a href="reproducible-builds.html">Reproducible builds</a></li>
+<li><a href="architecture.html">Architecture</a></li>
+</ul>
+<h2>Reference</h2><ul>
+<li><a href="rules/index.html">Rule explorer</a></li>
+<li><a href="generated/rule-summary.html">Rule summary</a></li>
+<li><a href="generated/rule-catalog.html">Rule catalog</a></li>
+<li><a href="generated/evaluator-catalog.html">Evaluator catalog</a></li>
+<li><a href="generated/taxonomy-coverage.html">Taxonomy coverage</a></li>
+<li><a href="generated/detection-limits.html">Detection limits</a></li>
+<li><a href="generated/first-run.html">First-run measure</a></li>
+<li><a href="generated/compatibility-matrix.html">Compatibility matrix</a></li>
+<li><a href="generated/application-measures.html">Application measures</a></li>
+</ul>
+<h2>Project direction</h2><ul>
+<li><a href="community.html">Community</a></li>
+</ul>
+<h2>Studies</h2><ul>
+<li><a href="studies/first-run-study.html">First-run study</a></li>
+<li><a href="studies/adopter-study.html">Adopter study</a></li>
+</ul>
+</nav>
+</details>
+<main id="main">
+<h1><code>guardana recipe</code> — the same checks against your application, every time<span class="status beta">beta</span></h1><p class="lede"><code>guardana recipe lock|run</code>: a repository recipe that pins what a team's checks are, refuses a run whose pins moved, and leaves one reviewable directory</p><p>A recipe is a file in your repository that names the profile your checks come from and what
+answers them. <code>guardana recipe lock</code> pins what those checks are; <code>guardana recipe run</code> refuses
+to send anything when a pin moved, runs otherwise, and writes one directory a reviewer opens.</p>
+<pre><code class="language-bash">guardana recipe lock                 # write guardana-recipe.lock.yaml; review and commit it
+guardana recipe lock --check         # in CI: fail when a pin moved, without writing
+guardana recipe run                  # check the pins, run, write the artifact directory
+</code></pre>
+<p>Each command reads <code>./guardana-recipe.yaml</code> unless you name another recipe file.</p>
+<h2 id="the-recipe">The recipe</h2>
+<p>You write the recipe; Guardana never rewrites it.</p>
+<pre><code class="language-yaml">schema_version: 1
+name: support-bot
+profile: guardana.yaml
+subject:
+  kind: application
+  connection:
+    url: http://127.0.0.1:8080
+    model: support-bot
+    api_key_env: SUPPORT_BOT_KEY
+deployment:
+  ai_system: support-bot
+  environment: ci
+output:
+  directory: guardana-artifact
+  exchanges: false
+</code></pre>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Required</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>schema_version</code></td>
+<td>yes</td>
+<td><code>3</code>; <code>2</code> for a recipe without <code>subject.target</code>; <code>1</code> for one without <code>subject.fixtures</code> either. A newer version is refused with &quot;upgrade Guardana&quot;. A schema-1 or schema-2 recipe keeps the digest its lock holds.</td>
+</tr>
+<tr>
+<td><code>name</code></td>
+<td>yes</td>
+<td>The recipe's name, recorded in the run.</td>
+</tr>
+<tr>
+<td><code>profile</code></td>
+<td>yes</td>
+<td>The <code>guardana.yaml</code> the checks come from, beside the recipe.</td>
+</tr>
+<tr>
+<td><code>subject.kind</code></td>
+<td>with <code>connection</code> or <code>target</code></td>
+<td>What answers: <code>application</code> or <code>model_harness</code>. No default. With <code>recording</code> it may be left out when the recording's header declares <code>subject_kind</code>; a run where neither declares one, or the two differ, is refused before anything is graded (exit <code>3</code>).</td>
+</tr>
+<tr>
+<td><code>subject.connection</code></td>
+<td>one of the three</td>
+<td><code>url</code>, <code>model</code>, and optionally <code>provider</code>, <code>api_key_env</code>, <code>adapter</code>, <code>system_prompt_file</code>, with the meanings <code>guardana probe</code> gives the same flags.</td>
+</tr>
+<tr>
+<td><code>subject.recording</code></td>
+<td>one of the three</td>
+<td>A recording to grade, as <code>guardana grade</code> reads it. Nothing is sent to the application.</td>
+</tr>
+<tr>
+<td><code>subject.target</code></td>
+<td>one of the three</td>
+<td>With <code>schema_version: 3</code>: an installed endpoint target, as <code>guardana probe --target</code> names it. <code>locator</code> is <code>scheme://value</code>; <code>options</code> maps each <code>--target-option</code> key to its value, every value a string.</td>
+</tr>
+<tr>
+<td><code>subject.fixtures</code></td>
+<td>no</td>
+<td>With <code>connection</code> and <code>schema_version: 2</code> or later: the <a href="usage-fixtures.html">fixtures file</a> declaring the synthetic data the application runs with — its tenants, seeded documents, records and tools. Refused with <code>recording</code> or <code>target</code>, and in a schema-1 recipe.</td>
+</tr>
+<tr>
+<td><code>deployment</code></td>
+<td>no</td>
+<td><code>ai_system</code>, <code>environment</code>, <code>deployment_id</code>, as the <code>probe</code> flags of the same names.</td>
+</tr>
+<tr>
+<td><code>output.directory</code></td>
+<td>no</td>
+<td>The artifact directory, a subdirectory beside the recipe. Default <code>guardana-artifact</code>.</td>
+</tr>
+<tr>
+<td><code>output.exchanges</code></td>
+<td>no</td>
+<td><code>true</code> puts the replies the profile keeps into the artifact. Default <code>false</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Unknown keys are refused. Relative paths are read beside the recipe.</p>
+<p><strong>Say what answers.</strong> <code>application</code> is the endpoint your users reach, run in CI with your own
+fixtures or test doubles behind it. <code>model_harness</code> is a model reached without your
+application's prompt, tools and data: a result about the model, not about what your users
+talk to. Guardana cannot tell the two apart from a URL, so it records what the recipe declares
+and shows it in the run, the terminal report, the JUnit suite name, <code>run inspect</code> and <code>diff</code>.</p>
+<h3 id="an-installed-target">An installed target</h3>
+<p>A pack can register its own endpoint target under a scheme (<a href="usage-target.html"><code>usage-target.md</code></a>).
+A recipe names it as <code>probe --target</code> does:</p>
+<pre><code class="language-yaml">schema_version: 3
+name: support-bot
+profile: guardana.yaml
+subject:
+  kind: application
+  target:
+    locator: acme-chat://staging
+    options:
+      region: eu
+</code></pre>
+<p><code>recipe lock</code> and <code>recipe run</code> build the target once, through the same resolution <code>plan probe</code>
+uses, and refuse with exit <code>3</code> what <code>probe --target</code> refuses: a malformed locator, a scheme no
+installed distribution registers, a scheme whose target is not
+an endpoint, an option the target rejects, a budget the target cannot enforce, <code>fixtures</code>
+beside <code>target</code>, and kept exchanges — <code>output.exchanges: true</code> or the profile's
+<code>privacy.keep_exchanges</code> — with a target that keeps none (only the built-in endpoint and a
+pack's target built on it keep exchanges). The <code>Target</code> contract forbids building a target
+from contacting it; a target that connects while it is built and fails exits <code>4</code>, as it does
+for <code>plan probe</code>. The run records <code>source: target</code>. Its options carry no secret; what the
+target declares it sends to authenticate (<a href="extending.html#adding-a-target"><code>sent_secrets()</code></a>) is
+withheld from every finding, failure and kept exchange the run saves.</p>
+<h2 id="the-lock">The lock</h2>
+<p><code>guardana recipe lock</code> builds the plan of the recipe's run without sending a request and
+without reading a key, and writes <code>guardana-recipe.lock.yaml</code> beside the recipe. It pins:</p>
+<ul>
+<li>the recipe (its parsed content, so a comment does not count), the Guardana version and the
+plugin trust in force;</li>
+<li>the profile's digest;</li>
+<li>every selected rule's digest, which for a quality suite covers its dataset, with the
+distribution and version that registered it and its trials per case;</li>
+<li>every evaluator a selected rule grades with: who registered it, its judge identity and the
+calibration in force for it;</li>
+<li>every rule the configuration skips, by reason;</li>
+<li>the adapter file the connection names, as written, and the text of its system-prompt file;</li>
+<li>the fixtures file <code>subject.fixtures</code> names, as written, and every tenant adapter it names
+(<code>fixtures</code>, <code>fixtures.tenants.&lt;name&gt;.adapter</code>);</li>
+<li>the installed target <code>subject.target</code> names: its scheme, and the distribution and version
+that register it (<code>target</code>);</li>
+<li>the files of every distribution installed from a directory or a URL (<code>sources</code>).</li>
+</ul>
+<p>It never pins a key or the recording: the recording is your application's answer, not your
+configuration.</p>
+<h3 id="distributions-installed-from-a-directory-or-a-url">Distributions installed from a directory or a URL</h3>
+<p>A distribution installed in editable mode or from a direct URL (PEP 610 <code>direct_url.json</code>) can
+change its code under one version, so a version pin says nothing about it. Neither does it about
+one whose metadata lives outside every <code>site-packages</code> directory, such as a <code>setup.py develop</code>
+install or an <code>.egg-info</code> checkout on the path, or one installed with no <code>RECORD</code>; with no
+<code>direct_url.json</code> to say where its files are, each of these stays unpinned. The lock pins each
+such distribution by its files, under <code>sources</code> (<code>digest</code>, <code>files</code>), when plugin trust let the
+run import any of its Guardana entry points (importing one runs its code, whether or not the
+recipe selects what it registers), when it registers a selected rule, an evaluator a selected
+rule grades with or the recipe's target, or when it is in the installed <code>Requires-Dist</code> closure
+of one of those: every requirement whose PEP 503-normalised name is installed is followed,
+markers and extras ignored, so a helper library installed editable is pinned as the pack that
+imports it is.</p>
+<ul>
+<li>An <strong>editable</strong> install is pinned by the directory its <code>file://</code> URL names: every file under
+it by sorted POSIX relative path and the SHA-256 of its content. Untracked files count: an
+editable install imports what the directory holds, not what git tracks. Left out are
+<code>.git/</code>, <code>__pycache__/</code>, <code>.venv/</code>, <code>.tox/</code>, <code>.nox/</code>, <code>node_modules/</code>, <code>*.egg-info/</code>,
+<code>.mypy_cache/</code>, <code>.ruff_cache/</code>, <code>.pytest_cache/</code>, <code>.idea/</code>, <code>.vscode/</code> and <code>.DS_Store</code> at
+any depth; <code>venv/</code>, <code>build/</code>, <code>dist/</code>, <code>htmlcov/</code>, <code>.coverage</code>, <code>.coverage.*</code> and <code>.env</code> at
+the top of the directory only (a package of the project may carry those names); and the
+recipe's own lock file and output directory when the recipe sits inside the directory, since
+<code>recipe lock</code> and <code>recipe run</code> write them. Symlinks are followed, so a linked file is pinned
+by what it holds, and a linked directory is also pinned by where it points, so retargeting it
+changes the pin. The <code>.pth</code> files and setuptools <code>__editable__…finder.py</code> modules the
+install's <code>RECORD</code> lists are read first: a path they add or map outside the directory, or
+into a directory the tree pin leaves out (such as <code>build/</code>, where a setuptools strict
+editable install maps its packages, <code>.venv/</code> or <code>*.egg-info/</code>), is code the pin would not
+cover, so the distribution stays unpinned. A finder is read only when it is the template a
+setuptools release 64.0.0 through 84.0.0 writes, with nothing but its mapping, namespaces
+and own name filled in, and the mapping and namespaces as absolute paths; a <code>.pth</code> file
+imports the finder, which runs all of it, so a finder with any other code leaves the
+distribution unpinned, and one from a later setuptools whose template differs does too,
+with that reason. A <code>.pth</code> file is read as UTF-8 as <code>site</code> reads it, past a byte order
+mark; setuptools writes it in the locale's encoding, so under a locale that is not UTF-8
+a <code>.pth</code> file naming a path outside ASCII cannot be read and leaves the distribution
+unpinned. Otherwise each is also pinned by its content and each package
+and path it maps, relative to the directory. Where they name the directory's absolute path,
+followed by a path separator, a quote or a line end, that path is pinned as a placeholder,
+so moving the project and installing it editable again keeps the pin; a <code>.pth</code> line written
+relative to the environment is pinned as written, so it moves with the environment. An
+editable digest is never that of a plain directory, even when <code>RECORD</code> lists no <code>.pth</code>
+file or finder. Editing a finder or <code>.pth</code> file, or mapping a package elsewhere, changes
+it; the bytecode check below applies to each finder too. A <code>.pth</code> file imports its finder
+by name, so anything else importable under that name beside the finder (a package, a
+directory, an extension module, legacy bytecode) or in a <code>sys.path</code> entry listed before it
+leaves the distribution unpinned, as does an entry listed before it that is, or lies inside,
+an archive or other file, which Guardana does not look into; the pin sees only the <code>sys.path</code> of the process that
+pins, not entries the environment adds when the recipe runs (<code>PYTHONPATH</code>, another <code>.pth</code>
+file, <code>sitecustomize</code>). A directory the pin leaves out
+whose name is a Python identifier — <code>node_modules</code> and <code>__pycache__</code> at any depth, and
+<code>venv</code>, <code>build</code>, <code>dist</code> and <code>htmlcov</code> at the top when a <code>.pth</code> file adds the directory
+itself to <code>sys.path</code> — stays importable by name, and what is imported from it is not
+pinned. Bytecode under <code>__pycache__/</code> is not pinned, but
+bytecode this interpreter would load in place of a pinned source (hash-based bytecode,
+whatever hash it records, or bytecode recording the source's modification time and size)
+leaves the distribution unpinned unless it is what that source compiles to; bytecode only
+another interpreter would load is checked when that interpreter pins, and this check does
+not change pin digests.</li>
+<li><strong>Any other direct URL</strong> — a directory installed without <code>-e</code>, a VCS checkout, an archive —
+is pinned by its installed <code>RECORD</code>: each entry's path and recorded hash, except bytecode
+under <code>__pycache__/</code> and every file of its own <code>.dist-info</code> but <code>METADATA</code> (its version and
+requirements) and <code>entry_points.txt</code> (what it registers). An entry inside the install root
+is pinned only once the installed file hashes to the recorded value: a file that differs
+from its <code>RECORD</code>, cannot be read, or is hashed in <code>RECORD</code> with an algorithm other than
+SHA-256 or a stronger one leaves the distribution unpinned, with the reason; so does a
+row inside the install root without a size, or a path <code>RECORD</code> lists twice. The same
+bytecode check as for an editable install applies to each listed source. The pinned value
+is the recorded hash, so this check does not change lock digests. The rest — <code>RECORD</code>, <code>INSTALLER</code>,
+<code>REQUESTED</code>, <code>direct_url.json</code>, an installer's cache file — records the install, not the
+code that runs. A file installed outside the install root (<code>../../../bin/…</code>,
+<code>../../../share/…</code>) or under <code>*.data/scripts/</code> is pinned by its path and the SHA-256 of the
+installed file, with one exception: where its first line names the running environment's
+interpreter after <code>#!</code> (or in the <code>/bin/sh</code> launcher an installer writes for a long path),
+that path is hashed as a placeholder and any arguments after it as written. Any other first
+line is hashed as written. A console or GUI script the installer generated from <code>entry_points.txt</code> is left out only
+when it sits directly in this installation's scripts directory (<code>bin/</code> or <code>Scripts/</code>),
+is run by the environment's interpreter, and holds exactly what pip, uv or
+pypa/installer generate for its declared entry point: the import, an optional rewrite of
+<code>sys.argv[0]</code> and <code>sys.exit(&lt;entry point&gt;())</code>: <code>entry_points.txt</code>, which is pinned, names
+what it calls. A file no <code>RECORD</code> lists is not pinned, including a module placed in the
+scripts directory beside the wrapper, which the wrapper imports first when it runs as a
+script, and an unlisted file in <code>site-packages</code> that can be imported too; Guardana imports
+plugin entry points in its own process and does not run console scripts. An edited wrapper, a file with the same name elsewhere and a Windows <code>.exe</code>
+launcher are hashed, so a Windows lock covering a launcher moves when the installer or
+the environment changes. Installing the same code again into an environment this interpreter's
+<code>sysconfig</code> describes pins the same. An installation none of its schemes describes
+(<code>pip install --target</code> or <code>--prefix</code>, or another environment's <code>site-packages</code> on the
+path) has its generated scripts hashed too, so its pin can differ by installer.</li>
+</ul>
+<p>A distribution stays under <code>unpinned</code>, with the reason, when it holds more than 20,000 files or
+256 MiB (an editable install's <code>.pth</code> files and finders count toward both), when one of those
+<code>.pth</code> files or finders is larger than 64 KiB, when a symlink leads outside its directory, when
+a file in its editable directory is not a regular file (a FIFO, a device, a socket) or changes
+between the listing of the directory and its hashing, when its editable install loads code
+from outside its directory or maps its packages in a way Guardana cannot read, when it has no
+<code>RECORD</code> to read, when its <code>RECORD</code> lists an entry inside the install root without a hash, or
+when a file it installed outside the install root cannot be read or is not a regular file (a
+FIFO, a device, a socket). <code>unpinned</code> maps each
+<code>rule:&lt;id&gt;</code>, <code>evaluator:&lt;id&gt;</code> and <code>target:&lt;scheme&gt;</code> it registers — or <code>distribution:&lt;name&gt;</code>
+when it registers none of them — to that reason. <code>recipe run</code> computes the lock again on every
+run, so it hashes each editable tree again, within the same bounds.</p>
+<p>A lock written before <code>sources</code> existed (schema 1) is still read, with no <code>sources</code>; compared
+with the current configuration it drifts <code>source_added</code> for each distribution the lock now
+pins, beside the <code>guardana_changed</code> an upgrade brings. Run <code>guardana recipe lock</code> again.</p>
+<h2 id="exit-codes">Exit codes</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Situation</th>
+<th><code>recipe lock</code></th>
+<th><code>recipe lock --check</code></th>
+<th><code>recipe run</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>written, or every pin holds</td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+<td>the run's own code</td>
+</tr>
+<tr>
+<td>a pin moved</td>
+<td>—</td>
+<td><code>1</code></td>
+<td><code>3</code>, nothing sent</td>
+</tr>
+<tr>
+<td>a regression pair of a selected suite no longer holds: a side graded the wrong way or declined, the evaluator raised, or it cannot regrade without sending</td>
+<td><code>1</code>, nothing written</td>
+<td><code>1</code></td>
+<td><code>3</code>, nothing sent</td>
+</tr>
+<tr>
+<td>the run could never pass: a check the fixtures demand that the profile does not select, or a recording whose run stopped</td>
+<td><code>3</code>, nothing written</td>
+<td><code>3</code></td>
+<td>runs, and is <code>2</code></td>
+</tr>
+<tr>
+<td>something selected is <code>unpinned</code></td>
+<td><code>2</code>, written</td>
+<td><code>2</code></td>
+<td>runs, and the run records what is unpinned</td>
+</tr>
+<tr>
+<td><code>subject.target</code> refused as <code>probe --target</code> refuses it</td>
+<td><code>3</code>, nothing written</td>
+<td><code>3</code></td>
+<td><code>3</code>, nothing sent</td>
+</tr>
+<tr>
+<td><code>subject.target</code> fails to connect while it is built</td>
+<td><code>4</code>, nothing written</td>
+<td><code>4</code></td>
+<td><code>4</code>, nothing sent</td>
+</tr>
+<tr>
+<td>nothing selected, plugin trust refused an installed extension, or a selected check would not grade (a rule file that did not load, an evaluator nobody registered)</td>
+<td><code>2</code>, nothing written</td>
+<td><code>2</code></td>
+<td><code>3</code> (the lock cannot match)</td>
+</tr>
+<tr>
+<td>recipe or lock missing, unreadable, or from a newer Guardana</td>
+<td><code>3</code></td>
+<td><code>3</code></td>
+<td><code>3</code></td>
+</tr>
+</tbody>
+</table></div>
+<p><code>--check</code> never writes, so a first run cannot pass by creating its own lock. <code>recipe run</code>
+sends nothing until the pins hold; then the run's gate decides its exit code as it does for
+<code>probe</code> and <code>grade</code>. A drifted pin is named by kind, both directions — <code>rule_changed</code>,
+<code>rule_added</code>, <code>rule_removed</code>, <code>judge_changed</code>, <code>calibration_changed</code>, <code>profile_changed</code>,
+<code>trust_changed</code>, <code>guardana_changed</code>, <code>recipe_changed</code>, <code>distribution_changed</code>,
+<code>skip_changed</code>, <code>trials_changed</code>, <code>subject_file_changed</code>, <code>evaluator_added</code>,
+<code>evaluator_removed</code>, <code>target_changed</code>, <code>source_added</code>, <code>source_removed</code>, <code>source_changed</code>.
+Review the change, then run <code>guardana recipe lock</code> again.</p>
+<p>A rule about a protocol the subject does not speak is pinned as skipped <code>not_applicable</code>: an
+MCP or A2A rule against a chat endpoint or a recording, a chat rule against an MCP server
+or an A2A agent. A lock that pinned such a rule under another reason, <code>missing_capability</code>
+or, under <code>--safety passive</code>, <code>unsafe_mode</code>, drifts <code>skip_changed</code> for it; take the lock
+again.</p>
+<p>All three commands regrade the regression pairs of every selected suite
+(<a href="usage-case.html"><code>guardana case add</code></a>) before they compare anything, sending nothing: each
+pair's <code>observed</code> must still grade <code>fail</code> and its <code>accepted</code> <code>pass</code> with the rule as it is
+now. A pair that no longer holds, or a suite whose evaluator cannot regrade without sending,
+is a refusal rather than a drifted pin, because it is broken in the lock and in the
+configuration alike; the refusal names each case by its rule and dataset line.</p>
+<p><code>recipe run</code> takes no selection, trust, trials or profile flags: those are what the lock pins.
+Its one flag is <code>--concurrency INTEGER</code> (default <code>4</code>): how many rules may run at once.</p>
+<p>Every rule the lock pins must run to completion. One that the run skips — a recording that
+holds no answer for it is the usual cause — that errors or that is never reached is a
+<code>demanded_check</code> coverage shortfall: the run is <code>indeterminate</code> (exit <code>2</code>) unless a finding
+fails it, whatever the profile's <code>fail_on_*</code> switches say.</p>
+<p>Before it sends anything, <code>recipe run</code> also checks what the lock does not cover: the
+subject's key variable and every judge's key variable must be set, and an adapter file read
+again to send must still have the digest the lock holds. With fixtures, every tenant's key
+variable must be set, no two tenants may send a secret value in common, as a key or in an adapter header, and
+every tenant adapter read again must still have its pinned digest; the fixtures file is read
+once, so the items a run asks about are the bytes the lock compared. Each refusal exits <code>3</code> and is
+written into the artifact. When the lock lists unpinned checks, the run says so on stderr,
+at the end of <code>report.txt</code> and in <code>guardana run inspect</code>.</p>
+<h2 id="the-artifact">The artifact</h2>
+<p><code>recipe run</code> claims <code>output.directory</code> before it starts: it writes a <code>junit.xml</code> with one
+error (&quot;the run did not finish&quot;) and a <code>report.txt</code> saying so. When the run ends it replaces
+the directory whole. An interrupted run leaves the placeholder; a refused run writes the
+refusal into the same two files; a run its target stopped part-way replaces it with the
+partial run and exits <code>4</code>. A CI step that uploads the directory after such a run
+does not show an earlier run's green. Exceptions are the refusals below that must not
+rewrite an input.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>run.json</code></td>
+<td>the saved run, with <code>run.recipe</code> (name, recipe and lock digests, kind, source, unpinned)</td>
+</tr>
+<tr>
+<td><code>report.txt</code></td>
+<td>the terminal report without colour, then the lock comparison</td>
+</tr>
+<tr>
+<td><code>junit.xml</code></td>
+<td>the JUnit report; its suite is named after the subject kind</td>
+</tr>
+<tr>
+<td><code>guardana-recipe.yaml</code>, <code>guardana-recipe.lock.yaml</code></td>
+<td>the recipe and the lock the run held</td>
+</tr>
+<tr>
+<td><code>run.exchanges.jsonl</code></td>
+<td>only when the profile keeps exchanges and <code>output.exchanges</code> is <code>true</code></td>
+</tr>
+<tr>
+<td><code>guardana-artifact.json</code></td>
+<td>the files above and the run's <code>status</code> (<code>incomplete</code>, <code>refused</code> or <code>complete</code>); it marks the directory as one a run may replace (<a href="https://github.com/guardana/guardana/blob/main/schemas/artifact-v1.schema.json"><code>schemas/artifact-v1.schema.json</code></a>)</td>
+</tr>
+</tbody>
+</table></div>
+<p>An existing directory holding a file that <code>guardana-artifact.json</code> does not list is refused, never deleted. A recipe that names a file inside its own <code>output.directory</code> is refused with exit <code>3</code> before anything is sent. The directory is marked refused in place: <code>junit.xml</code>, <code>report.txt</code> and <code>guardana-artifact.json</code> say so; the earlier run's other files are removed, and the files the recipe names stay. A file the recipe names is never rewritten, even to mark it refused: when the recipe names <code>guardana-artifact.json</code> itself, the marker stays as it was, the reports it does not name turn red, and stderr says so. A recipe that cannot be read marks the earlier artifact refused in the directory it names, or in <code>guardana-artifact</code> beside it when even that cannot be read, and treats every string it holds as a file it may name, so none of those is rewritten. When the files the recipe names include the marker and both reports, nothing in the directory can turn red: the marker may still say <code>complete</code>, and only the exit code and stderr report the refusal. It removes only that run's <code>run.json</code> and creates none. A recipe that does not parse at all leaves the artifact as it is and warns that it still holds an earlier run's files. A recipe so broken that it no longer names its directory can leave an earlier run in a custom directory, so treat the command's exit code as the verdict, not the directory alone. A
+profile that keeps exchanges without <code>output.exchanges: true</code> is refused: a CI artifact is a
+copy of your application's replies that nobody controls.</p>
+
+</main>
+</div>
+<footer class="foot"><div class="bar">
+<span class="who">Guardana 1.0.0 · Apache-2.0 ·
+maintained by Konrad Karauda</span>
+<a href="https://github.com/guardana/guardana/blob/main/docs/usage-recipe.md">Edit this page on GitHub</a>
+<a href="https://github.com/guardana/guardana">github.com/guardana</a>
+<a href="../llms.txt">llms.txt</a>
+</div></footer>
+</body>
+</html>

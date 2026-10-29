@@ -5,8 +5,8 @@ Keeps their versions, inter-package pins, and uv.lock consistent in one step.
 The five packages release together and pin to each other, so their versions and
 those pins must move as one — the single most error-prone step of a release, and
 the one `uv version` can't do alone (it bumps a version field but never the pins
-in the *other* packages that depend on it). Run this, then follow RELEASING.md
-for the changelog roll, tag, and push.
+in the *other* packages that depend on it). `scripts/release.py` runs it and then
+rolls the changelog, commits, pushes and tags.
 
     python scripts/bump_version.py patch        # 0.1.0 -> 0.1.1
     python scripts/bump_version.py minor        # 0.1.0 -> 0.2.0  (breaking, pre-1.0)
@@ -15,7 +15,9 @@ for the changelog roll, tag, and push.
 """
 
 import argparse
+import datetime
 import re
+import string
 import subprocess
 import sys
 from pathlib import Path
@@ -31,9 +33,16 @@ _PACKAGES = (
     "guardana-server",
 )
 _VERSION_RE = re.compile(r'^version = "(?P<v>[^"]+)"', re.MULTILINE)
-_PIN_RE = re.compile(r"(guardana-[a-z]+)>=\d+\.\d+\.\d+,<\d+(?:\.\d+)?")
-# `guardana --version` prints `guardana.core.__version__`; it must move with
-# the pyprojects or the CLI lies about what is installed.
+# A sibling pin, exact or in the older range form the rewrite replaces. The five
+# distributions are released together and tested only as one set, so a dependent
+# pins the exact version it shipped with; a range let a fresh install pair this CLI
+# with a later engine whose behaviour nobody tested against it.
+_PIN_RE = re.compile(
+    r"(guardana-[a-z]+)(?:>=\d+\.\d+\.\d+,<\d+(?:\.\d+)?"
+    r"|==\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?)(?=\")"
+)
+# `guardana.core.__version__` is what embedding code reads; it must move with
+# the pyprojects or it lies about what is installed.
 _DUNDER_PATH = Path("packages/guardana-core/src/guardana/core/__init__.py")
 _DUNDER_RE = re.compile(r'^__version__ = "[^"]+"', re.MULTILINE)
 # The docs tell users to pin `guardana/guardana@vMAJOR.MINOR` — the moving tag
@@ -56,10 +65,9 @@ _IMAGE_PIN_RE = re.compile(r"(ghcr\.io/guardana/guardana(?:-collector)?:)\d+\.\d
 _REQUIRED_ACTION_PIN = (Path("README.md"), Path("docs/integrations.md"))
 _REQUIRED_IMAGE_PIN = (Path("docs/install.md"), Path("deploy/docker/README.md"))
 # Exempt from both the rewrite and the staleness gate, each for its own reason:
-# the changelog records what past releases said, a design document states the
-# problem it solved rather than being kept current, and a test fixture that feeds
-# an *old* pin to the rewriter has to stay old to be a test at all.
-_PIN_EXEMPT = ("CHANGELOG.md", "docs/design/", "/tests/", "AUDIT_", "ROADMAP_V2")
+# the changelog and the notes record what was run against a past release, and a
+# test fixture that feeds an *old* pin to the rewriter has to stay old to be a test.
+_PIN_EXEMPT = ("CHANGELOG.md", "/notes/", "/tests/")
 
 
 def _tracked_text_files() -> tuple[Path, ...]:
@@ -98,24 +106,61 @@ def pin_bearing_files(pattern: re.Pattern[str]) -> tuple[Path, ...]:
 # 0.3 through the 0.4.0 release, because only the Action pins were automated —
 # the same staleness one file over. Each is `(pattern, replacement template)`,
 # rewritten in the same pass and checked by the same pre-flight.
-_SITE_VERSION_RE = re.compile(r'(<span class="ver mono">)v\d+\.\d+\.\d+')
+# A PEP 440 pre-, post- or dev-release suffix, so a marker that already names one is
+# replaced whole rather than left with the old suffix behind the new version.
+_SUFFIX = r"(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?"
+_SITE_VERSION_RE = re.compile(rf'(<span class="ver mono">)v\d+\.\d+\.\d+{_SUFFIX}')
+_SITE_LD_VERSION_RE = re.compile(
+    r'("name": "Guardana", [^}]*?"softwareVersion": ")\d+\.\d+\.\d+[^"]*(")'
+)
 # The Action's own CLI pin: `guardana/guardana@vX.Y` must install the CLI that tag
 # ships, or a workflow nobody edited changes engine on the next release.
-_ACTION_CLI_RE = re.compile(r'(default: ")\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?(")')
-_SECURITY_VERSION_RE = re.compile(r"(pre-1\.0 )\(\d+\.\d+\.x\)")
+_ACTION_CLI_RE = re.compile(rf'(default: ")\d+\.\d+\.\d+{_SUFFIX}(")')
+# The security policy's supported-versions line, rendered from one of two templates: a 0.x
+# series is named pre-1.0, and the first final release with major >= 1 replaces that line
+# with the supported one, whose series every later final release rewrites.
+_SECURITY_PRE_1_LINE = "Guardana is pre-1.0 ({series}.x)"
+_SECURITY_LINE = "Guardana supports major {major} ({series}.x)"
+_LINE_FIELDS = {"major": r"\d+", "series": r"\d+\.\d+"}
+
+
+def _line_pattern(template: str) -> str:
+    """Return a regex matching every line `template` can render."""
+    return "".join(
+        re.escape(literal) + ("" if field is None else _LINE_FIELDS[field])
+        for literal, field, _, _ in string.Formatter().parse(template)
+    )
+
+
+_SECURITY_VERSION_RE = re.compile(
+    f"{_line_pattern(_SECURITY_PRE_1_LINE)}|{_line_pattern(_SECURITY_LINE)}"
+)
+
+
+def _security_line(major: int, minor: int) -> str:
+    """Return the supported-versions line for the final release series `major.minor`."""
+    template = _SECURITY_PRE_1_LINE if major == 0 else _SECURITY_LINE
+    return template.format(major=major, series=f"{major}.{minor}")
+
+
 # The roadmap's own "what ships today" heading. Rewritten by hand until 0.22.0,
 # where forgetting it aborted the release after the bump.
-_ROADMAP_SHIPS_RE = re.compile(r"(## What ships today \()\d+\.\d+\.\d+(\))")
+_ROADMAP_SHIPS_RE = re.compile(rf"(## What ships today \()\d+\.\d+\.\d+{_SUFFIX}(\))")
 # The prose beside the moving Action pin. Rewriting the pin and leaving the
 # sentence that explains it is how README and integrations.md shipped 0.5.0
 # telling readers the tag points at "the latest 0.3.x".
 _PIN_PROSE_RE = re.compile(r"(latest )\d+\.\d+(\.x)")
-# The `major.minor.patch` core that drives bumps and the pin ceiling — the
+# The `major.minor.patch` core that drives bumps and the moving tags — the
 # leading numbers of any version, ignoring a PEP 440 pre/post/dev suffix.
 _CORE_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)")
 # An explicit target: a plain X.Y.Z, optionally with a PEP 440 pre/post/dev
 # marker (`1.0.0rc1`, `1.0.0b2`, `1.0.0.post1`, `1.0.0.dev3`).
-_EXPLICIT_RE = re.compile(r"^\d+\.\d+\.\d+(?:(?:a|b|rc)\d+|\.post\d+|\.dev\d+)?$")
+_EXPLICIT_RE = re.compile(rf"^\d+\.\d+\.\d+{_SUFFIX}$")
+_FINAL_RE = re.compile(r"^\d+\.\d+\.\d+$")
+# The citation names the release a reader ran and the day it was released.
+_CITATION_VERSION_RE = re.compile(rf"^(version: )\d+\.\d+\.\d+{_SUFFIX}$", re.MULTILINE)
+_CITATION_DATE_RE = re.compile(r"^(date-released: ')\d{4}-\d{2}-\d{2}(')$", re.MULTILINE)
+_BUMPS = frozenset({"major", "minor", "patch"})
 
 
 def _pyproject(package: str) -> Path:
@@ -140,6 +185,12 @@ def _core(version: str) -> tuple[int, int, int]:
 
 def _next_version(current: str, bump: str) -> str:
     major, minor, patch = _core(current)
+    if bump in _BUMPS and _FINAL_RE.match(current) is None:
+        # From 1.0.0rc1 a patch bump would skip 1.0.0 itself, so the next step is named.
+        sys.exit(
+            f"error: {current} is not a final release; name the next version "
+            f"(another candidate, or {major}.{minor}.{patch}) instead of {bump!r}"
+        )
     if bump == "major":
         return f"{major + 1}.0.0"
     if bump == "minor":
@@ -151,21 +202,9 @@ def _next_version(current: str, bump: str) -> str:
     return bump
 
 
-def _breaking_ceiling(version: tuple[int, int, int]) -> str:
-    """Return the upper bound of the compatibility range a dependent pins below.
-
-    Pre-1.0, SemVer treats a MINOR bump as the breaking one, so the ceiling is
-    the next minor (`0.2` for `0.1.x`). From 1.0 on, the MAJOR is breaking.
-    """
-    major, minor, _ = version
-    return f"0.{minor + 1}" if major == 0 else f"{major + 1}"
-
-
-def _rewrite(text: str, new: str, ceiling: str) -> str:
+def _rewrite(text: str, new: str) -> str:
     text = _VERSION_RE.sub(f'version = "{new}"', text, count=1)
-    # Lockstep pins: a dependent must require at least this release and stay
-    # below the next breaking boundary, so both bounds move on every release.
-    return _PIN_RE.sub(rf"\g<1>>={new},<{ceiling}", text)
+    return _PIN_RE.sub(rf"\g<1>=={new}", text)
 
 
 def _rewrite_dunder(text: str, new: str) -> str:
@@ -176,24 +215,37 @@ def _rewrite_dunder(text: str, new: str) -> str:
 
 _VERSION_MARKERS: tuple[tuple[Path, re.Pattern[str]], ...] = (
     (Path("site/index.html"), _SITE_VERSION_RE),
+    (Path("site/index.html"), _SITE_LD_VERSION_RE),
     (Path("SECURITY.md"), _SECURITY_VERSION_RE),
     (Path("README.md"), _PIN_PROSE_RE),
     (Path("docs/integrations.md"), _PIN_PROSE_RE),
     (Path("action.yml"), _ACTION_CLI_RE),
     (Path("ROADMAP.md"), _ROADMAP_SHIPS_RE),
+    (Path("CITATION.cff"), _CITATION_VERSION_RE),
+    (Path("CITATION.cff"), _CITATION_DATE_RE),
 )
 
 
 def _documented_versions(new: str) -> tuple[tuple[Path, re.Pattern[str], str], ...]:
-    """Pair every prose version marker with what this release turns it into."""
+    """Pair every prose version marker with what this release turns it into.
+
+    A pre-release keeps the series markers (the supported line in the security policy and
+    the prose beside the moving Action pin): it moves no stable tag, so they still name
+    the last final release.
+    """
     major, minor, _ = _core(new)
+    kept = r"\g<0>"
+    prerelease = Version(new).is_prerelease
     replacements = (
         rf"\g<1>v{new}",
-        rf"\g<1>({major}.{minor}.x)",
-        rf"\g<1>{major}.{minor}\g<2>",
-        rf"\g<1>{major}.{minor}\g<2>",
+        rf"\g<1>{new}\g<2>",
+        kept if prerelease else _security_line(major, minor).replace("\\", r"\\"),
+        kept if prerelease else rf"\g<1>{major}.{minor}\g<2>",
+        kept if prerelease else rf"\g<1>{major}.{minor}\g<2>",
         rf"\g<1>{new}\g<2>",
         rf"\g<1>{new}\g<2>",
+        rf"\g<1>{new}",
+        rf"\g<1>{datetime.datetime.now(tz=datetime.UTC).date().isoformat()}\g<2>",
     )
     return tuple(
         (path, pattern, replacement)
@@ -269,7 +321,6 @@ def main() -> int:
     new = _next_version(current, args.bump)
     if Version(new) <= Version(current):
         sys.exit(f"error: {new} is not newer than the current {current}; refusing to downgrade")
-    ceiling = _breaking_ceiling(_core(new))
 
     # Everything is validated before anything is written. A bump that fails
     # halfway leaves five pyprojects and `__version__` at the new version, an
@@ -277,10 +328,10 @@ def main() -> int:
     # state someone has to unpick by hand mid-release.
     _check_documented_markers()
 
-    print(f"{current} -> {new}  (dependents pin >={new},<{ceiling})")
+    print(f"{current} -> {new}  (siblings pin =={new})")
     for package in _PACKAGES:
         path = _pyproject(package)
-        _apply(path, _rewrite(path.read_text(encoding="utf-8"), new, ceiling), dry_run=args.dry_run)
+        _apply(path, _rewrite(path.read_text(encoding="utf-8"), new), dry_run=args.dry_run)
 
     dunder_path = _REPO / _DUNDER_PATH
     _apply(
@@ -311,7 +362,7 @@ def main() -> int:
 
     print("re-locking (uv lock)...")
     subprocess.run(["uv", "lock"], cwd=_REPO, check=True)  # noqa: S607
-    print(f"\nDone. Next: roll CHANGELOG to [{new}], commit, tag `v{new}` — see RELEASING.md")
+    print(f"\nDone. Next: roll CHANGELOG to [{new}], commit, push, tag `v{new}` once CI is green")
     return 0
 
 

@@ -218,6 +218,7 @@ def rule_properties(rule: dict[str, Any], up: str) -> str:
         ("Requests", "not declared" if declared is None else f"at most {declared}"),
         ("Evaluator", escape(str(rule["evaluator"])) if rule["evaluator"] else "graded in code"),
         ("Maturity", escape(str(rule["maturity"]))),
+        ("Detection", escape(str(rule.get("detection", "undeclared")))),
         ("Destructive", "yes" if rule["destructive"] else "no"),
         ("Needs", escape(requires)),
     ]

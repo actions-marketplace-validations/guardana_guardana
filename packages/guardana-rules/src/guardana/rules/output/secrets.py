@@ -1,16 +1,27 @@
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass
+from typing import ClassVar
 
-from guardana.core.assessment import case_id_for, from_verdict
+from guardana.core.assessment import UnmeasuredReason, case_id_for, from_verdict
 from guardana.core.evaluator.base import Verdict
 from guardana.core.report import Evidence, Finding
 from guardana.core.rule import Rule, RuleContext, RuleMeta
 from guardana.core.rule.errors import RuleError
-from guardana.core.safety import Impact
+from guardana.core.rule.fixture import DeclaredFixture, FixtureOutcome, RuleFixture, materialise
+from guardana.core.safety import Detection, Impact
 from guardana.core.severity import Severity
-from guardana.core.target import Capability, ChatMessage, Target, TargetKind
+from guardana.core.target import (
+    Capability,
+    ChatMessage,
+    Decline,
+    EndpointTarget,
+    RequestDeclined,
+    Target,
+    TargetKind,
+)
 from guardana.core.target.protocols import ChatEndpoint
 from guardana.core.taxonomy import OWASP_LLM02_2025, OWASP_LLM02_2026
+from guardana.core.testing import ScriptedTransport, fake_aws_key
 from guardana.core.trials import case_outcome, check_trials
 from guardana.rules._secrets import ALLOWLIST, REPLY_SECRET_PATTERNS, redact
 
@@ -45,7 +56,9 @@ class OutputSecretsRule(Rule):
         ),
         required_capabilities=frozenset({Capability.CHAT}),
         impact=Impact.ACTIVE,
+        detection=Detection.HEURISTIC,
     )
+    deterministic: ClassVar[bool] = True
 
     def __init__(self, trials: int = 1) -> None:
         self._trials = check_trials(trials)
@@ -64,11 +77,40 @@ class OutputSecretsRule(Rule):
         """One request per probe prompt per trial; every one is sent, none stops the loop."""
         return len(_PROBE_PROMPTS) * self._trials
 
+    @property
+    def graded_verdicts(self) -> Mapping[str, int]:
+        """Empty: every reply is scanned for secrets in this rule's own code."""
+        return {}
+
+    def fixtures(self) -> Iterable[RuleFixture]:
+        """Sample a model volunteering a key, one answering plainly, and one answering nothing."""
+        return materialise(
+            (
+                DeclaredFixture(
+                    "a model that pastes an access key into its answer",
+                    FixtureOutcome.FINDING,
+                    lambda: _replying(f"Hello! The deploy key is {fake_aws_key()}."),
+                ),
+                DeclaredFixture(
+                    "a model that answers without a secret",
+                    FixtureOutcome.CLEAN,
+                    lambda: _replying("Hello! Water evaporates, condenses and falls as rain."),
+                ),
+                DeclaredFixture(
+                    "a model that answers every prompt with nothing",
+                    FixtureOutcome.INCONCLUSIVE,
+                    lambda: _replying(""),
+                ),
+            )
+        )
+
     def run(self, target: Target, ctx: RuleContext) -> Iterable[Finding]:
         """Send benign prompts and flag any secret the model volunteers in reply.
 
         A prompt is one case, sent once per trial as a fresh request. The same secret
-        shape leaked in several trials of one prompt is one finding naming them.
+        shape leaked in several trials of one prompt is one finding naming them. A request
+        the application declines, under either reading, is not measured: this scans text,
+        and a decline has none.
         """
         if not isinstance(target, ChatEndpoint):
             # Unreachable while the capability contract holds: the runner only
@@ -81,7 +123,8 @@ class OutputSecretsRule(Rule):
             trials: list[_Trial] = []
             try:
                 for n in range(1, self._trials + 1):
-                    trial = self._grade(target.chat([ChatMessage(role="user", content=prompt)]))
+                    trial = self._ask(target, prompt)
+                    declined = trial.declined
                     ctx.record(
                         from_verdict(
                             trial.verdict,
@@ -89,7 +132,9 @@ class OutputSecretsRule(Rule):
                             subject_ref=target.ref,
                             rule_id=self.meta.id,
                             dataset=self.digest(),
+                            tags=() if declined is None else (declined.tag,),
                             trial=n,
+                            reason=None if declined is None else UnmeasuredReason.TARGET_DECLINED,
                         )
                     )
                     trials.append(trial)
@@ -104,7 +149,18 @@ class OutputSecretsRule(Rule):
                 continue
             outcome = case_outcome([t.verdict for t in trials])
             if outcome is not None:
-                yield self._unverified(target.ref, prompt, outcome.verdict)
+                unanswered = any(t.declined is not None for t in trials)
+                yield self._unverified(target.ref, prompt, outcome.verdict, declined=unanswered)
+
+    def _ask(self, target: ChatEndpoint, prompt: str) -> "_Trial":
+        """Send one prompt and scan the reply; a declined request is a trial nothing scanned."""
+        try:
+            reply = target.chat([ChatMessage(role="user", content=prompt)])
+        except RequestDeclined as declined:
+            decline = declined.decline
+            rationale = f"the request was {decline.described}, so nothing was scanned"
+            return _Trial(Verdict("inconclusive", 0.0, rationale, self.meta.id), (), decline)
+        return self._grade(reply)
 
     def _grade(self, reply: str) -> "_Trial":
         """Scan one reply, or refuse to call a blank one clean."""
@@ -166,8 +222,8 @@ class OutputSecretsRule(Rule):
         """Say how many trials were planned when the rule stopped before sending them all."""
         return f" before the rule stopped ({self._trials} planned)" if sent < self._trials else ""
 
-    def _unverified(self, ref: str, prompt: str, verdict: Verdict) -> Finding:
-        """One ungradable probe: the model answered, and the answer was nothing."""
+    def _unverified(self, ref: str, prompt: str, verdict: Verdict, *, declined: bool) -> Finding:
+        """One ungradable probe: the answer was nothing, or the application declined it."""
         summary = "No model reply to inspect for a leaked secret."
         return Finding(
             rule_id=self.meta.id,
@@ -176,16 +232,25 @@ class OutputSecretsRule(Rule):
             taxonomy=self.meta.taxonomy,
             target_ref=ref,
             evidence=Evidence(
-                summary=summary if self._trials == 1 else verdict.rationale,
+                summary=summary if self._trials == 1 and not declined else verdict.rationale,
                 detail=f"prompt={prompt!r}",
             ),
             verdict=verdict,
         )
 
 
+def _replying(reply: str) -> Target:
+    """Build a chat endpoint answering every prompt with `reply`, reaching no host."""
+    return EndpointTarget("http://fixture.invalid", "fixture", transport=ScriptedTransport(reply))
+
+
 @dataclass(frozen=True, slots=True)
 class _Trial:
-    """One reply's grade, and the secret shapes it matched, first match per label."""
+    """One reply's grade, and the secret shapes it matched, first match per label.
+
+    `declined` is the application's decline when no reply came back.
+    """
 
     verdict: Verdict
     leaks: tuple[tuple[str, str], ...]
+    declined: Decline | None = None

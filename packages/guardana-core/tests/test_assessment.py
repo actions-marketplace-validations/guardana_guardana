@@ -5,14 +5,16 @@ the passes, without which no rate has a denominator. Every test here inverts a
 behaviour: remove the guard and the assertion goes green on a lie.
 """
 
+import pytest
 from guardana.core.assessment import (
     Assessment,
     AssessmentStatus,
     Direction,
+    UnmeasuredReason,
     case_id_for,
     from_verdict,
 )
-from guardana.core.evaluator.base import Verdict
+from guardana.core.evaluator.base import Measurement, Verdict
 from guardana.core.gate import GateOutcome, gate_outcome
 from guardana.core.profile.model import FailOn, Policy
 from guardana.core.report import ScanResult
@@ -97,6 +99,7 @@ def test_an_inconclusive_verdict_becomes_an_absent_reading_never_a_failure() -> 
     assert assessment.status is AssessmentStatus.INCONCLUSIVE
     assert assessment.passed is None
     assert assessment.confidence is None
+    assert assessment.reason is UnmeasuredReason.DECLINED
 
 
 def test_a_confident_pass_keeps_its_confidence() -> None:
@@ -107,6 +110,82 @@ def test_a_confident_pass_keeps_its_confidence() -> None:
     assert assessment.status is AssessmentStatus.MEASURED
     assert assessment.passed is True
     assert assessment.confidence == 0.6
+    assert assessment.reason is None
+
+
+@pytest.mark.parametrize("reason", list(UnmeasuredReason))
+def test_a_measured_case_cannot_carry_a_reason_it_went_unmeasured(
+    reason: UnmeasuredReason,
+) -> None:
+    with pytest.raises(ValueError, match="measured"):
+        _assessment(status=AssessmentStatus.MEASURED, passed=True, reason=reason)
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (AssessmentStatus.ERROR, UnmeasuredReason.NOT_RECORDED),
+        (AssessmentStatus.INCONCLUSIVE, UnmeasuredReason.REPLY_ALTERED),
+        (AssessmentStatus.INCONCLUSIVE, UnmeasuredReason.DECLINED),
+        (AssessmentStatus.SKIPPED, None),
+    ],
+)
+def test_an_unmeasured_case_says_why_or_leaves_it_unknown(
+    status: AssessmentStatus, reason: UnmeasuredReason | None
+) -> None:
+    assert _assessment(status=status, reason=reason).reason is reason
+
+
+def test_the_reason_is_not_part_of_what_two_runs_must_agree_on() -> None:
+    # Why one run could not measure a case says nothing about which case it was.
+    declined = _assessment(status=AssessmentStatus.INCONCLUSIVE, reason=UnmeasuredReason.DECLINED)
+    unrecorded = _assessment(status=AssessmentStatus.ERROR, reason=UnmeasuredReason.NOT_RECORDED)
+
+    assert declined.comparable_key == unrecorded.comparable_key
+
+
+_CHARS = Measurement(812.0, "chars", Direction.LOWER_IS_BETTER, 4000.0)
+
+
+def test_a_graded_verdict_hands_its_measurement_to_the_assessment() -> None:
+    verdict = Verdict("fail", 0.5, "long", "length", _CHARS)
+
+    assessment = from_verdict(verdict, case_id="c", subject_ref="r", rule_id="guardana.x")
+
+    assert assessment.passed is False
+    assert (assessment.value, assessment.unit) == (812.0, "chars")
+    assert assessment.direction is Direction.LOWER_IS_BETTER
+    assert assessment.threshold == 4000.0
+
+
+def test_an_inconclusive_verdict_records_no_measurement() -> None:
+    # A number from a verdict nobody could grade would be averaged as if it were read.
+    verdict = Verdict("inconclusive", 0.0, "no reply", "length", _CHARS)
+
+    assessment = from_verdict(verdict, case_id="c", subject_ref="r", rule_id="guardana.x")
+
+    assert (assessment.value, assessment.unit, assessment.direction, assessment.threshold) == (
+        None,
+        None,
+        None,
+        None,
+    )
+
+
+def test_a_moved_threshold_unit_or_direction_changes_the_comparable_key() -> None:
+    base = _assessment(unit="chars", direction=Direction.LOWER_IS_BETTER, threshold=4000.0)
+    for moved in (
+        _assessment(unit="chars", direction=Direction.LOWER_IS_BETTER, threshold=2000.0),
+        _assessment(unit="tokens", direction=Direction.LOWER_IS_BETTER, threshold=4000.0),
+        _assessment(unit="chars", direction=Direction.HIGHER_IS_BETTER, threshold=4000.0),
+    ):
+        assert moved.comparable_key != base.comparable_key
+    assert (
+        _assessment(
+            unit="chars", direction=Direction.LOWER_IS_BETTER, threshold=4000.0, value=1.0
+        ).comparable_key
+        == base.comparable_key
+    )
 
 
 def test_a_case_id_is_stable_and_changes_with_the_case() -> None:

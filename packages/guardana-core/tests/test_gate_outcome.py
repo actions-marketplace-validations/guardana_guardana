@@ -6,8 +6,9 @@ a truncated run and a clean one end up looking alike to everything downstream â€
 the exit code, the manifest, and the comparison against last week.
 """
 
+import pytest
 from guardana.core.evaluator.base import Verdict
-from guardana.core.gate import GateOutcome, gate_outcome
+from guardana.core.gate import GateOutcome, exit_code_for, gate_outcome
 from guardana.core.profile import FailOn, Policy
 from guardana.core.report import Evidence, Finding, ScanResult, StopReason
 from guardana.core.report.check_error import CheckError
@@ -146,3 +147,23 @@ def test_merging_results_carries_the_stop_reason_from_either_side() -> None:
 
 def test_merging_clean_results_records_no_stop() -> None:
     assert ScanResult.merged([_result(), _result()]).stopped_by is None
+
+
+def test_a_run_its_target_stopped_is_indeterminate_and_exits_4() -> None:
+    result = _result(findings=(_finding(),), stopped_by=StopReason.TARGET_UNAVAILABLE)
+
+    assert gate_outcome(result, Policy()) is GateOutcome.INDETERMINATE
+    assert exit_code_for(GateOutcome.FAIL, StopReason.TARGET_UNAVAILABLE) == 4
+
+
+@pytest.mark.parametrize("order", [(0, 1), (1, 0)], ids=["budget first", "target first"])
+def test_merging_prefers_the_target_stop_over_the_budget_stop(order: tuple[int, int]) -> None:
+    """A larger budget would not have let a run whose target went away finish."""
+    stops = (
+        _result(stopped_by=StopReason.BUDGET_EXHAUSTED),
+        _result(stopped_by=StopReason.TARGET_UNAVAILABLE),
+    )
+
+    merged = ScanResult.merged([_result(), *(stops[i] for i in order)])
+
+    assert merged.stopped_by is StopReason.TARGET_UNAVAILABLE

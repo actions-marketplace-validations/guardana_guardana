@@ -45,8 +45,8 @@ jobs:
       contents: read
       security-events: write   # required to upload SARIF
     steps:
-      - uses: actions/checkout@v4
-      - uses: guardana/guardana@v0.27   # moving tag; pins to the latest 0.27.x
+      - uses: actions/checkout@v7
+      - uses: guardana/guardana@v1.0   # moving tag; pins to the latest 1.0.x
         with:
           path: .
           # args: --preset ci --baseline guardana-baseline.yaml
@@ -58,25 +58,38 @@ Inputs (all optional):
 |---|---|---|
 | `path` | `.` | Directory or single file to scan |
 | `args` | *(none)* | Extra `guardana scan` args (e.g. `--preset ci`, `--baseline guardana-baseline.yaml`) |
-| `version` | *(latest)* | Pin a `guardana-cli` version |
+| `version` | the CLI this Action tag was released with | The `guardana-cli` version to run; `latest` takes the newest release |
 | `sarif-file` | `guardana.sarif` | Where the SARIF is written |
 | `upload-sarif` | `true` | Upload to GitHub code scanning |
-| `fail-on-findings` | `true` | Fail the job when the gate trips |
+| `fail-on-findings` | `true` | Fail the job when the gate trips (exit `1`); accepts only `true` or `false`, otherwise the step fails |
 
-The SARIF is uploaded even when the gate fails, so alerts always land; set
-`fail-on-findings: false` to run it purely advisory.
+A separate install step fails the job if the CLI cannot be installed. The scan writes SARIF through `--output` and refuses a destination it reads or cannot create; exit `0` or `1` counts only with a SARIF file this scan writes, so `--help`, a snapshot mode or an unwritable SARIF path does not pass. The SARIF is uploaded even when the gate fails, so alerts always land; set
+`fail-on-findings: false` to make findings advisory. That input waives exit `1`
+and nothing else: a scan that did not finish — any other non-zero
+[exit code](exit-codes.md), such as `3` for a path that does not exist or `4` for
+a target it could not reach — fails the job whatever `fail-on-findings` says,
+because a scan that did not answer is not a clean result.
 
 ## Failing a build on deterioration, not just on findings
 
 The Action gates on what a scan finds *today*. To gate on whether today is worse
-than the last accepted run, save both runs and compare them:
+than the last accepted run, save both runs and compare them. These steps run the
+published image, so they need no separate install step. They run it as the runner's
+user: the image's default user cannot write to a checkout it does not own:
 
 ```yaml
+      - uses: actions/checkout@v7
+
       - name: Scan and save this run
-        run: guardana scan . --format json --output current.json
+        # exit 1 is a finding the comparison will judge; 2 and above still stop the job
+        run: >
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work" ghcr.io/guardana/guardana:1.0
+          scan /work --format json --output /work/current.json || test $? -eq 1
 
       - name: Compare against the last accepted run
-        run: guardana diff accepted.json current.json --preset ci
+        run: >
+          docker run --rm --user "$(id -u):$(id -g)" -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0
+          diff /work/accepted.json /work/current.json --preset ci
 ```
 
 Keep `accepted.json` in the repository (or in your CI's artifact store) and
@@ -92,7 +105,7 @@ copied. The shortest form, which is also what the Jenkins and Azure templates
 run:
 
 ```bash
-docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:0.27 \
+docker run --rm -v "$PWD:/work:ro" ghcr.io/guardana/guardana:1.0 \
   scan /work --format junit > guardana-junit.xml
 ```
 
@@ -106,7 +119,7 @@ GitLab can include the job rather than copy it:
 
 ```yaml
 include:
-  - remote: "https://raw.githubusercontent.com/guardana/guardana/v0.27/deploy/ci/gitlab-ci.yml"
+  - remote: "https://raw.githubusercontent.com/guardana/guardana/v1.0/deploy/ci/gitlab-ci.yml"
 
 guardana:
   variables:
